@@ -1,7 +1,7 @@
 Package: bsmanage
 Title: Biosecurity Management Resource Allocation and Incursion Scenario 
     Analysis
-Version: 0.1.9
+Version: 0.1.0
 Authors@R: c(person("Sean", "Haythorne", 
                     email = "sean.haythorne@unimelb.edu.au", 
                     role = c("aut", "cre")))
@@ -19,6 +19,9 @@ Imports:
     igraph (>= 1.2.8),
     raster (>= 3.5.2),
     terra (>= 1.6.47)
+Remotes:
+    cebra-analytics/bsspread,
+    cebra-analytics/bsdesign
 Suggests:
     knitr,
     rmarkdown,
