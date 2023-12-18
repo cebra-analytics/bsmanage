@@ -1,2 +1,2 @@
 # bsmanage
-Biosecurity Management Resource Allocation and Incursion Scenario Analysis
+Biosecurity Management Resource Allocation and Scenario Analysis
