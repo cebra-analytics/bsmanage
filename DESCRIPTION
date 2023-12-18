@@ -26,3 +26,6 @@ Suggests:
     knitr,
     rmarkdown,
     testthat
+Collate: 
+    'Results.R'
+    'Simulator.R'
