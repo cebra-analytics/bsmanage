@@ -1,12 +1,11 @@
 Package: bsmanage
-Title: Biosecurity Management Resource Allocation and Incursion Scenario 
-    Analysis
+Title: Biosecurity Management Resource Allocation and Scenario Analysis
 Version: 0.1.0
 Authors@R: c(person("Sean", "Haythorne", 
                     email = "sean.haythorne@unimelb.edu.au", 
                     role = c("aut", "cre")))
-Description: Biosecurity Management Resource Allocation and Incursion Scenario 
-    Analysis ...
+Description: Biosecurity Management Resource Allocation and Scenario Analysis 
+    ...
 Depends: R (>= 4.0)
 License: GPL-3
 URL: https://github.com/cebra-analytics/bsmanage
