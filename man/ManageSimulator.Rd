@@ -19,6 +19,7 @@ ManageSimulator(
   initializer = NULL,
   population_model = NULL,
   dispersal_models = list(),
+  impacts = list(),
   user_function = NULL,
   ...
 )
@@ -39,6 +40,7 @@ ManageSimulator(
   initializer = NULL,
   population_model = NULL,
   dispersal_models = list(),
+  impacts = list(),
   user_function = NULL,
   ...
 )
@@ -83,6 +85,11 @@ the incursion management simulations.}
 \item{dispersal_models}{A list of \code{bsspread::Dispersal} or inherited
 class objects defining the dispersal functionality for the different
 spread vectors to be simulated.}
+
+\item{impacts}{A list of \code{ManageImpacts} class objects specifying how
+to calculate various impacts of the simulated population at each time
+step. Each impact object encapsulates a \code{bsimpact::ImpactAnalysis} or
+inherited class object.}
 
 \item{user_function}{An optional user-defined \code{function(n)} that is
 applied to the population vector or matrix \code{n} (returning a

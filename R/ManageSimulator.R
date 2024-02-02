@@ -34,6 +34,10 @@
 #' @param dispersal_models A list of \code{bsspread::Dispersal} or inherited
 #'   class objects defining the dispersal functionality for the different
 #'   spread vectors to be simulated.
+#' @param impacts A list of \code{ManageImpacts} class objects specifying how
+#'   to calculate various impacts of the simulated population at each time
+#'   step. Each impact object encapsulates a \code{bsimpact::ImpactAnalysis} or
+#'   inherited class object.
 #' @param user_function An optional user-defined \code{function(n)} that is
 #'   applied to the population vector or matrix \code{n} (returning a
 #'   transformed \code{n}) prior to collating the results at each simulation
@@ -73,6 +77,7 @@ ManageSimulator <- function(region,
                             initializer = NULL,
                             population_model = NULL,
                             dispersal_models = list(),
+                            impacts = list(),
                             user_function = NULL, ...) {
   UseMethod("ManageSimulator")
 }
@@ -104,6 +109,7 @@ ManageSimulator.Region <- function(region,
                                    initializer = NULL,
                                    population_model = NULL,
                                    dispersal_models = list(),
+                                   impacts = list(),
                                    user_function = NULL, ...) {
 
   # Create a bsspread::Simulator class structure (includes validation)
@@ -119,6 +125,13 @@ ManageSimulator.Region <- function(region,
                               population_model = population_model,
                               dispersal_models = dispersal_models,
                               user_function = user_function, ...)
+
+  # Check impact objects
+  if (length(impacts) &&
+      !all(unlist(lapply(impacts, inherits, "ManageImpacts")))) {
+    impacts <<- list()
+    stop("Impacts must be a list of 'ManageImpacts' objects.", call. = FALSE)
+  }
 
   # Extend (override) run simulator function
   results <- NULL # DEBUG ####
@@ -192,6 +205,14 @@ ManageSimulator.Region <- function(region,
 
           # Unpack population array from separated list
           n <- dispersal_models[[1]]$unpack(n)
+        }
+
+        # Calculate impacts
+        if (length(impacts)) {
+          impact_list <- list()
+          for (i in 1:length(impacts)) {
+            impact_list[[i]] <- impacts[[i]]$calculate(n)
+          }
         }
 
         # User-defined function

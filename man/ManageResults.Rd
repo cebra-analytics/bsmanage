@@ -65,9 +65,10 @@ A \code{Results} class object (list) containing functions for
 calculating and collating results, as well as accessing lists of results
 and the simulation parameters used to produce them:
 \describe{
-\item{\code{collate(r, tm, n)}}{Collate the results at simulation
-replicate \code{r} and time step \code{tm} using the current vector or
-array \code{n} representing the population at each location.}
+\item{\code{collate(r, tm, n, impacts)}}{Collate the results at
+simulation replicate \code{r} and time step \code{tm} using the
+current vector or array \code{n} representing the population at each
+location, as well as calculated impacts.}
 \item{\code{finalize()}}{Finalize the results collation (summary
 calculations).}
 \item{\code{as_list()}}{Return the results as a list (collated, total,
