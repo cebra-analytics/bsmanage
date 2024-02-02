@@ -1,4 +1,4 @@
-#' Results class builder
+#' Manage results class builder
 #'
 #' Builds a class for encapsulating, calculating, and collating incursion
 #' management simulation results, including the population at each location at
@@ -63,25 +63,25 @@
 #'   fruit flies. \emph{Ecological Modelling}, 227, 93–108.
 #'   \doi{10.1016/j.ecolmodel.2011.11.026}
 #' @export
-Results <- function(region, population_model,
-                    time_steps = 1,
-                    step_duration = 1,
-                    step_units = "years",
-                    collation_steps = 1,
-                    replicates = 1,
-                    combine_stages = NULL, ...) {
-  UseMethod("Results")
+ManageResults <- function(region, population_model,
+                          time_steps = 1,
+                          step_duration = 1,
+                          step_units = "years",
+                          collation_steps = 1,
+                          replicates = 1,
+                          combine_stages = NULL, ...) {
+  UseMethod("ManageResults")
 }
 
-#' @name Results
+#' @name ManageResults
 #' @export
-Results.Region <- function(region, population_model,
-                           time_steps = 1,
-                           step_duration = 1,
-                           step_units = "years",
-                           collation_steps = 1,
-                           replicates = 1,
-                           combine_stages = NULL, ...) {
+ManageResults.Region <- function(region, population_model,
+                                 time_steps = 1,
+                                 step_duration = 1,
+                                 step_units = "years",
+                                 collation_steps = 1,
+                                 replicates = 1,
+                                 combine_stages = NULL, ...) {
 
   # Create a bsspread::Results class structure (includes validation)
   super <- bsspread::Results(region, population_model,

@@ -1,4 +1,4 @@
-#' Simulator class builder
+#' Manage simulator class builder
 #'
 #' Builds a class to configure and run replicate discrete-time incursion
 #' management simulations over a given spatial region using (sub)models for
@@ -39,7 +39,7 @@
 #'   transformed \code{n}) prior to collating the results at each simulation
 #'   time step.
 #' @param ... Additional parameters.
-#' @return A \code{Simulator} class object (list) containing functions for
+#' @return A \code{ManageSimulator} class object (list) containing functions for
 #'   setting objects (in the function environment) and running the simulations:
 #'   \describe{
 #'     \item{\code{set_initializer(object)}}{Set the initializer object.}
@@ -60,51 +60,51 @@
 #'   modelling approach to forecast establishment and spread of Bactrocera
 #'   fruit flies. \emph{Ecological Modelling}, 227, 93–108.
 #'   \doi{10.1016/j.ecolmodel.2011.11.026}
-#' @include Results.R
+#' @include ManageResults.R
 #' @export
-Simulator <- function(region,
-                      time_steps = 1,
-                      step_duration = 1,
-                      step_units = "years",
-                      collation_steps = 1,
-                      replicates = 1,
-                      result_stages = NULL,
-                      parallel_cores = NULL,
-                      initializer = NULL,
-                      population_model = NULL,
-                      dispersal_models = list(),
-                      user_function = NULL, ...) {
-  UseMethod("Simulator")
+ManageSimulator <- function(region,
+                            time_steps = 1,
+                            step_duration = 1,
+                            step_units = "years",
+                            collation_steps = 1,
+                            replicates = 1,
+                            result_stages = NULL,
+                            parallel_cores = NULL,
+                            initializer = NULL,
+                            population_model = NULL,
+                            dispersal_models = list(),
+                            user_function = NULL, ...) {
+  UseMethod("ManageSimulator")
 }
 
-#' @name Simulator
+#' @name ManageSimulator
 #' @export
-Simulator.Raster <- function(region, ...) {
+ManageSimulator.Raster <- function(region, ...) {
   # Call Region class version
-  Simulator(bsspread::Region(region), ...)
+  ManageSimulator(bsspread::Region(region), ...)
 }
 
-#' @name Simulator
+#' @name ManageSimulator
 #' @export
-Simulator.SpatRaster <- function(region, ...) {
+ManageSimulator.SpatRaster <- function(region, ...) {
   # Call Region class version
-  Simulator(bsspread::Region(region), ...)
+  ManageSimulator(bsspread::Region(region), ...)
 }
 
-#' @name Simulator
+#' @name ManageSimulator
 #' @export
-Simulator.Region <- function(region,
-                             time_steps = 1,
-                             step_duration = 1,
-                             step_units = "years",
-                             collation_steps = 1,
-                             replicates = 1,
-                             result_stages = NULL,
-                             parallel_cores = NULL,
-                             initializer = NULL,
-                             population_model = NULL,
-                             dispersal_models = list(),
-                             user_function = NULL, ...) {
+ManageSimulator.Region <- function(region,
+                                   time_steps = 1,
+                                   step_duration = 1,
+                                   step_units = "years",
+                                   collation_steps = 1,
+                                   replicates = 1,
+                                   result_stages = NULL,
+                                   parallel_cores = NULL,
+                                   initializer = NULL,
+                                   population_model = NULL,
+                                   dispersal_models = list(),
+                                   user_function = NULL, ...) {
 
   # Create a bsspread::Simulator class structure (includes validation)
   self <- bsspread::Simulator(region,
@@ -137,13 +137,13 @@ Simulator.Region <- function(region,
     continued_incursions <- initializer$continued_incursions()
 
     # Results setup
-    results <<- Results(region, population_model, # DEBUG ####
-                        time_steps = time_steps,
-                        step_duration = step_duration,
-                        step_units = step_units,
-                        collation_steps = collation_steps,
-                        replicates = replicates,
-                        combine_stages = result_stages)
+    results <<- ManageResults(region, population_model, # DEBUG ####
+                              time_steps = time_steps,
+                              step_duration = step_duration,
+                              step_units = step_units,
+                              collation_steps = collation_steps,
+                              replicates = replicates,
+                              combine_stages = result_stages)
 
     # Replicates
     for (r in 1:replicates) {
@@ -156,10 +156,10 @@ Simulator.Region <- function(region,
         attr(n, "initial_n") <- n
         attr(n, "diffusion_rate") <-
           unlist(lapply(dispersal_models, function(dm) {
-          if (inherits(dm, "Diffusion")) {
-            dm$get_diffusion_rate()
-          }
-        }))[1] # assume one only
+            if (inherits(dm, "Diffusion")) {
+              dm$get_diffusion_rate()
+            }
+          }))[1] # assume one only
         if (is.numeric(attr(n, "diffusion_rate"))) {
           attr(n, "diffusion_radius") <- 0
         }

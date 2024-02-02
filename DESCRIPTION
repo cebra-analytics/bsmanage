@@ -20,11 +20,13 @@ Imports:
     terra (>= 1.6.47)
 Remotes:
     cebra-analytics/bsspread,
-    cebra-analytics/bsdesign
+    cebra-analytics/bsdesign,
+    cebra-analytics/bsimpact
 Suggests:
     knitr,
     rmarkdown,
     testthat
 Collate: 
-    'Results.R'
-    'Simulator.R'
+    'ManageImpacts.R'
+    'ManageResults.R'
+    'ManageSimulator.R'
