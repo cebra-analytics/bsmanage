@@ -28,6 +28,8 @@ test_that("initializes with impacts, populations and impact stages", {
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
                                                 impact_stages = 2:3))
   expect_is(manage_impacts, "ManageImpacts")
+  expect_is(manage_impacts$get_context(), "Context")
+  expect_true(manage_impacts$includes_combined())
 })
 
 test_that("calculates impacts including combined", {
@@ -63,7 +65,7 @@ test_that("calculates impacts including combined", {
   names(expected_impacts) <- context$get_impact_scope()
   expected_impacts$combined <-
     expected_impacts$aspect1 + expected_impacts$aspect2
-  expect_silent(impact_list <- manage_impacts$calculate(n))
-  expect_named(impact_list, c("aspect1", "aspect2", "combined"))
-  expect_equal(impact_list, expected_impacts)
+  expect_silent(calc_impacts <- manage_impacts$calculate(n))
+  expect_named(calc_impacts, c("aspect1", "aspect2", "combined"))
+  expect_equal(calc_impacts, expected_impacts)
 })

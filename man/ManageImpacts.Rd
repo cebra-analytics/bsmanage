@@ -21,9 +21,12 @@ contribute to impacts. Default is all stages (when set to \code{NULL}).}
 \item{...}{Additional parameters.}
 }
 \value{
-A \code{ManageImpacts} class object (list) containing a function for
-performing impact calculations:
+A \code{ManageImpacts} class object (list) containing functions for
+getting the impact context and performing impact calculations:
 \describe{
+\item{\code{get_context()}}{Get \code{bsimpact::Context} object.}
+\item{\code{includes_combined()}}{Logical indicator for when impacts are
+combined.}
 \item{\code{calculate(n)}}{Perform impact calculations resulting from
 incursion population vector or matrix \code{n}, and return a list
 of impact values, including combined impacts when applicable.}

@@ -12,9 +12,12 @@
 #' @param impact_stages Numeric vector of population stages (indices) that
 #'   contribute to impacts. Default is all stages (when set to \code{NULL}).
 #' @param ... Additional parameters.
-#' @return A \code{ManageImpacts} class object (list) containing a function for
-#'   performing impact calculations:
+#' @return A \code{ManageImpacts} class object (list) containing functions for
+#'   getting the impact context and performing impact calculations:
 #'   \describe{
+#'     \item{\code{get_context()}}{Get \code{bsimpact::Context} object.}
+#'     \item{\code{includes_combined()}}{Logical indicator for when impacts are
+#'       combined.}
 #'     \item{\code{calculate(n)}}{Perform impact calculations resulting from
 #'       incursion population vector or matrix \code{n}, and return a list
 #'       of impact values, including combined impacts when applicable.}
@@ -53,6 +56,16 @@ ManageImpacts <- function(impacts, population_model,
 
   # Create a class structure
   self <- structure(list(), class = "ManageImpacts")
+
+  # Get context
+  self$get_context <- function() {
+    return(impacts$get_context())
+  }
+
+  # Impacts combined?
+  self$includes_combined <- function() {
+    return("combined_impacts" %in% names(impacts))
+  }
 
   # Calculate impacts
   self$calculate <- function(n) {

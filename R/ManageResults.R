@@ -14,6 +14,9 @@
 #' @param population_model A \code{bsspread::Population} or inherited class
 #'   object defining the population representation and growth functionality for
 #'   the incursion management simulations.
+#' @param impacts A list of \code{ManageImpacts} class objects specifying
+#'   various impacts of the simulated population. Each impact object
+#'   encapsulates a \code{bsimpact::ImpactAnalysis} or inherited class object.
 #' @param time_steps The number of discrete time steps to simulate. Default is
 #'   1.
 #' @param step_duration The duration of the simulation time steps in units
@@ -33,10 +36,10 @@
 #'   calculating and collating results, as well as accessing lists of results
 #'   and the simulation parameters used to produce them:
 #'   \describe{
-#'     \item{\code{collate(r, tm, n, impacts)}}{Collate the results at
+#'     \item{\code{collate(r, tm, n, calc_impacts)}}{Collate the results at
 #'       simulation replicate \code{r} and time step \code{tm} using the
 #'       current vector or array \code{n} representing the population at each
-#'       location, as well as calculated impacts.}
+#'       location, as well as calculated impacts (list).}
 #'     \item{\code{finalize()}}{Finalize the results collation (summary
 #'       calculations).}
 #'     \item{\code{as_list()}}{Return the results as a list (collated, total,
@@ -65,6 +68,7 @@
 #'   \doi{10.1016/j.ecolmodel.2011.11.026}
 #' @export
 ManageResults <- function(region, population_model,
+                          impacts = list(),
                           time_steps = 1,
                           step_duration = 1,
                           step_units = "years",
@@ -77,6 +81,7 @@ ManageResults <- function(region, population_model,
 #' @name ManageResults
 #' @export
 ManageResults.Region <- function(region, population_model,
+                                 impacts = list(),
                                  time_steps = 1,
                                  step_duration = 1,
                                  step_units = "years",
@@ -98,19 +103,114 @@ ManageResults.Region <- function(region, population_model,
 
   # Initialize additional incursion management result lists
   results <- list()
-  # TODO
+  if (length(impacts) > 0 || FALSE) { # TODO others
+    zeros <- list(collated = rep(0L, region$get_locations()), total = 0L)
+    if (replicates > 1) { # summaries
+      zeros$collated <- list(mean = zeros$collated, sd = zeros$collated)
+      zeros$total <- list(mean = zeros$total, sd = zeros$total)
+    }
+    zeros$collated_steps <- list()
+    for (tm in as.character(c(0, seq(collation_steps, time_steps,
+                                     by = collation_steps)))) {
+      zeros$collated_steps[[tm]] <- zeros$collated
+    }
+    zeros$total_steps <- list()
+    for (tm in as.character(0:time_steps)) {
+      zeros$total_steps[[tm]] <- zeros$total
+    }
+  }
+  if (length(impacts) > 0) {
+    results$impacts <- lapply(impacts, function(impacts_i) {
+      impact_aspects <- list()
+      for (a in impacts_i$get_context()$get_impact_scope()) {
+        impact_aspects[[a]] <- zeros$collated_steps
+      }
+      if (impacts_i$includes_combined()) {
+        impact_aspects$combined <- zeros$collated_steps
+      }
+      if (impacts_i$get_context()$get_valuation_type() == "monetary") {
+        impact_aspects$total <- zeros$total_steps
+      }
+      impact_aspects
+    })
+  }
+  rm(zeros)
 
   # Create a class structure
   self <- structure(list(), class = "Results")
 
   # Extended collate results
-  self$collate <- function(r, tm, n, impacts) {
+  self$collate <- function(r, tm, n, calc_impacts) {
 
     # Collate population spread results
     super$collate(r, tm, n)
 
-    # Collate additional incursion management results
-    # TODO
+    # Use character list index (allows initial time = 0 and collated times)
+    tmc <- as.character(tm)
+
+    # Collate impacts
+    if (length(impacts) > 0) {
+
+      if (replicates > 1) { # summaries
+
+        # Calculates running mean and standard deviation (note: variance*r is
+        # stored as SD and transformed at the final replicate and time step)
+
+        # Place calculated impacts in existing results structure
+        for (i in 1:length(calc_impacts)) {
+
+          # All calculated impact aspects recorded in collation steps only
+          if (tm %% collation_steps == 0) {
+            for (a in names(calc_impacts[[i]])) {
+              previous_mean <- results$impacts[[i]][[a]][[tmc]]$mean
+              results$impacts[[i]][[a]][[tmc]]$mean <<-
+                previous_mean + (calc_impacts[[i]][[a]] - previous_mean)/r
+              previous_sd <- results$impacts[[i]][[a]][[tmc]]$sd
+              results$impacts[[i]][[a]][[tmc]]$sd <<-
+                (previous_sd + ((calc_impacts[[i]][[a]] - previous_mean)*
+                                  (calc_impacts[[i]][[a]] -
+                                     results$impacts[[i]][[a]][[tmc]]$mean)))
+            }
+          }
+
+          # Total combined aspects at every time step
+          if ("combined" %in% names(calc_impacts[[i]]) &&
+              "total" %in% names(results$impacts[[i]])) {
+            previous_mean <- results$impacts[[i]]$total[[tmc]]$mean
+            total_impact <- sum(calc_impacts[[i]]$combined)
+            results$impacts[[i]]$total[[tmc]]$mean <<-
+              previous_mean + (total_impact - previous_mean)/r
+            previous_sd <- results$impacts[[i]]$total[[tmc]]$sd
+            results$impacts[[i]]$total[[tmc]]$sd <<-
+              (previous_sd + ((total_impact - previous_mean)*
+                                (total_impact -
+                                   results$impacts[[i]]$total[[tmc]]$mean)))
+          }
+        }
+
+      } else {
+
+        # Place calculated impacts in existing results structure
+        for (i in 1:length(calc_impacts)) {
+
+          # All calculated impact aspects recorded in collation steps only
+          if (tm %% collation_steps == 0) {
+            for (a in names(calc_impacts[[i]])) {
+              results$impacts[[i]][[a]][[tmc]] <- calc_impacts[[i]][[a]]
+            }
+          }
+
+          # Total combined aspects at every time step
+          if ("combined" %in% names(calc_impacts[[i]]) &&
+              "total" %in% names(results$impacts[[i]])) {
+            results$impacts[[i]]$total[[tmc]] <-
+              sum(calc_impacts[[i]]$combined)
+          }
+        }
+      }
+
+      # TODO collate others
+    }
   }
 
   # Extended finalize the results collation
@@ -119,18 +219,34 @@ ManageResults.Region <- function(region, population_model,
     # Finalize population spread results
     super$finalize()
 
-    # Finalize additional incursion management results
-    # TODO
+    if (replicates > 1) { # summaries
+
+      # Finalize impact results
+      if (length(impacts) > 0) {
+
+        # Transform impact standard deviations
+        for (i in 1:length(calc_impacts)) {
+          for (a in names(calc_impacts[[i]])) {
+            for (tmc in names(results$impacts[[i]][[a]])) {
+              results$impacts[[i]][[a]][[tmc]]$sd <<-
+                sqrt(results$impacts[[i]][[a]][[tmc]]$sd/(replicates - 1))
+            }
+          }
+          for (tmc in names(results$impacts[[i]]$total)) {
+            results$impacts[[i]]$total[[tmc]]$sd <<-
+              sqrt(results$impacts[[i]]$total[[tmc]]$sd/(replicates - 1))
+          }
+        }
+      }
+
+      # Finalize additional incursion management results
+      # TODO others
+    }
   }
 
   # Get results list
   self$get_list <- function() {
     return(c(super$get_list(), results))
-  }
-
-  # Get simulation parameters
-  self$get_params  <- function() {
-    return(super$get_params(), list())
   }
 
   # Save collated results as raster files

@@ -8,6 +8,7 @@
 ManageResults(
   region,
   population_model,
+  impacts = list(),
   time_steps = 1,
   step_duration = 1,
   step_units = "years",
@@ -20,6 +21,7 @@ ManageResults(
 \method{ManageResults}{Region}(
   region,
   population_model,
+  impacts = list(),
   time_steps = 1,
   step_duration = 1,
   step_units = "years",
@@ -37,6 +39,10 @@ simulations.}
 \item{population_model}{A \code{bsspread::Population} or inherited class
 object defining the population representation and growth functionality for
 the incursion management simulations.}
+
+\item{impacts}{A list of \code{ManageImpacts} class objects specifying
+various impacts of the simulated population. Each impact object
+encapsulates a \code{bsimpact::ImpactAnalysis} or inherited class object.}
 
 \item{time_steps}{The number of discrete time steps to simulate. Default is
 1.}
@@ -65,10 +71,10 @@ A \code{Results} class object (list) containing functions for
 calculating and collating results, as well as accessing lists of results
 and the simulation parameters used to produce them:
 \describe{
-\item{\code{collate(r, tm, n, impacts)}}{Collate the results at
+\item{\code{collate(r, tm, n, calc_impacts)}}{Collate the results at
 simulation replicate \code{r} and time step \code{tm} using the
 current vector or array \code{n} representing the population at each
-location, as well as calculated impacts.}
+location, as well as calculated impacts (list).}
 \item{\code{finalize()}}{Finalize the results collation (summary
 calculations).}
 \item{\code{as_list()}}{Return the results as a list (collated, total,

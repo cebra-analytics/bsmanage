@@ -129,7 +129,6 @@ ManageSimulator.Region <- function(region,
   # Check impact objects
   if (length(impacts) &&
       !all(unlist(lapply(impacts, inherits, "ManageImpacts")))) {
-    impacts <<- list()
     stop("Impacts must be a list of 'ManageImpacts' objects.", call. = FALSE)
   }
 
@@ -151,6 +150,7 @@ ManageSimulator.Region <- function(region,
 
     # Results setup
     results <<- ManageResults(region, population_model, # DEBUG ####
+                              impacts = impacts,
                               time_steps = time_steps,
                               step_duration = step_duration,
                               step_units = step_units,
@@ -178,8 +178,16 @@ ManageSimulator.Region <- function(region,
         }
       }
 
+      # Calculate impacts
+      if (length(impacts)) {
+        calc_impacts <- list()
+        for (i in 1:length(impacts)) {
+          calc_impacts[[i]] <- impacts[[i]]$calculate(n)
+        }
+      }
+
       # Initial results (t = 0)
-      results$collate(r, 0, n)
+      results$collate(r, 0, n, calc_impacts)
 
       # Time steps
       for (tm in 1:time_steps) {
@@ -209,10 +217,9 @@ ManageSimulator.Region <- function(region,
 
         # Calculate impacts
         if (length(impacts)) {
-          impact_list <- list()
-          for (i in 1:length(impacts)) {
-            impact_list[[i]] <- impacts[[i]]$calculate(n)
-          }
+          calc_impacts <- lapply(impacts, function(impacts_i) {
+            impacts_i$calculate(n)
+          })
         }
 
         # User-defined function
@@ -221,7 +228,7 @@ ManageSimulator.Region <- function(region,
         }
 
         # Collate results
-        results$collate(r, tm, n)
+        results$collate(r, tm, n, calc_impacts)
 
         # Continued incursions
         if (is.function(continued_incursions)) {
