@@ -41,6 +41,7 @@ test_that("calculates impacts including combined", {
                                impact_scope = c("aspect1", "aspect2"))
   incursion <- bsimpact::Incursion(template*0, region, type = "density",
                                    multiplier = 0.2)
+  aspects <- list(aspect1 = "aspect1", aspect2 = "aspect2")
   impact_layers <- list(aspect1 = 100*(template > 0.1 & template < 0.3),
                         aspect2 = 200*(template > 0.2 & template < 0.4))
   loss_rates <- c(aspect1 = 0.3, aspect2 = 0.4)
@@ -58,11 +59,10 @@ test_that("calculates impacts including combined", {
   n <- initializer$initialize()
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
                                                 impact_stages = 2:3))
-  expected_impacts <- lapply(context$get_impact_scope(), function(l) {
+  expected_impacts <- lapply(aspects, function(l) {
     (rowSums(n[,2:3])*impact_layers[[l]][region$get_indices()][,1]*0.2*
        loss_rates[l])
   })
-  names(expected_impacts) <- context$get_impact_scope()
   expected_impacts$combined <-
     expected_impacts$aspect1 + expected_impacts$aspect2
   expect_silent(calc_impacts <- manage_impacts$calculate(n))

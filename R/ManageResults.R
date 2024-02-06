@@ -89,35 +89,46 @@ ManageResults.Region <- function(region, population_model,
                                  replicates = 1,
                                  combine_stages = NULL, ...) {
 
-  # Create a bsspread::Results class structure (includes validation)
-  super <- bsspread::Results(region, population_model,
-                             time_steps = time_steps,
-                             step_duration = step_duration,
-                             step_units = step_units,
-                             collation_steps = collation_steps,
-                             replicates = replicates,
-                             combine_stages = combine_stages, ...)
+  # Inherit a bsspread::Results class structure (includes validation)
+  self <- bsspread::Results(region, population_model,
+                            time_steps = time_steps,
+                            step_duration = step_duration,
+                            step_units = step_units,
+                            collation_steps = collation_steps,
+                            replicates = replicates,
+                            combine_stages = combine_stages,
+                            class = "ManageResults", ...)
+
+  # List of inherited functions to be extended
+  super <- list(collate = self$collate, finalize = self$finalize,
+                get_list = self$get_list, save_csv = self$save_csv,
+                save_plots = self$save_plots)
+
+  # Validate impact objects
+  if (length(impacts) > 0 && (!is.list(impacts) ||
+      !all(sapply(impacts, function(i) inherits(i, "ManageImpacts"))))) {
+    stop(paste("Impacts must be a list of 'ManageImpacts' or inherited class",
+               "objects."), call. = FALSE)
+  }
 
   # Population stages (NULL or number of stages)
-  stages <- population_model$get_stages()
+  stages <- population_model$get_stages() # TODO - needed?
 
   # Initialize additional incursion management result lists
   results <- list()
-  if (length(impacts) > 0 || FALSE) { # TODO others
-    zeros <- list(collated = rep(0L, region$get_locations()), total = 0L)
-    if (replicates > 1) { # summaries
-      zeros$collated <- list(mean = zeros$collated, sd = zeros$collated)
-      zeros$total <- list(mean = zeros$total, sd = zeros$total)
-    }
-    zeros$collated_steps <- list()
-    for (tm in as.character(c(0, seq(collation_steps, time_steps,
-                                     by = collation_steps)))) {
-      zeros$collated_steps[[tm]] <- zeros$collated
-    }
-    zeros$total_steps <- list()
-    for (tm in as.character(0:time_steps)) {
-      zeros$total_steps[[tm]] <- zeros$total
-    }
+  zeros <- list(collated = rep(0L, region$get_locations()), total = 0L)
+  if (replicates > 1) { # summaries
+    zeros$collated <- list(mean = zeros$collated, sd = zeros$collated)
+    zeros$total <- list(mean = zeros$total, sd = zeros$total)
+  }
+  zeros$collated_steps <- list()
+  for (tm in as.character(c(0, seq(collation_steps, time_steps,
+                                   by = collation_steps)))) {
+    zeros$collated_steps[[tm]] <- zeros$collated
+  }
+  zeros$total_steps <- list()
+  for (tm in as.character(0:time_steps)) {
+    zeros$total_steps[[tm]] <- zeros$total
   }
   if (length(impacts) > 0) {
     results$impacts <- lapply(impacts, function(impacts_i) {
@@ -135,9 +146,6 @@ ManageResults.Region <- function(region, population_model,
     })
   }
   rm(zeros)
-
-  # Create a class structure
-  self <- structure(list(), class = "Results")
 
   # Extended collate results
   self$collate <- function(r, tm, n, calc_impacts) {
@@ -196,14 +204,14 @@ ManageResults.Region <- function(region, population_model,
           # All calculated impact aspects recorded in collation steps only
           if (tm %% collation_steps == 0) {
             for (a in names(calc_impacts[[i]])) {
-              results$impacts[[i]][[a]][[tmc]] <- calc_impacts[[i]][[a]]
+              results$impacts[[i]][[a]][[tmc]] <<- calc_impacts[[i]][[a]]
             }
           }
 
           # Total combined aspects at every time step
           if ("combined" %in% names(calc_impacts[[i]]) &&
               "total" %in% names(results$impacts[[i]])) {
-            results$impacts[[i]]$total[[tmc]] <-
+            results$impacts[[i]]$total[[tmc]] <<-
               sum(calc_impacts[[i]]$combined)
           }
         }
@@ -225,16 +233,12 @@ ManageResults.Region <- function(region, population_model,
       if (length(impacts) > 0) {
 
         # Transform impact standard deviations
-        for (i in 1:length(calc_impacts)) {
-          for (a in names(calc_impacts[[i]])) {
+        for (i in 1:length(results$impacts)) {
+          for (a in names(results$impacts[[i]])) {
             for (tmc in names(results$impacts[[i]][[a]])) {
               results$impacts[[i]][[a]][[tmc]]$sd <<-
                 sqrt(results$impacts[[i]][[a]][[tmc]]$sd/(replicates - 1))
             }
-          }
-          for (tmc in names(results$impacts[[i]]$total)) {
-            results$impacts[[i]]$total[[tmc]]$sd <<-
-              sqrt(results$impacts[[i]]$total[[tmc]]$sd/(replicates - 1))
           }
         }
       }
