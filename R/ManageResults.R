@@ -258,9 +258,58 @@ ManageResults.Region <- function(region, population_model,
     self$save_rasters  <- function(...) {
 
       # Save population spread results
-      super$save_rasters()
+      super$save_rasters(...)
 
-      # Save additional incursion management results
+      # Replicate summaries or single replicate
+      if (replicates > 1) {
+        summaries <- c("mean", "sd")
+      } else {
+        summaries <- ""
+      }
+
+      # Save impacts
+      if (length(impacts) > 0) {
+
+        # Save rasters for each impact aspect at each time step
+        if (!is.null(names(results$impacts))) {
+          impact_i <- names(results$impacts)    # named impacts
+        } else {
+          impact_i <- 1:length(results$impacts) # indices
+        }
+        for (i in impact_i) {
+          aspects <- names(results$impacts[[i]])
+          for (a in aspects[which(aspects != "total")]) {
+            for (tmc in names(results$impacts[[i]][[a]])) {
+              for (s in summaries) {
+
+                # Copy impacts into a raster
+                if (replicates > 1) {
+                  output_rast <-
+                    region$get_rast(results$impacts[[i]][[a]][[tmc]][[s]])
+                  s <- paste0("_", s)
+                } else {
+                  output_rast <-
+                    region$get_rast(results$impacts[[i]][[a]][[tmc]])
+                }
+
+                # Write raster to file
+                if (length(impact_i) == 1 && is.numeric(i)) {
+                  ic <- ""
+                } else {
+                  ic <- paste0("_", i)
+                }
+                filename <- sprintf(
+                  paste0("impacts%s_%s_t%0", nchar(as.character(time_steps)),
+                         "d%s.tif"),
+                  ic, a, as.integer(tmc), s)
+                terra::writeRaster(output_rast, filename, ...)
+              }
+            }
+          }
+        }
+      }
+
+      # Save others
       # TODO
     }
   }
@@ -271,7 +320,63 @@ ManageResults.Region <- function(region, population_model,
     # Save population spread results
     super$save_csv()
 
-    # Save additional incursion management results
+    # Replicate summaries or single replicate
+    if (replicates > 1) {
+      summaries <- c("mean", "sd")
+    } else {
+      summaries <- ""
+    }
+
+    # Save impacts
+    if (length(impacts) > 0) {
+
+      # Collated results for patch only
+      if (region$get_type() == "patch") {
+
+        # Save rasters for each impact aspect at each time step
+        # results_o = results; results = get("results", envir = environment(results_o$get_list))
+        if (!is.null(names(results$impacts))) {
+          impact_i <- names(results$impacts)    # named impacts
+        } else {
+          impact_i <- 1:length(results$impacts) # indices
+        }
+        for (i in impact_i) {
+          aspects <- names(results$impacts[[i]])
+          for (a in aspects[which(aspects != "total")]) {
+            for (tmc in names(results$impacts[[i]][[a]])) {
+              for (s in summaries) {
+
+                # TODO
+
+                # # Copy impacts into a raster
+                # if (replicates > 1) {
+                #   output_rast <-
+                #     region$get_rast(results$impacts[[i]][[a]][[tmc]][[s]])
+                #   s <- paste0("_", s)
+                # } else {
+                #   output_rast <-
+                #     region$get_rast(results$impacts[[i]][[a]][[tmc]])
+                # }
+                #
+                # # Write raster to file
+                # if (length(impact_i) == 1 && is.numeric(i)) {
+                #   ic <- ""
+                # } else {
+                #   ic <- paste0("_", i)
+                # }
+                # filename <- sprintf(
+                #   paste0("impacts%s_%s_t%0", nchar(as.character(time_steps)),
+                #          "d%s.tif"),
+                #   ic, a, as.integer(tmc), s)
+                # terra::writeRaster(output_rast, filename, ...)
+              }
+            }
+          }
+        }
+      }
+    }
+
+    # Save others
     # TODO
   }
 
