@@ -101,8 +101,8 @@ ManageResults.Region <- function(region, population_model,
 
   # List of inherited functions to be extended
   super <- list(collate = self$collate, finalize = self$finalize,
-                get_list = self$get_list, save_csv = self$save_csv,
-                save_plots = self$save_plots)
+                get_list = self$get_list, save_rasters = self$save_rasters,
+                save_csv = self$save_csv, save_plots = self$save_plots)
 
   # Validate impact objects
   if (length(impacts) > 0 && (!is.list(impacts) ||
@@ -445,7 +445,59 @@ ManageResults.Region <- function(region, population_model,
     # Save population spread results
     super$save_plots()
 
-    # Save impact totals when present
+    # All plots have time steps on x-axis
+    plot_x_label <- paste0("Time steps (", step_units, ")")
+
+    # Plot impact totals when present
+    if (length(impacts) > 0) {
+      totals_present <- sapply(results$impacts, function(i) is.list(i$total))
+      if (any(totals_present)) {
+
+        # Plots for each impact present
+        if (!is.null(names(results$impacts))) {
+          impact_i <- names(results$impacts)    # named impacts
+        } else {
+          impact_i <- 1:length(results$impacts) # indices
+        }
+        for (i in impact_i[totals_present]) {
+
+          # Plot impact totals at each time step
+          if (length(impact_i) == 1 && is.numeric(i)) {
+            ic <- c("", "")
+          } else {
+            ic <- c(paste0("_", i), paste0(" : ", i))
+          }
+          units <- impacts[[i]]$get_context()$get_impact_measures()
+          totals <- sapply(results$impacts[[i]]$total, function(tot) tot)
+          if (replicates > 1) { # plot summary mean +/- 2 SD
+            totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
+                           sd = as.numeric(totals["sd",,drop = FALSE]))
+            grDevices::png(filename = sprintf("impact_totals%s.png", ic[1]))
+            graphics::plot(0:time_steps, totals$mean, type = "l",
+                           main = sprintf("Total impacts%s (mean +/- 2 SD)",
+                                          ic[2]),
+                           xlab = plot_x_label,
+                           ylab = sprintf("Impact (%s)", units),
+                           ylim = c(0, 1.1*max(totals$mean + 2*totals$sd)))
+            graphics::lines(0:time_steps, totals$mean + 2*totals$sd,
+                            lty = "dashed")
+            graphics::lines(0:time_steps,
+                            pmax(0, totals$mean - 2*totals$sd),
+                            lty = "dashed")
+            invisible(grDevices::dev.off())
+          } else {
+            grDevices::png(filename = sprintf("impact_totals%s.png", ic[1]))
+            graphics::plot(0:time_steps, totals, type = "l",
+                           main = sprintf("Total impacts%s", ic[2]),
+                           xlab = plot_x_label,
+                           ylab = sprintf("Impact (%s)", units),
+                           ylim = c(0, 1.1*max(totals)))
+            invisible(grDevices::dev.off())
+          }
+        }
+      }
+    }
+
     # results_o = results; results = get("results", envir = environment(results_o$get_list))
     # TODO
 
