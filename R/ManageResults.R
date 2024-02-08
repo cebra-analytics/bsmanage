@@ -327,51 +327,110 @@ ManageResults.Region <- function(region, population_model,
       summaries <- ""
     }
 
+    # Location coordinates and labels
+    if (region$get_type() == "patch") {
+      coords <- region$get_coords(extra_cols = TRUE)
+      coords <- coords[, c("lon", "lat",
+                           names(which(sapply(coords, is.character))))]
+    }
+
     # Save impacts
     if (length(impacts) > 0) {
+
+      # Save CSV files for each impact
+      if (!is.null(names(results$impacts))) {
+        impact_i <- names(results$impacts)    # named impacts
+      } else {
+        impact_i <- 1:length(results$impacts) # indices
+      }
 
       # Collated results for patch only
       if (region$get_type() == "patch") {
 
-        # Save rasters for each impact aspect at each time step
-        # results_o = results; results = get("results", envir = environment(results_o$get_list))
-        if (!is.null(names(results$impacts))) {
-          impact_i <- names(results$impacts)    # named impacts
-        } else {
-          impact_i <- 1:length(results$impacts) # indices
-        }
+        # Combine coordinates and impacts
+        output_df <- list()
         for (i in impact_i) {
+          output_df[[i]] <- list()
           aspects <- names(results$impacts[[i]])
           for (a in aspects[which(aspects != "total")]) {
             for (tmc in names(results$impacts[[i]][[a]])) {
-              for (s in summaries) {
-
-                # TODO
-
-                # # Copy impacts into a raster
-                # if (replicates > 1) {
-                #   output_rast <-
-                #     region$get_rast(results$impacts[[i]][[a]][[tmc]][[s]])
-                #   s <- paste0("_", s)
-                # } else {
-                #   output_rast <-
-                #     region$get_rast(results$impacts[[i]][[a]][[tmc]])
-                # }
-                #
-                # # Write raster to file
-                # if (length(impact_i) == 1 && is.numeric(i)) {
-                #   ic <- ""
-                # } else {
-                #   ic <- paste0("_", i)
-                # }
-                # filename <- sprintf(
-                #   paste0("impacts%s_%s_t%0", nchar(as.character(time_steps)),
-                #          "d%s.tif"),
-                #   ic, a, as.integer(tmc), s)
-                # terra::writeRaster(output_rast, filename, ...)
+              if (replicates > 1) {
+                if (is.null(output_df[[i]][[tmc]])) {
+                  output_df[[i]][[tmc]] <- list()
+                }
+                for (s in summaries) {
+                  if (is.null(output_df[[i]][[tmc]][[s]])) {
+                    output_df[[i]][[tmc]][[s]] <- coords
+                  }
+                  output_df[[i]][[tmc]][[s]][[a]] <-
+                    results$impacts[[i]][[a]][[tmc]][[s]]
+                }
+              } else {
+                if (is.null(output_df[[i]][[tmc]])) {
+                  output_df[[i]][[tmc]] <- coords
+                }
+                output_df[[i]][[tmc]][[a]] <-
+                  results$impacts[[i]][[a]][[tmc]]
               }
             }
           }
+        }
+
+        # Write to CSV files
+        for (i in impact_i) {
+          for (tmc in names(output_df[[i]])) {
+            for (s in summaries) {
+              if (length(impact_i) == 1 && is.numeric(i)) {
+                ic <- ""
+              } else {
+                ic <- paste0("_", i)
+              }
+              if (replicates > 1) {
+                s <- paste0("_", s)
+              }
+              filename <- sprintf(
+                paste0("impacts%s_t%0",
+                       nchar(as.character(time_steps)), "d%s.csv"),
+                ic, as.integer(tmc), s)
+              if (replicates > 1) {
+                utils::write.csv(output_df[[i]][[tmc]][[s]], filename,
+                                 row.names = FALSE)
+              } else {
+                utils::write.csv(output_df[[i]][[tmc]], filename,
+                                 row.names = FALSE)
+              }
+            }
+          }
+        }
+      }
+
+      # Impact totals when present
+      totals_present <- sapply(results$impacts, function(i) is.list(i$total))
+      if (any(totals_present)) {
+        time_steps_labels <- sprintf(
+          paste0("t%0", nchar(as.character(time_steps)), "d"),
+          as.integer(0:time_steps))
+        for (i in impact_i[totals_present]) {
+
+          # Collect totals at each time step
+          if (replicates > 1) {
+            totals <- sapply(results$impacts[[i]]$total, function(tot) tot)
+          } else {
+            totals <- array(sapply(results$impacts[[i]]$total,
+                                   function(tot) tot),
+                            c(1, time_steps + 1))
+          }
+          colnames(totals) <- time_steps_labels
+
+          # Write to CSV file
+          if (length(impact_i) == 1 && is.numeric(i)) {
+            ic <- ""
+          } else {
+            ic <- paste0("_", i)
+          }
+          filename <- sprintf("impact_totals%s.csv", ic)
+          utils::write.csv(totals, filename,
+                           row.names = (length(summaries) > 1))
         }
       }
     }
@@ -386,7 +445,11 @@ ManageResults.Region <- function(region, population_model,
     # Save population spread results
     super$save_plots()
 
-    # Save additional incursion management results
+    # Save impact totals when present
+    # results_o = results; results = get("results", envir = environment(results_o$get_list))
+    # TODO
+
+    # Save others
     # TODO
   }
 
