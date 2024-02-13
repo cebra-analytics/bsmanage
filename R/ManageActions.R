@@ -9,6 +9,8 @@
 #' @param population_model A \code{bsspread::Population} or inherited class
 #'   object defining the population representation for the management
 #'   simulations.
+#' @param type One of \code{"detection"} (default), \code{"control"},
+#'   or \code{"removal"} to indicate the type of management actions applied.
 #' @param apply_stages Numeric vector of population stages (indices) to which
 #'   management actions are applied. Default is all stages (when set to
 #'   \code{NULL}).
@@ -16,6 +18,7 @@
 #' @return A \code{ManageActions} class object (list) containing a function for
 #'   applying simulated management actions:
 #'   \describe{
+#'     \item{\code{get_type()}}{Get the management actions type.}
 #'     \item{\code{apply(n)}}{Apply management actions to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, and return the
@@ -24,6 +27,7 @@
 #'   }
 #' @export
 ManageActions <- function(region, population_model,
+                          type = c("detection", "control", "removal"),
                           apply_stages = NULL,
                           class = character(), ...) {
   UseMethod("ManageActions")
@@ -32,6 +36,7 @@ ManageActions <- function(region, population_model,
 #' @name ManageActions
 #' @export
 ManageActions.Region <- function(region, population_model,
+                                 type = c("detection", "control", "removal"),
                                  apply_stages = NULL,
                                  class = character(), ...) {
 
@@ -61,8 +66,15 @@ ManageActions.Region <- function(region, population_model,
     }
   }
 
+  type <- match.arg(type)
+
   # Create a class structure
   self <- structure(list(), class = c(class, "ManageActions"))
+
+  # Get type
+  self$get_type <- function() {
+    return(type)
+  }
 
   # Generic apply method (overridden in inherited classes)
   self$apply <- function(x) return(x) # no change
