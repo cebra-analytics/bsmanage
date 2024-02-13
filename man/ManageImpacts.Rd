@@ -12,9 +12,8 @@ specifying how environment, social, and/or economic impacts are
 calculated, classified, and/or combined based on asset values,
 classifications, and/or incursion loss rates.}
 
-\item{population_model}{A \code{bsspread::Population} or inherited class
-object defining the population representation for the management
-simulations.}
+\item{population_model}{A \code{Population} or inherited class object
+defining the population representation for the management simulations.}
 
 \item{impact_stages}{Numeric vector of population stages (indices) that
 contribute to impacts. Default is all stages (when set to \code{NULL}).}

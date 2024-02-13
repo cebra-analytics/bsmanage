@@ -26,5 +26,6 @@ test_that("initializes with region, population model and apply stages", {
   manage_actions <- ManageActions(region, population_model,
                                   apply_stages = 2:3) # silent
   expect_is(manage_actions, "ManageActions")
+  expect_equal(manage_actions$get_type(), "detection")
   expect_equal(manage_actions$apply(1:10), 1:10) # returns n
 })
