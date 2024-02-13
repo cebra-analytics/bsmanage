@@ -27,6 +27,7 @@ Suggests:
     rmarkdown,
     testthat
 Collate: 
+    'ManageActions.R'
     'ManageImpacts.R'
     'ManageResults.R'
     'ManageSimulator.R'
