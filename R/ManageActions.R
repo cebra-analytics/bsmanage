@@ -45,7 +45,7 @@ ManageActions.Region <- function(region, population_model,
       !inherits(population_model, "Population")) {
     stop("Population model must be a 'Population' or inherited class object.",
          call. = FALSE)
-  } else if (nrow(as.matrix(population_model$make(0))) !=
+  } else if (population_model$get_region()$get_locations() !=
              region$get_locations()) {
     stop("Population model must be compatible with the region object.",
          call. = FALSE)
