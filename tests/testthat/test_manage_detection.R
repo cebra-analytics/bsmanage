@@ -30,7 +30,6 @@ test_that("initializes with region, population, and surveillance", {
     "Surveillance object must be compatible with the region object.")
   expect_silent(manage_detection <- ManageDetection(
     region, population_model, surveillance, apply_stages = 2:3))
-  class(manage_detection) # "ManageDetection" "ManageActions"
   expect_is(manage_detection, "ManageDetection")
   expect_s3_class(manage_detection, "ManageActions")
   expect_named(manage_detection, c(c("get_type", "apply")))
