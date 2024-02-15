@@ -1,7 +1,7 @@
 #' Manage detection class builder
 #'
 #' Builds a class for simulating the application of management detection or
-#' surveillance.
+#' surveillance resources.
 #'
 #' @param region A \code{bsspread::Region} or inherited class object
 #'   representing the spatial region (template) for the incursion management
@@ -9,6 +9,9 @@
 #' @param population_model A \code{bsspread::Population} or inherited class
 #'   object defining the population representation for the management
 #'   simulations.
+#' @param surveillance A \code{bsdesign::SurveillanceDesign} or inherited class
+#'   object representing the distribution of surveillance resources and their
+#'   detection sensitivities.
 #' @param apply_stages Numeric vector of population stages (indices) to which
 #'   management detection are applied. Default is all stages (when set to
 #'   \code{NULL}).
@@ -25,14 +28,14 @@
 #'       to the newly applied detection/surveillance.}
 #'   }
 #' @export
-ManageDetection <- function(region, population_model,
+ManageDetection <- function(region, population_model, surveillance,
                            apply_stages = NULL, ...) {
   UseMethod("ManageDetection")
 }
 
 #' @name ManageDetection
 #' @export
-ManageDetection.Region <- function(region, population_model,
+ManageDetection.Region <- function(region, population_model, surveillance,
                                   apply_stages = NULL, ...) {
 
   # Build via base class
@@ -41,6 +44,17 @@ ManageDetection.Region <- function(region, population_model,
                         type = "detection",
                         apply_stages = apply_stages,
                         class = "ManageDetection")
+
+  # Check the surveillance object
+  if (!is.null(surveillance) &&
+      !inherits(surveillance, "SurveillanceDesign")) {
+    stop(paste("Surveillance object must be a 'SurveillanceDesign' or",
+               "inherited class object."), call. = FALSE)
+  } else if (surveillance$get_divisions()$get_parts() !=
+             region$get_locations()) {
+    stop("Surveillance object must be compatible with the region object.",
+         call. = FALSE)
+  }
 
   # Detection/surveillance apply method
   self$apply <- function(x) return(x) # TODO

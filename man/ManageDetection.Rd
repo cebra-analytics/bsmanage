@@ -5,9 +5,21 @@
 \alias{ManageDetection.Region}
 \title{Manage detection class builder}
 \usage{
-ManageDetection(region, population_model, apply_stages = NULL, ...)
+ManageDetection(
+  region,
+  population_model,
+  surveillance,
+  apply_stages = NULL,
+  ...
+)
 
-\method{ManageDetection}{Region}(region, population_model, apply_stages = NULL, ...)
+\method{ManageDetection}{Region}(
+  region,
+  population_model,
+  surveillance,
+  apply_stages = NULL,
+  ...
+)
 }
 \arguments{
 \item{region}{A \code{bsspread::Region} or inherited class object
@@ -17,6 +29,10 @@ simulations.}
 \item{population_model}{A \code{bsspread::Population} or inherited class
 object defining the population representation for the management
 simulations.}
+
+\item{surveillance}{A \code{bsdesign::SurveillanceDesign} or inherited class
+object representing the distribution of surveillance resources and their
+detection sensitivities.}
 
 \item{apply_stages}{Numeric vector of population stages (indices) to which
 management detection are applied. Default is all stages (when set to
@@ -39,5 +55,5 @@ to the newly applied detection/surveillance.}
 }
 \description{
 Builds a class for simulating the application of management detection or
-surveillance.
+surveillance resources.
 }

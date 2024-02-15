@@ -23,9 +23,10 @@ test_that("initializes with region, population model and apply stages", {
                                                apply_stages = 3:4),
                paste("Apply stages must be a vector of stage indices",
                      "consistent with the population model."))
-  manage_actions <- ManageActions(region, population_model,
-                                  apply_stages = 2:3) # silent
+  expect_silent(manage_actions <- ManageActions(region, population_model,
+                                                apply_stages = 2:3))
   expect_is(manage_actions, "ManageActions")
+  expect_named(manage_actions, c(c("get_type", "apply")))
   expect_equal(manage_actions$get_type(), "detection")
   expect_equal(manage_actions$apply(1:10), 1:10) # returns n
 })
