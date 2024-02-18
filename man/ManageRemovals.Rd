@@ -5,9 +5,23 @@
 \alias{ManageRemovals.Region}
 \title{Manage removals class builder}
 \usage{
-ManageRemovals(region, population_model, apply_stages = NULL, ...)
+ManageRemovals(
+  region,
+  population_model,
+  removal_pr = 1,
+  radius = NULL,
+  apply_stages = NULL,
+  ...
+)
 
-\method{ManageRemovals}{Region}(region, population_model, apply_stages = NULL, ...)
+\method{ManageRemovals}{Region}(
+  region,
+  population_model,
+  removal_pr = 1,
+  radius = NULL,
+  apply_stages = NULL,
+  ...
+)
 }
 \arguments{
 \item{region}{A \code{bsspread::Region} or inherited class object
@@ -17,6 +31,19 @@ simulations.}
 \item{population_model}{A \code{bsspread::Population} or inherited class
 object defining the population representation for the management
 simulations.}
+
+\item{removal_pr}{A single probability value (0-1), or vector of values for
+each location specified by the \code{region}, to represent the likelihood
+of removal at locations where the invasive species has be detected, as
+indicated via a population attribute when present, else removal is applied
+at all locations. Default is \code{1}, indicating all (detected)
+occurrences are removed.}
+
+\item{radius}{The radius (m) of the removal. Stochastic removal is applied
+to all locations within the specified radius of each location where the
+invasive species has been detected. Default is \code{NULL}, indicating
+that removal is only applied at detected locations (when specified via a
+population attribute).}
 
 \item{apply_stages}{Numeric vector of population stages (indices) to which
 management removals are applied. Default is all stages (when set to
@@ -38,5 +65,5 @@ to the newly applied removals.}
 }
 \description{
 Builds a class for simulating the application of management removals or
-eradication.
+eradication of an invasive species.
 }

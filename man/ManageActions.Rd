@@ -54,6 +54,6 @@ to the newly applied actions.}
 }
 }
 \description{
-Builds a generic class for simulating the application of management actions,
-such as detection, control, and removal.
+Builds a generic class for simulating the application of invasive species
+management actions, such as detection, control, and removal.
 }

@@ -1,7 +1,7 @@
 #' Manage detection class builder
 #'
-#' Builds a class for simulating the application of management detection or
-#' surveillance resources.
+#' Builds a class for simulating the application of detection or surveillance
+#' resources applied in the management of an invasive species.
 #'
 #' @param region A \code{bsspread::Region} or inherited class object
 #'   representing the spatial region (template) for the incursion management

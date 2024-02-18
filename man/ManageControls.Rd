@@ -37,6 +37,6 @@ to the newly applied controls.}
 }
 }
 \description{
-Builds a class for simulating the application of management controls, such
-as suppressing growth, fertility, spread, or establishment.
+Builds a class for simulating the application of invasive species management
+controls, such as suppressing growth, fertility, spread, or establishment.
 }

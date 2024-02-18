@@ -1,7 +1,7 @@
 #' Manage actions class builder
 #'
-#' Builds a generic class for simulating the application of management actions,
-#' such as detection, control, and removal.
+#' Builds a generic class for simulating the application of invasive species
+#' management actions, such as detection, control, and removal.
 #'
 #' @param region A \code{bsspread::Region} or inherited class object
 #'   representing the spatial region (template) for the incursion management

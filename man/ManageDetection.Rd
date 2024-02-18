@@ -54,6 +54,6 @@ to the newly applied detection/surveillance.}
 }
 }
 \description{
-Builds a class for simulating the application of management detection or
-surveillance resources.
+Builds a class for simulating the application of detection or surveillance
+resources applied in the management of an invasive species.
 }
