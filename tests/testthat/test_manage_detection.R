@@ -18,7 +18,7 @@ test_that("initializes with region, population, and surveillance", {
                                 optimal = "none",
                                 exist_sens = template_vect)
   expect_error(manage_detection <- ManageDetection(
-    region, population_model, "surveillance", apply_stages = 2:3),
+    region, population_model, "surveillance", stages = 2:3),
     paste("Surveillance object must be a 'SurveillanceDesign' or inherited",
           "class object."))
   template2 <- template*1
@@ -26,12 +26,13 @@ test_that("initializes with region, population, and surveillance", {
   region2 <- bsspread::Region(template2)
   expect_error(manage_detection <- ManageDetection(
     region2, bsspread::StagedPopulation(region2, stage_matrix), surveillance,
-    apply_stages = 2:3),
+    stages = 2:3),
     "Surveillance object must be compatible with the region object.")
   expect_silent(manage_detection <- ManageDetection(
-    region, population_model, surveillance, apply_stages = 2:3))
+    region, population_model, surveillance, stages = 2:3))
   expect_is(manage_detection, "ManageDetection")
   expect_s3_class(manage_detection, "ManageActions")
-  expect_named(manage_detection, c(c("get_type", "apply")))
+  expect_named(manage_detection, c(c("get_type", "get_stages", "apply")))
   expect_equal(manage_detection$get_type(), "detection")
+  expect_equal(manage_detection$get_stages(), 2:3)
 })

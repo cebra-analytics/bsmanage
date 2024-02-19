@@ -11,7 +11,7 @@
 #'   simulations.
 #' @param type One of \code{"detection"} (default), \code{"control"},
 #'   or \code{"removal"} to indicate the type of management actions applied.
-#' @param apply_stages Numeric vector of population stages (indices) to which
+#' @param stages Numeric vector of population stages (indices) to which
 #'   management actions are applied. Default is all stages (when set to
 #'   \code{NULL}).
 #' @param ... Additional parameters.
@@ -19,6 +19,8 @@
 #'   applying simulated management actions:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the management actions type.}
+#'     \item{\code{get_stages()}}{Get the population stages to which management
+#'       actions are applied.}
 #'     \item{\code{apply(n)}}{Apply management actions to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, and return the
@@ -28,7 +30,7 @@
 #' @export
 ManageActions <- function(region, population_model,
                           type = c("detection", "control", "removal"),
-                          apply_stages = NULL,
+                          stages = NULL,
                           class = character(), ...) {
   UseMethod("ManageActions")
 }
@@ -37,7 +39,7 @@ ManageActions <- function(region, population_model,
 #' @export
 ManageActions.Region <- function(region, population_model,
                                  type = c("detection", "control", "removal"),
-                                 apply_stages = NULL,
+                                 stages = NULL,
                                  class = character(), ...) {
 
   # Check the population model
@@ -55,14 +57,14 @@ ManageActions.Region <- function(region, population_model,
   population_type <- population_model$get_type()
   if (population_type == "presence_only" ||
       population_type == "unstructured") {
-    apply_stages <- 1
+    stages <- 1
   } else if (population_type == "stage_structured") {
-    if (is.null(apply_stages)) {
-      apply_stages <- 1:population_model$get_stages()
-    } else if (!is.numeric(apply_stages) ||
-               !all(apply_stages %in% 1:population_model$get_stages())) {
-      stop("Apply stages must be a vector of stage indices consistent ",
-           "with the population model.", call. = FALSE)
+    if (is.null(stages)) {
+      stages <- 1:population_model$get_stages()
+    } else if (!is.numeric(stages) ||
+               !all(stages %in% 1:population_model$get_stages())) {
+      stop(paste("Stages must be a vector of stage indices consistent with",
+                 "the population model.", call. = FALSE))
     }
   }
 
@@ -74,6 +76,11 @@ ManageActions.Region <- function(region, population_model,
   # Get type
   self$get_type <- function() {
     return(type)
+  }
+
+  # Get stages
+  self$get_stages <- function() {
+    return(stages)
   }
 
   # Generic apply method (overridden in inherited classes)

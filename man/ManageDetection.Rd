@@ -5,21 +5,9 @@
 \alias{ManageDetection.Region}
 \title{Manage detection class builder}
 \usage{
-ManageDetection(
-  region,
-  population_model,
-  surveillance,
-  apply_stages = NULL,
-  ...
-)
+ManageDetection(region, population_model, surveillance, stages = NULL, ...)
 
-\method{ManageDetection}{Region}(
-  region,
-  population_model,
-  surveillance,
-  apply_stages = NULL,
-  ...
-)
+\method{ManageDetection}{Region}(region, population_model, surveillance, stages = NULL, ...)
 }
 \arguments{
 \item{region}{A \code{bsspread::Region} or inherited class object
@@ -34,7 +22,7 @@ simulations.}
 object representing the distribution of surveillance resources and their
 detection sensitivities.}
 
-\item{apply_stages}{Numeric vector of population stages (indices) to which
+\item{stages}{Numeric vector of population stages (indices) to which
 management detection are applied. Default is all stages (when set to
 \code{NULL}).}
 
@@ -46,6 +34,8 @@ for accessing attributes and applying simulated management detection:
 \describe{
 \item{\code{get_type()}}{Get the type of management action
 ("detection").}
+\item{\code{get_stages()}}{Get the population stages to which management
+actions are applied.}
 \item{\code{apply(n)}}{Apply management detection to a simulated
 population vector or matrix \code{n}, potentially with attached
 attributes relating to previously applied actions, and return the

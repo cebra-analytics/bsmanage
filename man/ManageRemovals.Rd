@@ -10,7 +10,7 @@ ManageRemovals(
   population_model,
   removal_pr = 1,
   radius = NULL,
-  apply_stages = NULL,
+  stages = NULL,
   ...
 )
 
@@ -19,7 +19,7 @@ ManageRemovals(
   population_model,
   removal_pr = 1,
   radius = NULL,
-  apply_stages = NULL,
+  stages = NULL,
   ...
 )
 }
@@ -45,7 +45,7 @@ invasive species has been detected. Default is \code{NULL}, indicating
 that removal is only applied at detected locations (when specified via a
 population attribute).}
 
-\item{apply_stages}{Numeric vector of population stages (indices) to which
+\item{stages}{Numeric vector of population stages (indices) to which
 management removals are applied. Default is all stages (when set to
 \code{NULL}).}
 
@@ -56,6 +56,8 @@ A \code{ManageRemovals} class object (list) containing a function
 for accessing attributes and applying simulated management removals:
 \describe{
 \item{\code{get_type()}}{Get the type of management action ("removal").}
+\item{\code{get_stages()}}{Get the population stages to which management
+actions are applied.}
 \item{\code{apply(n)}}{Apply management removals to a simulated
 population vector or matrix \code{n}, potentially with attached
 attributes relating to previously applied actions, and return the

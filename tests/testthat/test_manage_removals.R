@@ -21,9 +21,11 @@ test_that("initializes with region, population, and other parameters", {
   expect_silent(manage_removals <- ManageRemovals(region, population_model))
   expect_silent(manage_removals <- ManageRemovals(region, population_model,
                                                   removal_pr = template_vect,
-                                                  radius = 2000))
+                                                  radius = 2000,
+                                                  stages = 2:3))
   expect_is(manage_removals, "ManageRemovals")
   expect_s3_class(manage_removals, "ManageActions")
-  expect_named(manage_removals, c(c("get_type", "apply")))
+  expect_named(manage_removals, c(c("get_type", "get_stages", "apply")))
   expect_equal(manage_removals$get_type(), "removal")
+  expect_equal(manage_removals$get_stages(), 2:3)
 })

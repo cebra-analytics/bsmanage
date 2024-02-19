@@ -12,7 +12,7 @@
 #' @param surveillance A \code{bsdesign::SurveillanceDesign} or inherited class
 #'   object representing the distribution of surveillance resources and their
 #'   detection sensitivities.
-#' @param apply_stages Numeric vector of population stages (indices) to which
+#' @param stages Numeric vector of population stages (indices) to which
 #'   management detection are applied. Default is all stages (when set to
 #'   \code{NULL}).
 #' @param ... Additional parameters.
@@ -21,6 +21,8 @@
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action
 #'       ("detection").}
+#'     \item{\code{get_stages()}}{Get the population stages to which management
+#'       actions are applied.}
 #'     \item{\code{apply(n)}}{Apply management detection to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, and return the
@@ -29,20 +31,20 @@
 #'   }
 #' @export
 ManageDetection <- function(region, population_model, surveillance,
-                           apply_stages = NULL, ...) {
+                            stages = NULL, ...) {
   UseMethod("ManageDetection")
 }
 
 #' @name ManageDetection
 #' @export
 ManageDetection.Region <- function(region, population_model, surveillance,
-                                  apply_stages = NULL, ...) {
+                                   stages = NULL, ...) {
 
   # Build via base class
   self <- ManageActions(region = region,
                         population_model = population_model,
                         type = "detection",
-                        apply_stages = apply_stages,
+                        stages = stages,
                         class = "ManageDetection")
 
   # Check the surveillance object
@@ -57,7 +59,31 @@ ManageDetection.Region <- function(region, population_model, surveillance,
   }
 
   # Detection/surveillance apply method
-  self$apply <- function(x) return(x) # TODO
+  self$apply <- function(n) {
+
+    # Occupied locations
+    idx <- which(rowSums(as.matrix(n)) > 0)
+
+    # Get detection sensitivity (probability)
+    detect_pr <- surveillance$get_sensitivity()[idx]
+
+    # Sample detections
+    detected <- n*0
+    if (population_model$get_type() == "stage_structured") {
+      for (i in self$get_stages()) {
+        detected[idx,i] <- stats::rbinom(length(idx), size = n[idx,i],
+                                         prob = detect_pr)
+      }
+    } else {
+      detected[idx] <- stats::rbinom(length(idx), size = n[idx],
+                                     prob = detect_pr)
+    }
+
+    # Add detected as an attachment
+    attr(n, "detected") <- detected
+
+    return(n)
+  }
 
   return(self)
 }

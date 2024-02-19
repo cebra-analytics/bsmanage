@@ -20,7 +20,7 @@
 #'   invasive species has been detected. Default is \code{NULL}, indicating
 #'   that removal is only applied at detected locations (when specified via a
 #'   population attribute).
-#' @param apply_stages Numeric vector of population stages (indices) to which
+#' @param stages Numeric vector of population stages (indices) to which
 #'   management removals are applied. Default is all stages (when set to
 #'   \code{NULL}).
 #' @param ... Additional parameters.
@@ -28,6 +28,8 @@
 #'   for accessing attributes and applying simulated management removals:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action ("removal").}
+#'     \item{\code{get_stages()}}{Get the population stages to which management
+#'       actions are applied.}
 #'     \item{\code{apply(n)}}{Apply management removals to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, and return the
@@ -38,7 +40,7 @@
 ManageRemovals <- function(region, population_model,
                            removal_pr = 1,
                            radius = NULL,
-                           apply_stages = NULL, ...) {
+                           stages = NULL, ...) {
   UseMethod("ManageRemovals")
 }
 
@@ -47,13 +49,13 @@ ManageRemovals <- function(region, population_model,
 ManageRemovals.Region <- function(region, population_model,
                                   removal_pr = 1,
                                   radius = NULL,
-                                  apply_stages = NULL, ...) {
+                                  stages = NULL, ...) {
 
   # Build via base class
   self <- ManageActions(region = region,
                         population_model = population_model,
                         type = "removal",
-                        apply_stages = apply_stages,
+                        stages = stages,
                         class = "ManageRemovals")
 
   # Validate removal probability and radius
@@ -66,7 +68,6 @@ ManageRemovals.Region <- function(region, population_model,
   if (!is.null(radius) && (!is.numeric(radius) || radius < 0)) {
     stop("The radius (m) parameter must be numeric and >= 0.", call. = FALSE)
   }
-
 
   # Removal apply method
   self$apply <- function(x) return(x) # TODO

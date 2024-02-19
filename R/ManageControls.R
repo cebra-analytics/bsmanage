@@ -9,7 +9,7 @@
 #' @param population_model A \code{bsspread::Population} or inherited class
 #'   object defining the population representation for the management
 #'   simulations.
-#' @param apply_stages Numeric vector of population stages (indices) to which
+#' @param stages Numeric vector of population stages (indices) to which
 #'   management controls are applied. Default is all stages (when set to
 #'   \code{NULL}).
 #' @param ... Additional parameters.
@@ -17,6 +17,8 @@
 #'   for accessing attributes and applying simulated management controls:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action ("control").}
+#'     \item{\code{get_stages()}}{Get the population stages to which management
+#'       actions are applied.}
 #'     \item{\code{apply(n)}}{Apply management controls to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, and return the
@@ -25,20 +27,20 @@
 #'   }
 #' @export
 ManageControls <- function(region, population_model,
-                           apply_stages = NULL, ...) {
+                           stages = NULL, ...) {
   UseMethod("ManageControls")
 }
 
 #' @name ManageControls
 #' @export
 ManageControls.Region <- function(region, population_model,
-                                  apply_stages = NULL, ...) {
+                                  stages = NULL, ...) {
 
   # Build via base class
   self <- ManageActions(region = region,
                         population_model = population_model,
                         type = "control",
-                        apply_stages = apply_stages,
+                        stages = stages,
                         class = "ManageControls")
 
   # Control apply method

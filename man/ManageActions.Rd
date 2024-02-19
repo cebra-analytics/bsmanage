@@ -9,7 +9,7 @@ ManageActions(
   region,
   population_model,
   type = c("detection", "control", "removal"),
-  apply_stages = NULL,
+  stages = NULL,
   class = character(),
   ...
 )
@@ -18,7 +18,7 @@ ManageActions(
   region,
   population_model,
   type = c("detection", "control", "removal"),
-  apply_stages = NULL,
+  stages = NULL,
   class = character(),
   ...
 )
@@ -35,7 +35,7 @@ simulations.}
 \item{type}{One of \code{"detection"} (default), \code{"control"},
 or \code{"removal"} to indicate the type of management actions applied.}
 
-\item{apply_stages}{Numeric vector of population stages (indices) to which
+\item{stages}{Numeric vector of population stages (indices) to which
 management actions are applied. Default is all stages (when set to
 \code{NULL}).}
 
@@ -46,6 +46,8 @@ A \code{ManageActions} class object (list) containing a function for
 applying simulated management actions:
 \describe{
 \item{\code{get_type()}}{Get the management actions type.}
+\item{\code{get_stages()}}{Get the population stages to which management
+actions are applied.}
 \item{\code{apply(n)}}{Apply management actions to a simulated
 population vector or matrix \code{n}, potentially with attached
 attributes relating to previously applied actions, and return the
