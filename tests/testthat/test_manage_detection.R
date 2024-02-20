@@ -36,3 +36,38 @@ test_that("initializes with region, population, and surveillance", {
   expect_equal(manage_detection$get_type(), "detection")
   expect_equal(manage_detection$get_stages(), 2:3)
 })
+
+test_that("applies stochastic detection to invasive population", {
+  TEST_DIRECTORY <- test_path("test_inputs")
+
+  template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
+  region <- bsspread::Region(template)
+  template[region$get_indices()][5920:5922,] <- c(0.5, 0.75, 1)
+  template_vect <- template[region$get_indices()][,1]
+  stage_matrix <- matrix(c(0.0, 2.0, 5.0,
+                           0.3, 0.0, 0.0,
+                           0.0, 0.6, 0.8),
+                         nrow = 3, ncol = 3, byrow = TRUE)
+  population_model <- bsspread::StagedPopulation(region, stage_matrix)
+  surveillance <-
+    bsdesign::SpatialSurvDesign(context = bsdesign::Context("test"),
+                                divisions = bsdesign::Divisions(template),
+                                establish_pr = template_vect*0,
+                                lambda = 1,
+                                optimal = "none",
+                                exist_sens = template_vect)
+  initial_n <- rep(0, region$get_locations())
+  initial_n[5920:5922] <- (10:12)*5
+  initializer <- bsspread::Initializer(initial_n, region = region,
+                                       population_model = population_model)
+  n <- initializer$initialize()
+  set.seed(1234)
+  expected_detected <- array(c(rep(0, 3),
+                               stats::rbinom(6, size = n[5920:5922, 2:3],
+                                             c(0.5, 0.75, 1))), c(3, 3))
+  expect_silent(manage_detection <- ManageDetection(
+    region, population_model, surveillance, stages = 2:3))
+  set.seed(1234)
+  expect_silent(new_n <- manage_detection$apply(n))
+  expect_equal(attr(new_n, "detected")[5920:5922,], expected_detected)
+})
