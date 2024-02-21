@@ -11,10 +11,14 @@
 #'   simulations.
 #' @param removal_pr A single probability value (0-1), or vector of values for
 #'   each location specified by the \code{region}, to represent the likelihood
-#'   of removal at locations where the invasive species has be detected, as
+#'   of removal at locations where the invasive species has been detected, as
 #'   indicated via a population attribute when present, else removal is applied
 #'   at all locations. Default is \code{1}, indicating all (detected)
 #'   occurrences are removed.
+#' @param detected_only A logical indication of whether or not removal is only
+#'   applied to detected individuals (e.g. via traps). Default is \code{FALSE},
+#'   indicating that removal is applied to all individuals at locations where
+#'   the invasive species has been detected (e.g. via treatment).
 #' @param radius The radius (m) of the removal. Stochastic removal is applied
 #'   to all locations within the specified radius of each location where the
 #'   invasive species has been detected. Default is \code{NULL}, indicating
@@ -39,6 +43,7 @@
 #' @export
 ManageRemovals <- function(region, population_model,
                            removal_pr = 1,
+                           detected_only = FALSE,
                            radius = NULL,
                            stages = NULL, ...) {
   UseMethod("ManageRemovals")
@@ -48,6 +53,7 @@ ManageRemovals <- function(region, population_model,
 #' @export
 ManageRemovals.Region <- function(region, population_model,
                                   removal_pr = 1,
+                                  detected_only = FALSE,
                                   radius = NULL,
                                   stages = NULL, ...) {
 
@@ -69,8 +75,82 @@ ManageRemovals.Region <- function(region, population_model,
     stop("The radius (m) parameter must be numeric and >= 0.", call. = FALSE)
   }
 
+  # Notify if radius is provided when detected only
+  if (is.numeric(radius) && detected_only) {
+    message("Radius is not used when only detected individuals are removed.")
+  }
+
+  # Configure region paths via removal radius
+  if (is.numeric(radius)) {
+    region$configure_paths(max_distance = radius)
+  }
+
   # Removal apply method
-  self$apply <- function(x) return(x) # TODO
+  self$apply <- function(n) {
+
+    # Detection-based removal
+    if ("detected" %in% names(attributes(n))) {
+
+      # Removal locations
+      idx <- which(rowSums(as.matrix(attr(n, "detected"))) > 0)
+
+      # Individuals to which to apply removal
+      if (detected_only) {
+        n_apply <- attr(n, "detected")
+      } else {
+        n_apply <- n
+      }
+
+    } else {
+
+      # Removal locations
+      if (detected_only) {
+        idx <- c() # none detected
+      } else {
+        idx <- which(rowSums(as.matrix(n)) > 0)
+      }
+
+      # Apply to all individuals
+      n_apply <- n
+    }
+
+    # Expand removal locations via radius
+    if ("detected" %in% names(attributes(n)) && is.numeric(radius) &&
+        length(idx) > 0) {
+      region$calculate_paths(idx)
+      idx <- sort(unique(c(idx, unname(unlist(region$get_paths(idx)$idx)))))
+      idx <- idx[which(rowSums(as.matrix(n))[idx] > 0)]
+    }
+
+    # Sample and apply removals
+    removed <- n*0
+    if (length(idx) > 0) {
+      if (population_model$get_type() == "stage_structured") {
+        for (i in self$get_stages()) {
+          removed[idx,i] <- stats::rbinom(length(idx), size = n_apply[idx,i],
+                                          prob = removal_pr[idx])
+          n[idx,i] <- n[idx,i] - removed[idx,i]
+        }
+      } else {
+        removed[idx] <- stats::rbinom(length(idx), size = n_apply[idx],
+                                      prob = removal_pr[idx])
+        if (population_model$get_type() == "presence_only") {
+          n[idx] <- n[idx] & !removed[idx]
+        } else {
+          n[idx] <- n[idx] - removed[idx]
+        }
+      }
+    }
+
+    # Add removed as an attachment
+    if (population_model$get_type() == "presence_only") {
+      attr(n, "removed") <- as.logical(removed)
+    } else {
+      attr(n, "removed") <- removed
+    }
+
+    return(n)
+  }
 
   return(self)
 }

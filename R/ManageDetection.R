@@ -80,7 +80,11 @@ ManageDetection.Region <- function(region, population_model, surveillance,
     }
 
     # Add detected as an attachment
-    attr(n, "detected") <- detected
+    if (population_model$get_type() == "presence_only") {
+      attr(n, "detected") <- as.logical(detected)
+    } else {
+      attr(n, "detected") <- detected
+    }
 
     return(n)
   }

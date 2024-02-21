@@ -9,6 +9,7 @@ ManageRemovals(
   region,
   population_model,
   removal_pr = 1,
+  detected_only = FALSE,
   radius = NULL,
   stages = NULL,
   ...
@@ -18,6 +19,7 @@ ManageRemovals(
   region,
   population_model,
   removal_pr = 1,
+  detected_only = FALSE,
   radius = NULL,
   stages = NULL,
   ...
@@ -34,10 +36,15 @@ simulations.}
 
 \item{removal_pr}{A single probability value (0-1), or vector of values for
 each location specified by the \code{region}, to represent the likelihood
-of removal at locations where the invasive species has be detected, as
+of removal at locations where the invasive species has been detected, as
 indicated via a population attribute when present, else removal is applied
 at all locations. Default is \code{1}, indicating all (detected)
 occurrences are removed.}
+
+\item{detected_only}{A logical indication of whether or not removal is only
+applied to detected individuals (e.g. via traps). Default is \code{FALSE},
+indicating that removal is applied to all individuals at locations where
+the invasive species has been detected (e.g. via treatment).}
 
 \item{radius}{The radius (m) of the removal. Stochastic removal is applied
 to all locations within the specified radius of each location where the
