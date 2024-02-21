@@ -21,6 +21,8 @@
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action
 #'       ("detection").}
+#'     \item{\code{get_surveillance()}}{Get the surveillance design class
+#'       object.}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       actions are applied.}
 #'     \item{\code{apply(n)}}{Apply management detection to a simulated
@@ -56,6 +58,11 @@ ManageDetection.Region <- function(region, population_model, surveillance,
              region$get_locations()) {
     stop("Surveillance object must be compatible with the region object.",
          call. = FALSE)
+  }
+
+  # Get the surveillance object
+  self$get_surveillance <- function() {
+    return(surveillance)
   }
 
   # Detection/surveillance apply method
