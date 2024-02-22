@@ -32,9 +32,10 @@ test_that("initializes with region, population, and surveillance", {
     region, population_model, surveillance, stages = 2:3))
   expect_is(manage_detection, "ManageDetection")
   expect_s3_class(manage_detection, "ManageActions")
-  expect_named(manage_detection, c(c("get_type", "get_stages", "apply",
-                                     "get_surveillance")))
+  expect_named(manage_detection, c(c("get_type", "get_label", "get_stages",
+                                     "apply", "get_surveillance")))
   expect_equal(manage_detection$get_type(), "detection")
+  expect_equal(manage_detection$get_label(), "detected")
   expect_is(manage_detection$get_surveillance(), "SpatialSurvDesign")
   expect_equal(manage_detection$get_stages(), 2:3)
 })

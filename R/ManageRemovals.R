@@ -32,6 +32,8 @@
 #'   for accessing attributes and applying simulated management removals:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action ("removal").}
+#'     \item{\code{get_label()}}{Get the management actions label used in
+#'       simulation results (i.e. "removed").}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       actions are applied.}
 #'     \item{\code{apply(n)}}{Apply management removals to a simulated
@@ -83,6 +85,11 @@ ManageRemovals.Region <- function(region, population_model,
   # Configure region paths via removal radius
   if (is.numeric(radius)) {
     region$configure_paths(max_distance = radius)
+  }
+
+  # Get results label
+  self$get_label <- function() {
+    return("removed")
   }
 
   # Removal apply method

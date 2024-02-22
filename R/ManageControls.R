@@ -17,6 +17,8 @@
 #'   for accessing attributes and applying simulated management controls:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action ("control").}
+#'     \item{\code{get_label()}}{Get the management actions label used in
+#'       simulation results (e.g. "control_growth").}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       actions are applied.}
 #'     \item{\code{apply(n)}}{Apply management controls to a simulated
@@ -42,6 +44,11 @@ ManageControls.Region <- function(region, population_model,
                         type = "control",
                         stages = stages,
                         class = "ManageControls")
+
+  # Get results label
+  self$get_label <- function() { # TODO
+    return("control_")
+  }
 
   # Control apply method
   self$apply <- function(x) return(x) # TODO

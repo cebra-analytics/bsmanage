@@ -26,8 +26,10 @@ test_that("initializes with region, population model and stages", {
   expect_silent(manage_actions <- ManageActions(region, population_model,
                                                 stages = 2:3))
   expect_is(manage_actions, "ManageActions")
-  expect_named(manage_actions, c(c("get_type", "get_stages", "apply")))
+  expect_named(manage_actions, c(c("get_type", "get_label", "get_stages",
+                                   "apply")))
   expect_equal(manage_actions$get_type(), "detection")
+  expect_equal(manage_actions$get_label(), "action")
   expect_equal(manage_actions$get_stages(), 2:3)
   expect_equal(manage_actions$apply(1:10), 1:10) # returns n
 })

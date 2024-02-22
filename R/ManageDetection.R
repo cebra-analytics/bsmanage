@@ -21,6 +21,8 @@
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action
 #'       ("detection").}
+#'     \item{\code{get_label()}}{Get the management actions label used in
+#'       simulation results (i.e. "detected").}
 #'     \item{\code{get_surveillance()}}{Get the surveillance design class
 #'       object.}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
@@ -58,6 +60,11 @@ ManageDetection.Region <- function(region, population_model, surveillance,
              region$get_locations()) {
     stop("Surveillance object must be compatible with the region object.",
          call. = FALSE)
+  }
+
+  # Get results label
+  self$get_label <- function() {
+    return("detected")
   }
 
   # Get the surveillance object

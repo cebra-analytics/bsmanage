@@ -63,6 +63,8 @@ A \code{ManageRemovals} class object (list) containing a function
 for accessing attributes and applying simulated management removals:
 \describe{
 \item{\code{get_type()}}{Get the type of management action ("removal").}
+\item{\code{get_label()}}{Get the management actions label used in
+simulation results (i.e. "removed").}
 \item{\code{get_stages()}}{Get the population stages to which management
 actions are applied.}
 \item{\code{apply(n)}}{Apply management removals to a simulated

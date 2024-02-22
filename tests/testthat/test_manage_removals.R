@@ -31,8 +31,10 @@ test_that("initializes with region, population, and other parameters", {
                                                   stages = 2:3))
   expect_is(manage_removals, "ManageRemovals")
   expect_s3_class(manage_removals, "ManageActions")
-  expect_named(manage_removals, c(c("get_type", "get_stages", "apply")))
+  expect_named(manage_removals, c(c("get_type", "get_label", "get_stages",
+                                    "apply")))
   expect_equal(manage_removals$get_type(), "removal")
+  expect_equal(manage_removals$get_label(), "removed")
   expect_equal(manage_removals$get_stages(), 2:3)
 })
 

@@ -19,6 +19,8 @@
 #'   applying simulated management actions:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the management actions type.}
+#'     \item{\code{get_label()}}{Get the management actions label used in
+#'       simulation results.}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       actions are applied.}
 #'     \item{\code{apply(n)}}{Apply management actions to a simulated
@@ -76,6 +78,11 @@ ManageActions.Region <- function(region, population_model,
   # Get type
   self$get_type <- function() {
     return(type)
+  }
+
+  # Get results label (overridden in inherited classes)
+  self$get_label <- function() {
+    return("action")
   }
 
   # Get stages
