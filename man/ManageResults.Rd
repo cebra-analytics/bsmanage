@@ -9,6 +9,7 @@ ManageResults(
   region,
   population_model,
   impacts = list(),
+  actions = list(),
   time_steps = 1,
   step_duration = 1,
   step_units = "years",
@@ -22,6 +23,7 @@ ManageResults(
   region,
   population_model,
   impacts = list(),
+  actions = list(),
   time_steps = 1,
   step_duration = 1,
   step_units = "years",
@@ -43,6 +45,10 @@ the incursion management simulations.}
 \item{impacts}{A list of \code{ManageImpacts} class objects specifying
 various impacts of the simulated population. Each impact object
 encapsulates a \code{bsimpact::ImpactAnalysis} or inherited class object.}
+
+\item{actions}{A list of \code{ManageActions} or inherited class objects
+specifying simulated management actions, such as detection, control, and
+removal.}
 
 \item{time_steps}{The number of discrete time steps to simulate. Default is
 1.}
@@ -67,7 +73,7 @@ stage indices) of stage-based population results. The default
 \item{...}{Additional parameters.}
 }
 \value{
-A \code{Results} class object (list) containing functions for
+A \code{ManageResults} class object (list) containing functions for
 calculating and collating results, as well as accessing lists of results
 and the simulation parameters used to produce them:
 \describe{

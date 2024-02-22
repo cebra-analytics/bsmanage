@@ -17,6 +17,9 @@
 #' @param impacts A list of \code{ManageImpacts} class objects specifying
 #'   various impacts of the simulated population. Each impact object
 #'   encapsulates a \code{bsimpact::ImpactAnalysis} or inherited class object.
+#' @param actions A list of \code{ManageActions} or inherited class objects
+#'   specifying simulated management actions, such as detection, control, and
+#'   removal.
 #' @param time_steps The number of discrete time steps to simulate. Default is
 #'   1.
 #' @param step_duration The duration of the simulation time steps in units
@@ -32,7 +35,7 @@
 #'   stage indices) of stage-based population results. The default
 #'   (\code{NULL}) maintains results for each stage.
 #' @param ... Additional parameters.
-#' @return A \code{Results} class object (list) containing functions for
+#' @return A \code{ManageResults} class object (list) containing functions for
 #'   calculating and collating results, as well as accessing lists of results
 #'   and the simulation parameters used to produce them:
 #'   \describe{
@@ -69,6 +72,7 @@
 #' @export
 ManageResults <- function(region, population_model,
                           impacts = list(),
+                          actions = list(),
                           time_steps = 1,
                           step_duration = 1,
                           step_units = "years",
@@ -82,6 +86,7 @@ ManageResults <- function(region, population_model,
 #' @export
 ManageResults.Region <- function(region, population_model,
                                  impacts = list(),
+                                 actions = list(),
                                  time_steps = 1,
                                  step_duration = 1,
                                  step_units = "years",
@@ -105,9 +110,18 @@ ManageResults.Region <- function(region, population_model,
                 save_csv = self$save_csv, save_plots = self$save_plots)
 
   # Validate impact objects
-  if (length(impacts) > 0 && (!is.list(impacts) ||
-      !all(sapply(impacts, function(i) inherits(i, "ManageImpacts"))))) {
+  if (length(impacts) > 0 &&
+      (!is.list(impacts) ||
+       !all(sapply(impacts, function(i) inherits(i, "ManageImpacts"))))) {
     stop(paste("Impacts must be a list of 'ManageImpacts' or inherited class",
+               "objects."), call. = FALSE)
+  }
+
+  # Validate action objects
+  if (length(actions) > 0 &&
+      (!is.list(actions) ||
+       !all(sapply(actions, function(i) inherits(i, "ManageActions"))))) {
+    stop(paste("Actions must be a list of 'ManageActions' or inherited class",
                "objects."), call. = FALSE)
   }
 
@@ -143,6 +157,14 @@ ManageResults.Region <- function(region, population_model,
         impact_aspects$total <- zeros$total_steps
       }
       impact_aspects
+    })
+  }
+  if (length(actions) > 0) {
+    results$actions <- lapply(actions, function(actions_i) {
+      actions_list <- list()
+      actions_list[[actions_i$get_label()]] <- zeros$collated_steps
+      actions_list$total <- zeros$total_steps
+      actions_list
     })
   }
   rm(zeros)
@@ -216,8 +238,66 @@ ManageResults.Region <- function(region, population_model,
           }
         }
       }
+    }
 
-      # TODO collate others
+    # Collate management actions
+    if (length(actions) > 0) {
+
+      if (replicates > 1) { # summaries
+
+        # Calculates running mean and standard deviation (note: variance*r is
+        # stored as SD and transformed at the final replicate and time step)
+
+        # Place applied actions in existing results structure
+        for (i in 1:length(actions)) {
+
+          # All applied actions recorded in collation steps only
+          if (tm %% collation_steps == 0) {
+            a <- actions[[i]]$get_label()
+            previous_mean <- results$actions[[i]][[a]][[tmc]]$mean
+
+            # results$actions[[i]][[a]][[tmc]]$mean <<-
+            #   previous_mean + (calc_impacts[[i]][[a]] - previous_mean)/r
+            # previous_sd <- results$actions[[i]][[a]][[tmc]]$sd
+            # results$actions[[i]][[a]][[tmc]]$sd <<-
+            #   (previous_sd + ((calc_impacts[[i]][[a]] - previous_mean)*
+            #                     (calc_impacts[[i]][[a]] -
+            #                        results$impacts[[i]][[a]][[tmc]]$mean)))
+          }
+
+          # Total applied actions at every time step
+          if ("total" %in% names(results$actions[[i]])) {
+            previous_mean <- results$actions[[i]]$total[[tmc]]$mean
+            # total_impact <- sum(calc_impacts[[i]]$combined)
+            # results$impacts[[i]]$total[[tmc]]$mean <<-
+            #   previous_mean + (total_impact - previous_mean)/r
+            # previous_sd <- results$impacts[[i]]$total[[tmc]]$sd
+            # results$impacts[[i]]$total[[tmc]]$sd <<-
+            #   (previous_sd + ((total_impact - previous_mean)*
+            #                     (total_impact -
+            #                        results$impacts[[i]]$total[[tmc]]$mean)))
+          }
+        }
+
+      } else {
+
+        # Place applied actions in existing results structure
+        for (i in 1:length(actions)) {
+
+          # All applied actions recorded in collation steps only
+          if (tm %% collation_steps == 0) {
+            # for (a in names(calc_impacts[[i]])) {
+            #   results$impacts[[i]][[a]][[tmc]] <<- calc_impacts[[i]][[a]]
+            # }
+          }
+
+          # Total combined aspects at every time step
+          if ("total" %in% names(results$actions[[i]])) {
+            # results$impacts[[i]]$total[[tmc]] <<-
+            #   sum(calc_impacts[[i]]$combined)
+          }
+        }
+      }
     }
   }
 

@@ -1,9 +1,10 @@
 context("ManageResults")
 
-test_that("initializes inherited object with impacts", {
+test_that("initializes inherited object with impacts and actions", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
   region <- bsspread::Region(template)
+  template_vect <- template[region$get_indices()][,1]
   pops <- region$get_locations()
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   context <- list(bsimpact::Context("My species",
@@ -26,7 +27,16 @@ test_that("initializes inherited object with impacts", {
       bsimpact::ValueImpacts(context[[2]], region, incursion,
                              impact_layers[3:4], loss_rates = loss_rates[3:4]),
       population_model))
-
+  surveillance <-
+    bsdesign::SpatialSurvDesign(context = bsdesign::Context("test"),
+                                divisions = bsdesign::Divisions(template),
+                                establish_pr = template_vect*0,
+                                lambda = 1,
+                                optimal = "none",
+                                exist_sens = template_vect)
+  actions <- list(
+    a3 = ManageDetection(region, population_model, surveillance),
+    a4 = ManageRemovals(region, population_model))
   expect_silent(results <- ManageResults(region,
                                          population_model = population_model))
   expect_error(results <- ManageResults(region,
@@ -34,10 +44,16 @@ test_that("initializes inherited object with impacts", {
                                         impacts = as.list(1:2)),
                paste("Impacts must be a list of 'ManageImpacts' or inherited",
                      "class objects."))
+  expect_error(results <- ManageResults(region,
+                                        population_model = population_model,
+                                        actions = as.list(1:2)),
+               paste("Actions must be a list of 'ManageActions' or inherited",
+                     "class objects."))
   expect_silent(results <- ManageResults(region,
                                          population_model = population_model,
-                                         impacts = impacts, time_steps = 10,
-                                         collation_steps = 2, replicates = 1))
+                                         impacts = impacts, actions = actions,
+                                         time_steps = 10, collation_steps = 2,
+                                         replicates = 1))
   expect_is(results, "ManageResults")
   expect_s3_class(results, "Results")
   expect_named(results, c("collate", "finalize", "get_list", "get_params",
@@ -48,12 +64,16 @@ test_that("initializes inherited object with impacts", {
                     combine_stages = NULL))
   expect_silent(result_list <- results$get_list())
   expect_named(result_list,
-               c("collated", "total", "area", "occupancy", "impacts"))
+               c("collated", "total", "area", "occupancy", "impacts",
+                 "actions"))
   expect_equal(lapply(result_list$impacts, function(i) lapply(i, length)),
                list(a1 = list(aspect1 = 6, aspect2 = 6, combined = 6,
                               total = 11),
                     a2 = list(aspect3 = 6, aspect4 = 6, combined = 6,
                               total = 11)))
+  expect_equal(lapply(result_list$actions, function(i) lapply(i, length)),
+               list(a3 = list(detected = 6, total = 11),
+                    a4 = list(removed = 6, total = 11)))
   collated <- rep(pops, 6)
   names(collated) <- as.character(seq(0, 10, 2))
   totals <- rep(1, 11)
@@ -64,6 +84,10 @@ test_that("initializes inherited object with impacts", {
                               combined = collated, total = totals),
                     a2 = list(aspect3 = collated, aspect4 = collated,
                               combined = collated, total = totals)))
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i, function(j) sapply(j, length))),
+               list(a3 = list(detected = collated, total = totals),
+                    a4 = list(removed = collated, total = totals)))
 })
 
 test_that("initializes inherited object with impacts", {

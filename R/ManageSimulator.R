@@ -179,8 +179,8 @@ ManageSimulator.Region <- function(region,
       }
 
       # Calculate impacts
+      calc_impacts <- list()
       if (length(impacts)) {
-        calc_impacts <- list()
         for (i in 1:length(impacts)) {
           calc_impacts[[i]] <- impacts[[i]]$calculate(n)
         }
