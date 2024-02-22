@@ -105,7 +105,7 @@ ManageRemovals.Region <- function(region, population_model,
       if (detected_only) {
         n_apply <- attr(n, "detected")
       } else {
-        n_apply <- n
+        n_apply <- as.numeric(n)
       }
 
     } else {
@@ -118,7 +118,7 @@ ManageRemovals.Region <- function(region, population_model,
       }
 
       # Apply to all individuals
-      n_apply <- n
+      n_apply <- as.numeric(n)
     }
 
     # Expand removal locations via radius
@@ -130,7 +130,7 @@ ManageRemovals.Region <- function(region, population_model,
     }
 
     # Sample and apply removals
-    removed <- n*0
+    removed <- as.numeric(n)*0
     if (length(idx) > 0) {
       if (population_model$get_type() == "stage_structured") {
         for (i in self$get_stages()) {

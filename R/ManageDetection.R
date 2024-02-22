@@ -82,7 +82,7 @@ ManageDetection.Region <- function(region, population_model, surveillance,
     detect_pr <- surveillance$get_sensitivity()[idx]
 
     # Sample detections
-    detected <- n*0
+    detected <- as.numeric(n)*0
     if (population_model$get_type() == "stage_structured") {
       for (i in self$get_stages()) {
         detected[idx,i] <- stats::rbinom(length(idx), size = n[idx,i],
