@@ -390,8 +390,47 @@ ManageResults.Region <- function(region, population_model,
         }
       }
 
-      # Save others
-      # TODO
+      # Save actions
+      if (length(actions) > 0) {
+
+        # Save rasters for each impact aspect at each time step
+        if (!is.null(names(results$actions))) {
+          action_i <- names(results$actions)    # named actions
+        } else {
+          action_i <- 1:length(results$actions) # indices
+        }
+        for (i in action_i) {
+          aspects <- names(results$actions[[i]])
+          for (a in aspects[which(aspects != "total")]) {
+            for (tmc in names(results$actions[[i]][[a]])) {
+              for (s in summaries) {
+
+                # Copy actions into a raster
+                if (replicates > 1) {
+                  output_rast <-
+                    region$get_rast(results$actions[[i]][[a]][[tmc]][[s]])
+                  s <- paste0("_", s)
+                } else {
+                  output_rast <-
+                    region$get_rast(results$actions[[i]][[a]][[tmc]])
+                }
+
+                # Write raster to file
+                if (length(action_i) == 1 && is.numeric(i)) {
+                  ic <- ""
+                } else {
+                  ic <- paste0("_", i)
+                }
+                filename <- sprintf(
+                  paste0("actions%s_%s_t%0", nchar(as.character(time_steps)),
+                         "d%s.tif"),
+                  ic, a, as.integer(tmc), s)
+                terra::writeRaster(output_rast, filename, ...)
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -467,19 +506,16 @@ ManageResults.Region <- function(region, population_model,
                 ic <- paste0("_", i)
               }
               if (replicates > 1) {
+                output <- output_df[[i]][[tmc]][[s]]
                 s <- paste0("_", s)
+              } else {
+                output <- output_df[[i]][[tmc]]
               }
               filename <- sprintf(
                 paste0("impacts%s_t%0",
                        nchar(as.character(time_steps)), "d%s.csv"),
                 ic, as.integer(tmc), s)
-              if (replicates > 1) {
-                utils::write.csv(output_df[[i]][[tmc]][[s]], filename,
-                                 row.names = FALSE)
-              } else {
-                utils::write.csv(output_df[[i]][[tmc]], filename,
-                                 row.names = FALSE)
-              }
+              utils::write.csv(output, filename, row.names = FALSE)
             }
           }
         }
@@ -516,8 +552,103 @@ ManageResults.Region <- function(region, population_model,
       }
     }
 
-    # Save others
-    # TODO
+    # Save actions # TODO - multi time steps per file
+    if (length(actions) > 0) {
+
+      # Save CSV files for each action
+      if (!is.null(names(results$actions))) {
+        action_i <- names(results$actions)    # named actions
+      } else {
+        action_i <- 1:length(results$actions) # indices
+      }
+
+      # Collated results for patch only
+      if (region$get_type() == "patch") {
+
+        # Combine coordinates and actions
+        output_df <- list()
+        for (i in action_i) {
+          output_df[[i]] <- list()
+          aspects <- names(results$actions[[i]])
+          for (a in aspects[which(aspects != "total")]) {
+            for (tmc in names(results$actions[[i]][[a]])) {
+              if (replicates > 1) {
+                if (is.null(output_df[[i]][[tmc]])) {
+                  output_df[[i]][[tmc]] <- list()
+                }
+                for (s in summaries) {
+                  if (is.null(output_df[[i]][[tmc]][[s]])) {
+                    output_df[[i]][[tmc]][[s]] <- coords
+                  }
+                  output_df[[i]][[tmc]][[s]][[a]] <-
+                    results$actions[[i]][[a]][[tmc]][[s]]
+                }
+              } else {
+                if (is.null(output_df[[i]][[tmc]])) {
+                  output_df[[i]][[tmc]] <- coords
+                }
+                output_df[[i]][[tmc]][[a]] <-
+                  results$actions[[i]][[a]][[tmc]]
+              }
+            }
+          }
+        }
+
+        # Write to CSV files
+        for (i in action_i) {
+          for (tmc in names(output_df[[i]])) {
+            for (s in summaries) {
+              if (length(action_i) == 1 && is.numeric(i)) {
+                ic <- ""
+              } else {
+                ic <- paste0("_", i)
+              }
+              if (replicates > 1) {
+                output <- output_df[[i]][[tmc]][[s]]
+                s <- paste0("_", s)
+              } else {
+                output <- output_df[[i]][[tmc]]
+              }
+              filename <- sprintf(
+                paste0("actions%s_t%0",
+                       nchar(as.character(time_steps)), "d%s.csv"),
+                ic, as.integer(tmc), s)
+              utils::write.csv(output, filename, row.names = FALSE)
+            }
+          }
+        }
+      }
+
+      # Action totals when present
+      totals_present <- sapply(results$actions, function(i) is.list(i$total))
+      if (any(totals_present)) {
+        time_steps_labels <- sprintf(
+          paste0("t%0", nchar(as.character(time_steps)), "d"),
+          as.integer(0:time_steps))
+        for (i in action_i[totals_present]) {
+
+          # Collect totals at each time step
+          if (replicates > 1) {
+            totals <- sapply(results$actions[[i]]$total, function(tot) tot)
+          } else {
+            totals <- array(sapply(results$actions[[i]]$total,
+                                   function(tot) tot),
+                            c(1, time_steps + 1))
+          }
+          colnames(totals) <- time_steps_labels
+
+          # Write to CSV file
+          if (length(action_i) == 1 && is.numeric(i)) {
+            ic <- ""
+          } else {
+            ic <- paste0("_", i)
+          }
+          filename <- sprintf("action_totals%s.csv", ic)
+          utils::write.csv(totals, filename,
+                           row.names = (length(summaries) > 1))
+        }
+      }
+    }
   }
 
   # Extended save plots as PNG files
