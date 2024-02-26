@@ -90,7 +90,7 @@ test_that("initializes inherited object with impacts and actions", {
                     a4 = list(removed = collated, total = totals)))
 })
 
-test_that("initializes inherited object with impacts", {
+test_that("collates and finalizes impact results", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
   region <- bsspread::Region(template)
@@ -149,17 +149,12 @@ test_that("initializes inherited object with impacts", {
   n[5920:5922] <- 5:7
   calc_impacts[[1]] <- lapply(impacts,
                               function(impacts_i) impacts_i$calculate(n))
-  expect_silent(results$collate(r = 1, tm = 2, n = n, calc_impacts[[1]]))
   n[5920:5922] <- 7:9
   calc_impacts[[2]] <- lapply(impacts,
                               function(impacts_i) impacts_i$calculate(n))
-  expect_silent(results$collate(r = 2, tm = 2, n = n, calc_impacts[[2]]))
   n[5920:5922] <- 8:10
   calc_impacts[[3]] <- lapply(impacts,
                               function(impacts_i) impacts_i$calculate(n))
-  expect_silent(results$collate(r = 3, tm = 2, n = n, calc_impacts[[3]]))
-  expect_silent(results$finalize())
-  expect_silent(result_list <- results$get_list())
   calc_impacts_vals <- lapply(calc_impacts, function(i) {
     lapply(i, function(a) lapply(a, function(v) v[5920:5922]))
   })
@@ -172,6 +167,11 @@ test_that("initializes inherited object with impacts", {
       }
     }
   }
+  expect_silent(results$collate(r = 1, tm = 2, n = n, calc_impacts[[1]]))
+  expect_silent(results$collate(r = 2, tm = 2, n = n, calc_impacts[[2]]))
+  expect_silent(results$collate(r = 3, tm = 2, n = n, calc_impacts[[3]]))
+  expect_silent(results$finalize())
+  expect_silent(result_list <- results$get_list())
   expect_equal(lapply(result_list$impacts, function(i) {
     lapply(i[1:3], function(j) j[["2"]]$mean[5920:5922])
   }), lapply(calc_impacts_r,
@@ -188,4 +188,83 @@ test_that("initializes inherited object with impacts", {
     lapply(i[4], function(j) j[["2"]]$sd)
   }), lapply(calc_impacts_r,
              function(i) list(total = sd(rowSums(i$combined)))))
+})
+
+test_that("collates and finalizes action results", {
+  TEST_DIRECTORY <- test_path("test_inputs")
+  template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
+  region <- bsspread::Region(template)
+  template[region$get_indices()][5916:5922,] <- c(rep(0.5, 4), 0.5, 0.75, 1)
+  template_vect <- template[region$get_indices()][,1]
+  population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
+  n <- rep(0, region$get_locations())
+  n[5920:5922] <- (10:12)*5
+  surveillance <-
+    bsdesign::SpatialSurvDesign(context = bsdesign::Context("test"),
+                                divisions = bsdesign::Divisions(template),
+                                establish_pr = template_vect*0,
+                                lambda = 1,
+                                optimal = "none",
+                                exist_sens = template_vect)
+  actions <- list(
+    a3 = ManageDetection(region, population_model, surveillance),
+    a4 = ManageRemovals(region, population_model, removal_pr = template_vect))
+  n <- actions$a3$apply(n)
+  n <- actions$a4$apply(n)
+  # single replicate
+  expected_collated <- lapply(actions, function(a) {
+    n_a <- attr(n, a$get_label())
+    collated <- list(n_a, total = sum(n_a))
+    names(collated)[1] <- a$get_label()
+    collated
+  })
+  expect_silent(results <- ManageResults(region,
+                                         population_model = population_model,
+                                         actions = actions, time_steps = 4,
+                                         collation_steps = 2, replicates = 1))
+  expect_silent(results$collate(r = 1, tm = 2, n = n))
+  expect_silent(result_list <- results$get_list())
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i, function(j) j[["2"]])),
+               expected_collated)
+  # multiple replicates
+  n_r <- list()
+  n[5920:5922] <- (9:11)*5
+  n <- actions$a3$apply(n); n <- actions$a4$apply(n); n_r[[1]] <- n
+  n[5920:5922] <- (10:12)*5
+  n <- actions$a3$apply(n); n <- actions$a4$apply(n); n_r[[2]] <- n
+  n[5920:5922] <- (11:13)*5
+  n <- actions$a3$apply(n); n <- actions$a4$apply(n); n_r[[3]] <- n
+  collated_r <- lapply(n_r, function(n) lapply(actions, function(a) {
+    n_a <- attr(n, a$get_label())
+    collated <- list(n_a, total = sum(n_a))
+    names(collated)[1] <- a$get_label()
+    collated
+  }))
+  collated_arrays <- collated_r[[1]]
+  for (i in 2:3) {
+    for (j in names(actions)) {
+      for (a in names(collated_r[[i]][[j]])) {
+        collated_arrays[[j]][[a]] <- rbind(collated_arrays[[j]][[a]],
+                                           collated_r[[i]][[j]][[a]])
+      }
+    }
+  }
+  expect_silent(results <- ManageResults(region,
+                                         population_model = population_model,
+                                         actions = actions, time_steps = 4,
+                                         collation_steps = 2, replicates = 3))
+  expect_silent(results$collate(r = 1, tm = 2, n = n_r[[1]]))
+  expect_silent(results$collate(r = 2, tm = 2, n = n_r[[2]]))
+  expect_silent(results$collate(r = 3, tm = 2, n = n_r[[3]]))
+  expect_silent(results$finalize())
+  expect_silent(result_list <- results$get_list())
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i, function(j) j[["2"]]$mean)),
+               lapply(collated_arrays,
+                      function(i) lapply(i, function(a) colMeans(a))))
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i, function(j) j[["2"]]$sd)),
+               lapply(collated_arrays, function(i)
+                 lapply(i, function(a) apply(a, 2, sd))))
 })

@@ -181,13 +181,13 @@ ManageResults.Region <- function(region, population_model,
     # Collate impacts
     if (length(impacts) > 0) {
 
-      if (replicates > 1) { # summaries
+      # Place calculated impacts in existing results structure
+      for (i in 1:length(calc_impacts)) {
 
-        # Calculates running mean and standard deviation (note: variance*r is
-        # stored as SD and transformed at the final replicate and time step)
+        if (replicates > 1) { # summaries
 
-        # Place calculated impacts in existing results structure
-        for (i in 1:length(calc_impacts)) {
+          # Calculates running mean and standard deviation (note: variance*r is
+          # stored as SD and transformed at the final replicate and time step)
 
           # All calculated impact aspects recorded in collation steps only
           if (tm %% collation_steps == 0) {
@@ -216,12 +216,8 @@ ManageResults.Region <- function(region, population_model,
                                 (total_impact -
                                    results$impacts[[i]]$total[[tmc]]$mean)))
           }
-        }
 
-      } else {
-
-        # Place calculated impacts in existing results structure
-        for (i in 1:length(calc_impacts)) {
+        } else {
 
           # All calculated impact aspects recorded in collation steps only
           if (tm %% collation_steps == 0) {
@@ -243,58 +239,52 @@ ManageResults.Region <- function(region, population_model,
     # Collate management actions
     if (length(actions) > 0) {
 
-      if (replicates > 1) { # summaries
+      # Place applied actions in existing results structure
+      for (i in 1:length(actions)) {
 
-        # Calculates running mean and standard deviation (note: variance*r is
-        # stored as SD and transformed at the final replicate and time step)
+        # Get attribute from n
+        a <- actions[[i]]$get_label()
+        n_a <- attr(n, a)
 
-        # Place applied actions in existing results structure
-        for (i in 1:length(actions)) {
+        if (replicates > 1) { # summaries
+
+          # Calculates running mean and standard deviation (note: variance*r is
+          # stored as SD and transformed at the final replicate and time step)
 
           # All applied actions recorded in collation steps only
           if (tm %% collation_steps == 0) {
-            a <- actions[[i]]$get_label()
             previous_mean <- results$actions[[i]][[a]][[tmc]]$mean
-
-            # results$actions[[i]][[a]][[tmc]]$mean <<-
-            #   previous_mean + (calc_impacts[[i]][[a]] - previous_mean)/r
-            # previous_sd <- results$actions[[i]][[a]][[tmc]]$sd
-            # results$actions[[i]][[a]][[tmc]]$sd <<-
-            #   (previous_sd + ((calc_impacts[[i]][[a]] - previous_mean)*
-            #                     (calc_impacts[[i]][[a]] -
-            #                        results$impacts[[i]][[a]][[tmc]]$mean)))
+            results$actions[[i]][[a]][[tmc]]$mean <<-
+              previous_mean + (n_a - previous_mean)/r
+            previous_sd <- results$actions[[i]][[a]][[tmc]]$sd
+            results$actions[[i]][[a]][[tmc]]$sd <<-
+              (previous_sd + ((n_a - previous_mean)*
+                                (n_a - results$actions[[i]][[a]][[tmc]]$mean)))
           }
 
           # Total applied actions at every time step
           if ("total" %in% names(results$actions[[i]])) {
             previous_mean <- results$actions[[i]]$total[[tmc]]$mean
-            # total_impact <- sum(calc_impacts[[i]]$combined)
-            # results$impacts[[i]]$total[[tmc]]$mean <<-
-            #   previous_mean + (total_impact - previous_mean)/r
-            # previous_sd <- results$impacts[[i]]$total[[tmc]]$sd
-            # results$impacts[[i]]$total[[tmc]]$sd <<-
-            #   (previous_sd + ((total_impact - previous_mean)*
-            #                     (total_impact -
-            #                        results$impacts[[i]]$total[[tmc]]$mean)))
+            total <- sum(n_a)
+            results$actions[[i]]$total[[tmc]]$mean <<-
+              previous_mean + (total - previous_mean)/r
+            previous_sd <- results$actions[[i]]$total[[tmc]]$sd
+            results$actions[[i]]$total[[tmc]]$sd <<-
+              (previous_sd + ((total - previous_mean)*
+                                (total -
+                                   results$actions[[i]]$total[[tmc]]$mean)))
           }
-        }
 
-      } else {
-
-        # Place applied actions in existing results structure
-        for (i in 1:length(actions)) {
+        } else {
 
           # All applied actions recorded in collation steps only
           if (tm %% collation_steps == 0) {
-            # for (a in names(calc_impacts[[i]])) {
-            #   results$impacts[[i]][[a]][[tmc]] <<- calc_impacts[[i]][[a]]
-            # }
+            results$actions[[i]][[a]][[tmc]] <<- n_a
           }
 
           # Total combined aspects at every time step
           if ("total" %in% names(results$actions[[i]])) {
-            # results$impacts[[i]]$total[[tmc]] <<-
-            #   sum(calc_impacts[[i]]$combined)
+            results$actions[[i]]$total[[tmc]] <<- sum(n_a)
           }
         }
       }
@@ -323,8 +313,19 @@ ManageResults.Region <- function(region, population_model,
         }
       }
 
-      # Finalize additional incursion management results
-      # TODO others
+      # Finalize action results
+      if (length(actions) > 0) {
+
+        # Transform action standard deviations
+        for (i in 1:length(results$actions)) {
+          for (a in names(results$actions[[i]])) {
+            for (tmc in names(results$actions[[i]][[a]])) {
+              results$actions[[i]][[a]][[tmc]]$sd <<-
+                sqrt(results$actions[[i]][[a]][[tmc]]$sd/(replicates - 1))
+            }
+          }
+        }
+      }
     }
   }
 
