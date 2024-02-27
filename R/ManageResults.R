@@ -473,89 +473,61 @@ ManageResults.Region <- function(region, population_model,
         impact_i <- 1:length(results$impacts) # indices
       }
 
-      # Collated results for patch only
-      if (region$get_type() == "patch") {
+      # Results for each impact
+      for (i in impact_i) {
 
-        # Combine coordinates and impacts
-        output_df <- list()
-        for (i in impact_i) {
-          output_df[[i]] <- list()
+        # Include impact name or numeric index
+        if (length(impact_i) == 1 && is.numeric(i)) {
+          ic <- ""
+        } else {
+          ic <- paste0("_", i)
+        }
+
+        # Collated results for patch only
+        if (region$get_type() == "patch") {
+
+          # Impact aspects
           aspects <- names(results$impacts[[i]])
           for (a in aspects[which(aspects != "total")]) {
-            for (tmc in names(results$impacts[[i]][[a]])) {
-              if (replicates > 1) {
-                if (is.null(output_df[[i]][[tmc]])) {
-                  output_df[[i]][[tmc]] <- list()
-                }
-                for (s in summaries) {
-                  if (is.null(output_df[[i]][[tmc]][[s]])) {
-                    output_df[[i]][[tmc]][[s]] <- coords
-                  }
-                  output_df[[i]][[tmc]][[s]][[a]] <-
-                    results$impacts[[i]][[a]][[tmc]][[s]]
-                }
-              } else {
-                if (is.null(output_df[[i]][[tmc]])) {
-                  output_df[[i]][[tmc]] <- coords
-                }
-                output_df[[i]][[tmc]][[a]] <-
-                  results$impacts[[i]][[a]][[tmc]]
-              }
-            }
-          }
-        }
 
-        # Write to CSV files
-        for (i in impact_i) {
-          for (tmc in names(output_df[[i]])) {
+            # Combine coordinates and collated impact values
+            output_df <- list()
             for (s in summaries) {
-              if (length(impact_i) == 1 && is.numeric(i)) {
-                ic <- ""
-              } else {
-                ic <- paste0("_", i)
-              }
               if (replicates > 1) {
-                output <- output_df[[i]][[tmc]][[s]]
-                s <- paste0("_", s)
+                output_df[[s]] <- lapply(results$impacts[[i]][[a]],
+                                         function(a_tm) a_tm[[s]])
               } else {
-                output <- output_df[[i]][[tmc]]
+                output_df[[s]] <- results$impacts[[i]][[a]]
               }
-              filename <- sprintf(
-                paste0("impacts%s_t%0",
-                       nchar(as.character(time_steps)), "d%s.csv"),
-                ic, as.integer(tmc), s)
-              utils::write.csv(output, filename, row.names = FALSE)
+              names(output_df[[s]]) <- collated_labels
+              output_df[[s]] <- cbind(coords, as.data.frame(output_df[[s]]))
+            }
+
+            # Write to CSV files
+            for (s in summaries) {
+              filename <- sprintf("impacts%s_%s%s.csv", ic, a, s_fname[[s]])
+              utils::write.csv(output_df[[s]], filename, row.names = FALSE)
             }
           }
         }
-      }
 
-      # Impact totals when present
-      totals_present <- sapply(results$impacts, function(i) is.list(i$total))
-      if (any(totals_present)) {
-        time_steps_labels <- sprintf(
-          paste0("t%0", nchar(as.character(time_steps)), "d"),
-          as.integer(0:time_steps))
-        for (i in impact_i[totals_present]) {
+        # Impact totals when present
+        if (is.list(results$impacts[[i]]$total)) {
 
           # Collect totals at each time step
           if (replicates > 1) {
-            totals <- sapply(results$impacts[[i]]$total, function(tot) tot)
+            output_df <- sapply(results$impacts[[i]]$total,
+                                function(tot) tot)
+            colnames(output_df) <- time_steps_labels
           } else {
-            totals <- array(sapply(results$impacts[[i]]$total,
-                                   function(tot) tot),
-                            c(1, time_steps + 1))
+            output_df <- results$impacts[[i]]$total
+            names(output_df) <- time_steps_labels
+            output_df <- as.data.frame(output_df)
           }
-          colnames(totals) <- time_steps_labels
 
           # Write to CSV file
-          if (length(impact_i) == 1 && is.numeric(i)) {
-            ic <- ""
-          } else {
-            ic <- paste0("_", i)
-          }
-          filename <- sprintf("impact_totals%s.csv", ic)
-          utils::write.csv(totals, filename,
+          filename <- sprintf("impacts%s_totals.csv", ic)
+          utils::write.csv(output_df, filename,
                            row.names = (length(summaries) > 1))
         }
       }
