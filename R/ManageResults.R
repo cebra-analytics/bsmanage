@@ -444,8 +444,17 @@ ManageResults.Region <- function(region, population_model,
     if (replicates > 1) {
       summaries <- c("mean", "sd")
     } else {
-      summaries <- ""
+      summaries <- 1
     }
+    s_fname <- list("", mean = "_mean", sd = "_sd")
+
+    # Time step labels
+    time_steps_labels <- sprintf(
+      paste0("t%0", nchar(as.character(time_steps)), "d"),
+      as.integer(0:time_steps))
+    collated_labels <- sprintf(
+      paste0("t%0", nchar(as.character(time_steps)), "d"),
+      c(0, seq(collation_steps, time_steps, by = collation_steps)))
 
     # Location coordinates and labels
     if (region$get_type() == "patch") {
@@ -552,7 +561,7 @@ ManageResults.Region <- function(region, population_model,
       }
     }
 
-    # Save actions # TODO - multi time steps per file
+    # Save actions
     if (length(actions) > 0) {
 
       # Save CSV files for each action
@@ -562,89 +571,61 @@ ManageResults.Region <- function(region, population_model,
         action_i <- 1:length(results$actions) # indices
       }
 
-      # Collated results for patch only
-      if (region$get_type() == "patch") {
+      # Results for each action
+      for (i in action_i) {
 
-        # Combine coordinates and actions
-        output_df <- list()
-        for (i in action_i) {
-          output_df[[i]] <- list()
+        # Include action name or numeric index
+        if (length(action_i) == 1 && is.numeric(i)) {
+          ic <- ""
+        } else {
+          ic <- paste0("_", i)
+        }
+
+        # Collated results for patch only
+        if (region$get_type() == "patch") {
+
+          # Action aspects
           aspects <- names(results$actions[[i]])
           for (a in aspects[which(aspects != "total")]) {
-            for (tmc in names(results$actions[[i]][[a]])) {
-              if (replicates > 1) {
-                if (is.null(output_df[[i]][[tmc]])) {
-                  output_df[[i]][[tmc]] <- list()
-                }
-                for (s in summaries) {
-                  if (is.null(output_df[[i]][[tmc]][[s]])) {
-                    output_df[[i]][[tmc]][[s]] <- coords
-                  }
-                  output_df[[i]][[tmc]][[s]][[a]] <-
-                    results$actions[[i]][[a]][[tmc]][[s]]
-                }
-              } else {
-                if (is.null(output_df[[i]][[tmc]])) {
-                  output_df[[i]][[tmc]] <- coords
-                }
-                output_df[[i]][[tmc]][[a]] <-
-                  results$actions[[i]][[a]][[tmc]]
-              }
-            }
-          }
-        }
 
-        # Write to CSV files
-        for (i in action_i) {
-          for (tmc in names(output_df[[i]])) {
+            # Combine coordinates and collated action values
+            output_df <- list()
             for (s in summaries) {
-              if (length(action_i) == 1 && is.numeric(i)) {
-                ic <- ""
-              } else {
-                ic <- paste0("_", i)
-              }
               if (replicates > 1) {
-                output <- output_df[[i]][[tmc]][[s]]
-                s <- paste0("_", s)
+                output_df[[s]] <- lapply(results$actions[[i]][[a]],
+                                         function(a_tm) a_tm[[s]])
               } else {
-                output <- output_df[[i]][[tmc]]
+                output_df[[s]] <- results$actions[[i]][[a]]
               }
-              filename <- sprintf(
-                paste0("actions%s_t%0",
-                       nchar(as.character(time_steps)), "d%s.csv"),
-                ic, as.integer(tmc), s)
-              utils::write.csv(output, filename, row.names = FALSE)
+              names(output_df[[s]]) <- collated_labels
+              output_df[[s]] <- cbind(coords, as.data.frame(output_df[[s]]))
+            }
+
+            # Write to CSV files
+            for (s in summaries) {
+              filename <- sprintf("actions%s_%s%s.csv", ic, a, s_fname[[s]])
+              utils::write.csv(output_df[[s]], filename, row.names = FALSE)
             }
           }
         }
-      }
 
-      # Action totals when present
-      totals_present <- sapply(results$actions, function(i) is.list(i$total))
-      if (any(totals_present)) {
-        time_steps_labels <- sprintf(
-          paste0("t%0", nchar(as.character(time_steps)), "d"),
-          as.integer(0:time_steps))
-        for (i in action_i[totals_present]) {
+        # Action totals when present
+        if (is.list(results$actions[[i]]$total)) {
 
           # Collect totals at each time step
           if (replicates > 1) {
-            totals <- sapply(results$actions[[i]]$total, function(tot) tot)
+            output_df <- sapply(results$actions[[i]]$total,
+                                function(tot) tot)
+            colnames(output_df) <- time_steps_labels
           } else {
-            totals <- array(sapply(results$actions[[i]]$total,
-                                   function(tot) tot),
-                            c(1, time_steps + 1))
+            output_df <- results$actions[[i]]$total
+            names(output_df) <- time_steps_labels
+            output_df <- as.data.frame(output_df)
           }
-          colnames(totals) <- time_steps_labels
 
           # Write to CSV file
-          if (length(action_i) == 1 && is.numeric(i)) {
-            ic <- ""
-          } else {
-            ic <- paste0("_", i)
-          }
-          filename <- sprintf("action_totals%s.csv", ic)
-          utils::write.csv(totals, filename,
+          filename <- sprintf("actions%s_totals.csv", ic)
+          utils::write.csv(output_df, filename,
                            row.names = (length(summaries) > 1))
         }
       }
