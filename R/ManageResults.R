@@ -663,11 +663,58 @@ ManageResults.Region <- function(region, population_model,
       }
     }
 
-    # results_o = results; results = get("results", envir = environment(results_o$get_list))
-    # TODO
+    # Plot action totals when present
+    if (length(actions) > 0) {
+      totals_present <- sapply(results$actions, function(i) is.list(i$total))
+      if (any(totals_present)) {
 
-    # Save others
-    # TODO
+        # Plots for each action present
+        if (!is.null(names(results$actions))) {
+          action_i <- names(results$actions)    # named actions
+        } else {
+          action_i <- 1:length(results$actions) # indices
+        }
+        for (i in action_i[totals_present]) {
+
+          # Plot action totals at each time step
+          if (length(action_i) == 1 && is.numeric(i)) {
+            ic <- c("", "")
+          } else {
+            ic <- c(paste0("_", i), paste0(" : ", i))
+          }
+          # units <- actions[[i]]$get_context()$get_action_measures()
+          label <- actions[[i]]$get_label()
+          totals <- sapply(results$actions[[i]]$total, function(tot) tot)
+          if (replicates > 1) { # plot summary mean +/- 2 SD
+            totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
+                           sd = as.numeric(totals["sd",,drop = FALSE]))
+            grDevices::png(filename = sprintf("action_total%s_%s.png", ic[1],
+                                              label))
+            graphics::plot(0:time_steps, totals$mean, type = "l",
+                           main = sprintf("Total actions%s %s (mean +/- 2 SD)",
+                                          ic[2], label),
+                           xlab = plot_x_label,
+                           ylab = sprintf("Number %s", label),
+                           ylim = c(0, 1.1*max(totals$mean + 2*totals$sd)))
+            graphics::lines(0:time_steps, totals$mean + 2*totals$sd,
+                            lty = "dashed")
+            graphics::lines(0:time_steps,
+                            pmax(0, totals$mean - 2*totals$sd),
+                            lty = "dashed")
+            invisible(grDevices::dev.off())
+          } else {
+            grDevices::png(filename = sprintf("action_total%s_%s.png", ic[1],
+                                              label))
+            graphics::plot(0:time_steps, totals, type = "l",
+                           main = sprintf("Total action%s %s", ic[2], label),
+                           xlab = plot_x_label,
+                           ylab = sprintf("Number %s", label),
+                           ylim = c(0, 1.1*max(totals)))
+            invisible(grDevices::dev.off())
+          }
+        }
+      }
+    }
   }
 
   return(self)
