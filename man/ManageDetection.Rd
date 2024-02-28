@@ -59,11 +59,12 @@ object.}
 detection are applied.}
 \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 which management detection are applied.}
-\item{\code{apply(n)}}{Apply management detection to a simulated
+\item{\code{apply(n, tm)}}{Apply management detection to a simulated
 population vector or matrix \code{n}, potentially with attached
-attributes relating to previously applied actions, and return the
-resulting population \code{n} along with attached attributes relating
-to the newly applied detection/surveillance.}
+attributes relating to previously applied actions, providing the time
+step \code{tm} is in the \code{schedule}, and return the resulting
+population \code{n} along with attached attributes relating to the
+newly applied detection/surveillance.}
 }
 }
 \description{

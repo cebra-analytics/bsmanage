@@ -40,11 +40,12 @@
 #'       removals are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 #'       which management removals are applied.}
-#'     \item{\code{apply(n)}}{Apply management removals to a simulated
+#'     \item{\code{apply(n, tm)}}{Apply management removals to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
-#'       attributes relating to previously applied actions, and return the
-#'       resulting population \code{n} along with attached attributes relating
-#'       to the newly applied removals.}
+#'       attributes relating to previously applied actions, providing the time
+#'       step \code{tm} is in the \code{schedule}, and return the resulting
+#'       population \code{n} along with attached attributes relating to the
+#'       newly applied removals.}
 #'   }
 #' @export
 ManageRemovals <- function(region, population_model,
@@ -98,71 +99,80 @@ ManageRemovals.Region <- function(region, population_model,
   }
 
   # Removal apply method
-  self$apply <- function(n) {
+  self$apply <- function(n, tm) {
 
-    # Detection-based removal
-    if ("detected" %in% names(attributes(n))) {
+    # Scheduled time step?
+    if (is.null(schedule) || tm %in% schedule) {
 
-      # Removal locations
-      idx <- which(rowSums(as.matrix(attr(n, "detected"))) > 0)
+      # Detection-based removal
+      if ("detected" %in% names(attributes(n))) {
 
-      # Individuals to which to apply removal
-      if (detected_only) {
-        n_apply <- attr(n, "detected")
+        # Removal locations
+        idx <- which(rowSums(as.matrix(attr(n, "detected"))) > 0)
+
+        # Individuals to which to apply removal
+        if (detected_only) {
+          n_apply <- attr(n, "detected")
+        } else {
+          n_apply <- as.numeric(n)
+        }
+
       } else {
+
+        # Removal locations
+        if (detected_only) {
+          idx <- c() # none detected
+        } else {
+          idx <- which(rowSums(as.matrix(n)) > 0)
+        }
+
+        # Apply to all individuals
         n_apply <- as.numeric(n)
       }
 
-    } else {
-
-      # Removal locations
-      if (detected_only) {
-        idx <- c() # none detected
-      } else {
-        idx <- which(rowSums(as.matrix(n)) > 0)
+      # Expand removal locations via radius
+      if ("detected" %in% names(attributes(n)) && is.numeric(radius) &&
+          length(idx) > 0) {
+        region$calculate_paths(idx)
+        idx <- sort(unique(c(idx, unname(unlist(region$get_paths(idx)$idx)))))
+        idx <- idx[which(rowSums(as.matrix(n))[idx] > 0)]
       }
 
-      # Apply to all individuals
-      n_apply <- as.numeric(n)
-    }
-
-    # Expand removal locations via radius
-    if ("detected" %in% names(attributes(n)) && is.numeric(radius) &&
-        length(idx) > 0) {
-      region$calculate_paths(idx)
-      idx <- sort(unique(c(idx, unname(unlist(region$get_paths(idx)$idx)))))
-      idx <- idx[which(rowSums(as.matrix(n))[idx] > 0)]
-    }
-
-    # Sample and apply removals
-    removed <- as.numeric(n)*0
-    if (population_model$get_type() == "stage_structured") {
-      removed <- array(removed, dim(n))
-    }
-    if (length(idx) > 0) {
+      # Sample and apply removals
+      removed <- as.numeric(n)*0
       if (population_model$get_type() == "stage_structured") {
-        n_apply <- array(n_apply, dim(n))
-        for (i in self$get_stages()) {
-          removed[idx,i] <- stats::rbinom(length(idx), size = n_apply[idx,i],
-                                          prob = removal_pr[idx])
-          n[idx,i] <- n[idx,i] - removed[idx,i]
-        }
-      } else {
-        removed[idx] <- stats::rbinom(length(idx), size = n_apply[idx],
-                                      prob = removal_pr[idx])
-        if (population_model$get_type() == "presence_only") {
-          n[idx] <- n[idx] & !removed[idx]
+        removed <- array(removed, dim(n))
+      }
+      if (length(idx) > 0) {
+        if (population_model$get_type() == "stage_structured") {
+          n_apply <- array(n_apply, dim(n))
+          for (i in self$get_stages()) {
+            removed[idx,i] <- stats::rbinom(length(idx), size = n_apply[idx,i],
+                                            prob = removal_pr[idx])
+            n[idx,i] <- n[idx,i] - removed[idx,i]
+          }
         } else {
-          n[idx] <- n[idx] - removed[idx]
+          removed[idx] <- stats::rbinom(length(idx), size = n_apply[idx],
+                                        prob = removal_pr[idx])
+          if (population_model$get_type() == "presence_only") {
+            n[idx] <- n[idx] & !removed[idx]
+          } else {
+            n[idx] <- n[idx] - removed[idx]
+          }
         }
       }
-    }
 
-    # Add removed as an attachment
-    if (population_model$get_type() == "presence_only") {
-      attr(n, "removed") <- as.logical(removed)
+      # Attach removed as an attribute
+      if (population_model$get_type() == "presence_only") {
+        attr(n, "removed") <- as.logical(removed)
+      } else {
+        attr(n, "removed") <- removed
+      }
+
     } else {
-      attr(n, "removed") <- removed
+
+      # Remove removed attribute
+      attr(n, "removed") <- NULL
     }
 
     return(n)

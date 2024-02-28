@@ -74,11 +74,12 @@ simulation results (i.e. "removed").}
 removals are applied.}
 \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 which management removals are applied.}
-\item{\code{apply(n)}}{Apply management removals to a simulated
+\item{\code{apply(n, tm)}}{Apply management removals to a simulated
 population vector or matrix \code{n}, potentially with attached
-attributes relating to previously applied actions, and return the
-resulting population \code{n} along with attached attributes relating
-to the newly applied removals.}
+attributes relating to previously applied actions, providing the time
+step \code{tm} is in the \code{schedule}, and return the resulting
+population \code{n} along with attached attributes relating to the
+newly applied removals.}
 }
 }
 \description{

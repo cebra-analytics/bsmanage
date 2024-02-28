@@ -31,11 +31,12 @@
 #'       detection are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 #'       which management detection are applied.}
-#'     \item{\code{apply(n)}}{Apply management detection to a simulated
+#'     \item{\code{apply(n, tm)}}{Apply management detection to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
-#'       attributes relating to previously applied actions, and return the
-#'       resulting population \code{n} along with attached attributes relating
-#'       to the newly applied detection/surveillance.}
+#'       attributes relating to previously applied actions, providing the time
+#'       step \code{tm} is in the \code{schedule}, and return the resulting
+#'       population \code{n} along with attached attributes relating to the
+#'       newly applied detection/surveillance.}
 #'   }
 #' @export
 ManageDetection <- function(region, population_model, surveillance,
@@ -78,32 +79,41 @@ ManageDetection.Region <- function(region, population_model, surveillance,
   }
 
   # Detection/surveillance apply method
-  self$apply <- function(n) {
+  self$apply <- function(n, tm) {
 
-    # Occupied locations
-    idx <- which(rowSums(as.matrix(n)) > 0)
+    # Scheduled time step?
+    if (is.null(schedule) || tm %in% schedule) {
 
-    # Get detection sensitivity (probability)
-    detect_pr <- surveillance$get_sensitivity()[idx]
+      # Occupied locations
+      idx <- which(rowSums(as.matrix(n)) > 0)
 
-    # Sample detections
-    detected <- as.numeric(n)*0
-    if (population_model$get_type() == "stage_structured") {
-      detected <- array(detected, dim(n))
-      for (i in self$get_stages()) {
-        detected[idx,i] <- stats::rbinom(length(idx), size = n[idx,i],
-                                         prob = detect_pr)
+      # Get detection sensitivity (probability)
+      detect_pr <- surveillance$get_sensitivity()[idx]
+
+      # Sample detections
+      detected <- as.numeric(n)*0
+      if (population_model$get_type() == "stage_structured") {
+        detected <- array(detected, dim(n))
+        for (i in self$get_stages()) {
+          detected[idx,i] <- stats::rbinom(length(idx), size = n[idx,i],
+                                           prob = detect_pr)
+        }
+      } else {
+        detected[idx] <- stats::rbinom(length(idx), size = n[idx],
+                                       prob = detect_pr)
       }
-    } else {
-      detected[idx] <- stats::rbinom(length(idx), size = n[idx],
-                                     prob = detect_pr)
-    }
 
-    # Add detected as an attachment
-    if (population_model$get_type() == "presence_only") {
-      attr(n, "detected") <- as.logical(detected)
+      # Attach detected as an attribute
+      if (population_model$get_type() == "presence_only") {
+        attr(n, "detected") <- as.logical(detected)
+      } else {
+        attr(n, "detected") <- detected
+      }
+
     } else {
-      attr(n, "detected") <- detected
+
+      # Remove detected attribute
+      attr(n, "detected") <- NULL
     }
 
     return(n)

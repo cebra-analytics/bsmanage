@@ -38,11 +38,12 @@ simulation results (e.g. "control_growth").}
 controls are applied.}
 \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 which management controls are applied.}
-\item{\code{apply(n)}}{Apply management controls to a simulated
+\item{\code{apply(n, tm)}}{Apply management controls to a simulated
 population vector or matrix \code{n}, potentially with attached
-attributes relating to previously applied actions, and return the
-resulting population \code{n} along with attached attributes relating
-to the newly applied controls.}
+attributes relating to previously applied actions, providing the time
+step \code{tm} is in the \code{schedule}, and return the resulting
+population \code{n} along with attached attributes relating to the
+newly applied controls.}
 }
 }
 \description{

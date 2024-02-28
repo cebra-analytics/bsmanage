@@ -71,8 +71,10 @@ test_that("applies stochastic detection to invasive population", {
                                stats::rbinom(6, size = n[5920:5922, 2:3],
                                              c(0.5, 0.75, 1))), c(3, 3))
   expect_silent(manage_detection <- ManageDetection(
-    region, population_model, surveillance, stages = 2:3))
+    region, population_model, surveillance, stages = 2:3, schedule = 4:6))
   set.seed(1234)
-  expect_silent(new_n <- manage_detection$apply(n))
+  expect_silent(new_n <- manage_detection$apply(n, 4))
   expect_equal(attr(new_n, "detected")[5920:5922,], expected_detected)
+  expect_silent(new_n <- manage_detection$apply(n, 2))
+  expect_null(attr(new_n, "detected"))
 })

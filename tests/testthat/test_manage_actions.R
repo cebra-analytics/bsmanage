@@ -36,5 +36,5 @@ test_that("initializes with region, population model, stages & schedule", {
   expect_equal(manage_actions$get_label(), "action")
   expect_equal(manage_actions$get_stages(), 2:3)
   expect_equal(manage_actions$get_schedule(), 4:6)
-  expect_equal(manage_actions$apply(1:10), 1:10) # returns n
+  expect_equal(manage_actions$apply(1:10, 4), 1:10) # returns n
 })
