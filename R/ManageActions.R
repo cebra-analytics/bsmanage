@@ -14,6 +14,8 @@
 #' @param stages Numeric vector of population stages (indices) to which
 #'   management actions are applied. Default is all stages (when set to
 #'   \code{NULL}).
+#' @param schedule Vector of discrete simulation time steps in which to apply
+#'   management actions. Default is all time steps (when set to \code{NULL}).
 #' @param ... Additional parameters.
 #' @return A \code{ManageActions} class object (list) containing a function for
 #'   applying simulated management actions:
@@ -23,6 +25,8 @@
 #'       simulation results.}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       actions are applied.}
+#'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
+#'       which management actions are applied.}
 #'     \item{\code{apply(n)}}{Apply management actions to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, and return the
@@ -33,6 +37,7 @@
 ManageActions <- function(region, population_model,
                           type = c("detection", "control", "removal"),
                           stages = NULL,
+                          schedule = NULL,
                           class = character(), ...) {
   UseMethod("ManageActions")
 }
@@ -42,6 +47,7 @@ ManageActions <- function(region, population_model,
 ManageActions.Region <- function(region, population_model,
                                  type = c("detection", "control", "removal"),
                                  stages = NULL,
+                                 schedule = NULL,
                                  class = character(), ...) {
 
   # Check the population model
@@ -70,6 +76,12 @@ ManageActions.Region <- function(region, population_model,
     }
   }
 
+  # Check the time step schedule for action application
+  if (!is.null(schedule) && !is.numeric(schedule)) {
+    stop(paste("The schedule for applying actions should be a vector of",
+               "numeric simulation time steps."), call. = FALSE)
+  }
+
   type <- match.arg(type)
 
   # Create a class structure
@@ -88,6 +100,11 @@ ManageActions.Region <- function(region, population_model,
   # Get stages
   self$get_stages <- function() {
     return(stages)
+  }
+
+  # Get schedule
+  self$get_schedule <- function() {
+    return(schedule)
   }
 
   # Generic apply method (overridden in inherited classes)

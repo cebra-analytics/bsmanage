@@ -10,6 +10,7 @@ ManageActions(
   population_model,
   type = c("detection", "control", "removal"),
   stages = NULL,
+  schedule = NULL,
   class = character(),
   ...
 )
@@ -19,6 +20,7 @@ ManageActions(
   population_model,
   type = c("detection", "control", "removal"),
   stages = NULL,
+  schedule = NULL,
   class = character(),
   ...
 )
@@ -39,6 +41,9 @@ or \code{"removal"} to indicate the type of management actions applied.}
 management actions are applied. Default is all stages (when set to
 \code{NULL}).}
 
+\item{schedule}{Vector of discrete simulation time steps in which to apply
+management actions. Default is all time steps (when set to \code{NULL}).}
+
 \item{...}{Additional parameters.}
 }
 \value{
@@ -50,6 +55,8 @@ applying simulated management actions:
 simulation results.}
 \item{\code{get_stages()}}{Get the population stages to which management
 actions are applied.}
+\item{\code{get_schedule()}}{Get the scheduled simulation time steps in
+which management actions are applied.}
 \item{\code{apply(n)}}{Apply management actions to a simulated
 population vector or matrix \code{n}, potentially with attached
 attributes relating to previously applied actions, and return the

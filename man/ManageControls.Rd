@@ -5,9 +5,9 @@
 \alias{ManageControls.Region}
 \title{Manage controls class builder}
 \usage{
-ManageControls(region, population_model, stages = NULL, ...)
+ManageControls(region, population_model, stages = NULL, schedule = NULL, ...)
 
-\method{ManageControls}{Region}(region, population_model, stages = NULL, ...)
+\method{ManageControls}{Region}(region, population_model, stages = NULL, schedule = NULL, ...)
 }
 \arguments{
 \item{region}{A \code{bsspread::Region} or inherited class object
@@ -22,6 +22,9 @@ simulations.}
 management controls are applied. Default is all stages (when set to
 \code{NULL}).}
 
+\item{schedule}{Vector of discrete simulation time steps in which to apply
+management controls. Default is all time steps (when set to \code{NULL}).}
+
 \item{...}{Additional parameters.}
 }
 \value{
@@ -32,7 +35,9 @@ for accessing attributes and applying simulated management controls:
 \item{\code{get_label()}}{Get the management actions label used in
 simulation results (e.g. "control_growth").}
 \item{\code{get_stages()}}{Get the population stages to which management
-actions are applied.}
+controls are applied.}
+\item{\code{get_schedule()}}{Get the scheduled simulation time steps in
+which management controls are applied.}
 \item{\code{apply(n)}}{Apply management controls to a simulated
 population vector or matrix \code{n}, potentially with attached
 attributes relating to previously applied actions, and return the

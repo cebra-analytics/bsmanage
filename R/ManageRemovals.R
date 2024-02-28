@@ -27,6 +27,8 @@
 #' @param stages Numeric vector of population stages (indices) to which
 #'   management removals are applied. Default is all stages (when set to
 #'   \code{NULL}).
+#' @param schedule Vector of discrete simulation time steps in which to apply
+#'   management removals Default is all time steps (when set to \code{NULL}).
 #' @param ... Additional parameters.
 #' @return A \code{ManageRemovals} class object (list) containing a function
 #'   for accessing attributes and applying simulated management removals:
@@ -35,7 +37,9 @@
 #'     \item{\code{get_label()}}{Get the management actions label used in
 #'       simulation results (i.e. "removed").}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
-#'       actions are applied.}
+#'       removals are applied.}
+#'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
+#'       which management removals are applied.}
 #'     \item{\code{apply(n)}}{Apply management removals to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, and return the
@@ -47,7 +51,7 @@ ManageRemovals <- function(region, population_model,
                            removal_pr = 1,
                            detected_only = FALSE,
                            radius = NULL,
-                           stages = NULL, ...) {
+                           stages = NULL, schedule = NULL, ...) {
   UseMethod("ManageRemovals")
 }
 
@@ -57,13 +61,14 @@ ManageRemovals.Region <- function(region, population_model,
                                   removal_pr = 1,
                                   detected_only = FALSE,
                                   radius = NULL,
-                                  stages = NULL, ...) {
+                                  stages = NULL, schedule = NULL, ...) {
 
   # Build via base class
   self <- ManageActions(region = region,
                         population_model = population_model,
                         type = "removal",
                         stages = stages,
+                        schedule = schedule,
                         class = "ManageRemovals")
 
   # Validate removal probability and radius
@@ -131,8 +136,12 @@ ManageRemovals.Region <- function(region, population_model,
 
     # Sample and apply removals
     removed <- as.numeric(n)*0
+    if (population_model$get_type() == "stage_structured") {
+      removed <- array(removed, dim(n))
+    }
     if (length(idx) > 0) {
       if (population_model$get_type() == "stage_structured") {
+        n_apply <- array(n_apply, dim(n))
         for (i in self$get_stages()) {
           removed[idx,i] <- stats::rbinom(length(idx), size = n_apply[idx,i],
                                           prob = removal_pr[idx])

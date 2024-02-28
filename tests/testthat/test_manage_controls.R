@@ -11,12 +11,14 @@ test_that("initializes with region, population, and other parameters", {
                          nrow = 3, ncol = 3, byrow = TRUE)
   population_model <- bsspread::StagedPopulation(region, stage_matrix)
   expect_silent(manage_controls <- ManageControls(region, population_model,
-                                                  stages = 2:3))
+                                                  stages = 2:3,
+                                                  schedule = 4:6))
   expect_is(manage_controls, "ManageControls")
   expect_s3_class(manage_controls, "ManageActions")
   expect_named(manage_controls, c(c("get_type", "get_label", "get_stages",
-                                    "apply")))
+                                    "get_schedule", "apply")))
   expect_equal(manage_controls$get_type(), "control")
   expect_equal(manage_controls$get_label(), "control_")
   expect_equal(manage_controls$get_stages(), 2:3)
+  expect_equal(manage_controls$get_schedule(), 4:6)
 })

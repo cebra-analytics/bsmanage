@@ -1,6 +1,6 @@
 context("ManageActions")
 
-test_that("initializes with region, population model and stages", {
+test_that("initializes with region, population model, stages & schedule", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
   region <- bsspread::Region(template)
@@ -23,13 +23,18 @@ test_that("initializes with region, population model and stages", {
                                                stages = 3:4),
                paste("Stages must be a vector of stage indices consistent",
                      "with the population model."))
+  expect_error(manage_actions <- ManageActions(region, population_model,
+                                               schedule = "2"),
+               paste("The schedule for applying actions should be a vector of",
+                     "numeric simulation time steps."))
   expect_silent(manage_actions <- ManageActions(region, population_model,
-                                                stages = 2:3))
+                                                stages = 2:3, schedule = 4:6))
   expect_is(manage_actions, "ManageActions")
   expect_named(manage_actions, c(c("get_type", "get_label", "get_stages",
-                                   "apply")))
+                                   "get_schedule", "apply")))
   expect_equal(manage_actions$get_type(), "detection")
   expect_equal(manage_actions$get_label(), "action")
   expect_equal(manage_actions$get_stages(), 2:3)
+  expect_equal(manage_actions$get_schedule(), 4:6)
   expect_equal(manage_actions$apply(1:10), 1:10) # returns n
 })

@@ -15,6 +15,8 @@
 #' @param stages Numeric vector of population stages (indices) to which
 #'   management detection are applied. Default is all stages (when set to
 #'   \code{NULL}).
+#' @param schedule Vector of discrete simulation time steps in which to apply
+#'   management detection. Default is all time steps (when set to \code{NULL}).
 #' @param ... Additional parameters.
 #' @return A \code{ManageDetection} class object (list) containing a function
 #'   for accessing attributes and applying simulated management detection:
@@ -26,7 +28,9 @@
 #'     \item{\code{get_surveillance()}}{Get the surveillance design class
 #'       object.}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
-#'       actions are applied.}
+#'       detection are applied.}
+#'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
+#'       which management detection are applied.}
 #'     \item{\code{apply(n)}}{Apply management detection to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, and return the
@@ -35,20 +39,21 @@
 #'   }
 #' @export
 ManageDetection <- function(region, population_model, surveillance,
-                            stages = NULL, ...) {
+                            stages = NULL, schedule = NULL, ...) {
   UseMethod("ManageDetection")
 }
 
 #' @name ManageDetection
 #' @export
 ManageDetection.Region <- function(region, population_model, surveillance,
-                                   stages = NULL, ...) {
+                                   stages = NULL, schedule = NULL, ...) {
 
   # Build via base class
   self <- ManageActions(region = region,
                         population_model = population_model,
                         type = "detection",
                         stages = stages,
+                        schedule = schedule,
                         class = "ManageDetection")
 
   # Check the surveillance object
@@ -84,6 +89,7 @@ ManageDetection.Region <- function(region, population_model, surveillance,
     # Sample detections
     detected <- as.numeric(n)*0
     if (population_model$get_type() == "stage_structured") {
+      detected <- array(detected, dim(n))
       for (i in self$get_stages()) {
         detected[idx,i] <- stats::rbinom(length(idx), size = n[idx,i],
                                          prob = detect_pr)

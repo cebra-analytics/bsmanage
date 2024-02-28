@@ -5,9 +5,23 @@
 \alias{ManageDetection.Region}
 \title{Manage detection class builder}
 \usage{
-ManageDetection(region, population_model, surveillance, stages = NULL, ...)
+ManageDetection(
+  region,
+  population_model,
+  surveillance,
+  stages = NULL,
+  schedule = NULL,
+  ...
+)
 
-\method{ManageDetection}{Region}(region, population_model, surveillance, stages = NULL, ...)
+\method{ManageDetection}{Region}(
+  region,
+  population_model,
+  surveillance,
+  stages = NULL,
+  schedule = NULL,
+  ...
+)
 }
 \arguments{
 \item{region}{A \code{bsspread::Region} or inherited class object
@@ -26,6 +40,9 @@ detection sensitivities.}
 management detection are applied. Default is all stages (when set to
 \code{NULL}).}
 
+\item{schedule}{Vector of discrete simulation time steps in which to apply
+management detection. Default is all time steps (when set to \code{NULL}).}
+
 \item{...}{Additional parameters.}
 }
 \value{
@@ -39,7 +56,9 @@ simulation results (i.e. "detected").}
 \item{\code{get_surveillance()}}{Get the surveillance design class
 object.}
 \item{\code{get_stages()}}{Get the population stages to which management
-actions are applied.}
+detection are applied.}
+\item{\code{get_schedule()}}{Get the scheduled simulation time steps in
+which management detection are applied.}
 \item{\code{apply(n)}}{Apply management detection to a simulated
 population vector or matrix \code{n}, potentially with attached
 attributes relating to previously applied actions, and return the

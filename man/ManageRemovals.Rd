@@ -12,6 +12,7 @@ ManageRemovals(
   detected_only = FALSE,
   radius = NULL,
   stages = NULL,
+  schedule = NULL,
   ...
 )
 
@@ -22,6 +23,7 @@ ManageRemovals(
   detected_only = FALSE,
   radius = NULL,
   stages = NULL,
+  schedule = NULL,
   ...
 )
 }
@@ -56,6 +58,9 @@ population attribute).}
 management removals are applied. Default is all stages (when set to
 \code{NULL}).}
 
+\item{schedule}{Vector of discrete simulation time steps in which to apply
+management removals Default is all time steps (when set to \code{NULL}).}
+
 \item{...}{Additional parameters.}
 }
 \value{
@@ -66,7 +71,9 @@ for accessing attributes and applying simulated management removals:
 \item{\code{get_label()}}{Get the management actions label used in
 simulation results (i.e. "removed").}
 \item{\code{get_stages()}}{Get the population stages to which management
-actions are applied.}
+removals are applied.}
+\item{\code{get_schedule()}}{Get the scheduled simulation time steps in
+which management removals are applied.}
 \item{\code{apply(n)}}{Apply management removals to a simulated
 population vector or matrix \code{n}, potentially with attached
 attributes relating to previously applied actions, and return the
