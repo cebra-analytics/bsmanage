@@ -20,6 +20,7 @@ ManageSimulator(
   population_model = NULL,
   dispersal_models = list(),
   impacts = list(),
+  actions = list(),
   user_function = NULL,
   ...
 )
@@ -41,6 +42,7 @@ ManageSimulator(
   population_model = NULL,
   dispersal_models = list(),
   impacts = list(),
+  actions = list(),
   user_function = NULL,
   ...
 )
@@ -91,6 +93,10 @@ to calculate various impacts of the simulated population at each time
 step. Each impact object encapsulates a \code{bsimpact::ImpactAnalysis} or
 inherited class object.}
 
+\item{actions}{A list of \code{ManageActions} or inherited class objects for
+applying invasive species management actions, such as detection, control,
+and removal.}
+
 \item{user_function}{An optional user-defined \code{function(n)} that is
 applied to the population vector or matrix \code{n} (returning a
 transformed \code{n}) prior to collating the results at each simulation
@@ -113,7 +119,8 @@ model objects.}
 \description{
 Builds a class to configure and run replicate discrete-time incursion
 management simulations over a given spatial region using (sub)models for
-population growth, dispersal, impacts, detection, and management. Extends
+simulating population growth and dispersal, calculating impacts, and
+applying management actions, such as detection, control and removal. Extends
 the \code{bsspread::Simulator} package module.
 }
 \references{

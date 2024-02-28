@@ -2,7 +2,8 @@
 #'
 #' Builds a class to configure and run replicate discrete-time incursion
 #' management simulations over a given spatial region using (sub)models for
-#' population growth, dispersal, impacts, detection, and management. Extends
+#' simulating population growth and dispersal, calculating impacts, and
+#' applying management actions, such as detection, control and removal. Extends
 #' the \code{bsspread::Simulator} package module.
 #'
 #' @param region A \code{raster::RasterLayer}, \code{terra::SpatRaster}, or
@@ -38,6 +39,9 @@
 #'   to calculate various impacts of the simulated population at each time
 #'   step. Each impact object encapsulates a \code{bsimpact::ImpactAnalysis} or
 #'   inherited class object.
+#' @param actions A list of \code{ManageActions} or inherited class objects for
+#'   applying invasive species management actions, such as detection, control,
+#'   and removal.
 #' @param user_function An optional user-defined \code{function(n)} that is
 #'   applied to the population vector or matrix \code{n} (returning a
 #'   transformed \code{n}) prior to collating the results at each simulation
@@ -78,6 +82,7 @@ ManageSimulator <- function(region,
                             population_model = NULL,
                             dispersal_models = list(),
                             impacts = list(),
+                            actions = list(),
                             user_function = NULL, ...) {
   UseMethod("ManageSimulator")
 }
@@ -110,6 +115,7 @@ ManageSimulator.Region <- function(region,
                                    population_model = NULL,
                                    dispersal_models = list(),
                                    impacts = list(),
+                                   actions = list(),
                                    user_function = NULL, ...) {
 
   # Create a bsspread::Simulator class structure (includes validation)
@@ -132,6 +138,12 @@ ManageSimulator.Region <- function(region,
     stop("Impacts must be a list of 'ManageImpacts' objects.", call. = FALSE)
   }
 
+  # Check action objects
+  if (length(actions) &&
+      !all(unlist(lapply(actions, inherits, "ManageActions")))) {
+    stop("Actions must be a list of 'ManageActions' objects.", call. = FALSE)
+  }
+
   # Extend (override) run simulator function
   results <- NULL # DEBUG ####
   self$run <- function() {
@@ -151,6 +163,7 @@ ManageSimulator.Region <- function(region,
     # Results setup
     results <<- ManageResults(region, population_model, # DEBUG ####
                               impacts = impacts,
+                              actions = actions,
                               time_steps = time_steps,
                               step_duration = step_duration,
                               step_units = step_units,
@@ -179,10 +192,16 @@ ManageSimulator.Region <- function(region,
       }
 
       # Calculate impacts
-      calc_impacts <- list()
       if (length(impacts)) {
-        for (i in 1:length(impacts)) {
-          calc_impacts[[i]] <- impacts[[i]]$calculate(n)
+        calc_impacts <- lapply(impacts, function(impacts_i) {
+          impacts_i$calculate(n)
+        })
+      }
+
+      # Apply actions
+      if (length(actions)) {
+        for (i in 1:length(actions)) {
+          n <- actions[[i]]$apply(n)
         }
       }
 
@@ -220,6 +239,13 @@ ManageSimulator.Region <- function(region,
           calc_impacts <- lapply(impacts, function(impacts_i) {
             impacts_i$calculate(n)
           })
+        }
+
+        # Apply actions
+        if (length(actions)) {
+          for (i in 1:length(actions)) {
+            n <- actions[[i]]$apply(n)
+          }
         }
 
         # User-defined function
