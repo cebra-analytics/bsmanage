@@ -66,11 +66,15 @@ test_that("applies stochastic removals to invasive population", {
                                                   removal_pr = template_vect,
                                                   detected_only = FALSE,
                                                   radius = NULL,
-                                                  stages = 2:3))
+                                                  stages = 2:3,
+                                                  schedule = 4:6))
   set.seed(1234)
-  expect_silent(new_n <- manage_removals$apply(n, 2))
+  expect_silent(new_n <- manage_removals$apply(n, 4))
   expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals)
   expect_equal(new_n[5920:5922,], n[5920:5922,] - expected_removals)
+  expect_silent(new_n <- manage_removals$apply(n, 2))
+  expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals*0)
+  expect_equal(new_n[5920:5922,], n[5920:5922,])
   expect_silent(manage_removals <- ManageRemovals(region, population_model,
                                                   removal_pr = template_vect,
                                                   detected_only = TRUE,
@@ -80,8 +84,6 @@ test_that("applies stochastic removals to invasive population", {
   expect_silent(new_n <- manage_removals$apply(n, 4))
   expect_equal(attr(new_n, "removed")[5920:5922,], n[5920:5922,]*0)
   expect_equal(new_n[5920:5922,], n[5920:5922,])
-  expect_silent(new_n <- manage_removals$apply(n, 2))
-  expect_null(attr(new_n, "removed"))
   # with detected
   attr(n, "detected") <- n*0
   attr(n, "detected")[5920:5922,2:3] <- trunc(n[5920:5922,2:3]*c(0, 0.5, 1))

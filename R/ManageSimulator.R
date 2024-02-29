@@ -244,7 +244,7 @@ ManageSimulator.Region <- function(region,
         # Apply actions
         if (length(actions)) {
           for (i in 1:length(actions)) {
-            n <- actions[[i]]$apply(n)
+            n <- actions[[i]]$apply(n, tm)
           }
         }
 

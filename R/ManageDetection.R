@@ -81,6 +81,12 @@ ManageDetection.Region <- function(region, population_model, surveillance,
   # Detection/surveillance apply method
   self$apply <- function(n, tm) {
 
+    # Initial zero detections
+    detected <- as.numeric(n)*0
+    if (population_model$get_type() == "stage_structured") {
+      detected <- array(detected, dim(n))
+    }
+
     # Scheduled time step?
     if (is.null(schedule) || tm %in% schedule) {
 
@@ -91,9 +97,7 @@ ManageDetection.Region <- function(region, population_model, surveillance,
       detect_pr <- surveillance$get_sensitivity()[idx]
 
       # Sample detections
-      detected <- as.numeric(n)*0
       if (population_model$get_type() == "stage_structured") {
-        detected <- array(detected, dim(n))
         for (i in self$get_stages()) {
           detected[idx,i] <- stats::rbinom(length(idx), size = n[idx,i],
                                            prob = detect_pr)
@@ -102,18 +106,13 @@ ManageDetection.Region <- function(region, population_model, surveillance,
         detected[idx] <- stats::rbinom(length(idx), size = n[idx],
                                        prob = detect_pr)
       }
+    }
 
-      # Attach detected as an attribute
-      if (population_model$get_type() == "presence_only") {
-        attr(n, "detected") <- as.logical(detected)
-      } else {
-        attr(n, "detected") <- detected
-      }
-
+    # Attach detected as an attribute
+    if (population_model$get_type() == "presence_only") {
+      attr(n, "detected") <- as.logical(detected)
     } else {
-
-      # Remove detected attribute
-      attr(n, "detected") <- NULL
+      attr(n, "detected") <- detected
     }
 
     return(n)

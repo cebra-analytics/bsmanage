@@ -101,6 +101,12 @@ ManageRemovals.Region <- function(region, population_model,
   # Removal apply method
   self$apply <- function(n, tm) {
 
+    # Initial zero removals
+    removed <- as.numeric(n)*0
+    if (population_model$get_type() == "stage_structured") {
+      removed <- array(removed, dim(n))
+    }
+
     # Scheduled time step?
     if (is.null(schedule) || tm %in% schedule) {
 
@@ -139,10 +145,6 @@ ManageRemovals.Region <- function(region, population_model,
       }
 
       # Sample and apply removals
-      removed <- as.numeric(n)*0
-      if (population_model$get_type() == "stage_structured") {
-        removed <- array(removed, dim(n))
-      }
       if (length(idx) > 0) {
         if (population_model$get_type() == "stage_structured") {
           n_apply <- array(n_apply, dim(n))
@@ -161,18 +163,13 @@ ManageRemovals.Region <- function(region, population_model,
           }
         }
       }
+    }
 
-      # Attach removed as an attribute
-      if (population_model$get_type() == "presence_only") {
-        attr(n, "removed") <- as.logical(removed)
-      } else {
-        attr(n, "removed") <- removed
-      }
-
+    # Attach removed as an attribute
+    if (population_model$get_type() == "presence_only") {
+      attr(n, "removed") <- as.logical(removed)
     } else {
-
-      # Remove removed attribute
-      attr(n, "removed") <- NULL
+      attr(n, "removed") <- removed
     }
 
     return(n)

@@ -76,5 +76,5 @@ test_that("applies stochastic detection to invasive population", {
   expect_silent(new_n <- manage_detection$apply(n, 4))
   expect_equal(attr(new_n, "detected")[5920:5922,], expected_detected)
   expect_silent(new_n <- manage_detection$apply(n, 2))
-  expect_null(attr(new_n, "detected"))
+  expect_equal(attr(new_n, "detected")[5920:5922,], expected_detected*0)
 })

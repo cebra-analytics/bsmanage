@@ -207,10 +207,12 @@ test_that("collates and finalizes action results", {
                                 optimal = "none",
                                 exist_sens = template_vect)
   actions <- list(
-    a3 = ManageDetection(region, population_model, surveillance),
-    a4 = ManageRemovals(region, population_model, removal_pr = template_vect))
-  n <- actions$a3$apply(n)
-  n <- actions$a4$apply(n)
+    a3 = ManageDetection(region, population_model, surveillance,
+                         schedule = 2:3),
+    a4 = ManageRemovals(region, population_model, removal_pr = template_vect,
+                        schedule = 2:3))
+  n <- actions$a3$apply(n, 2)
+  n <- actions$a4$apply(n, 2)
   # single replicate
   expected_collated <- lapply(actions, function(a) {
     n_a <- attr(n, a$get_label())
@@ -223,18 +225,28 @@ test_that("collates and finalizes action results", {
                                          actions = actions, time_steps = 4,
                                          collation_steps = 2, replicates = 1))
   expect_silent(results$collate(r = 1, tm = 2, n = n))
+  n <- actions$a3$apply(n, 4)
+  n <- actions$a4$apply(n, 4)
+  expect_silent(results$collate(r = 1, tm = 4, n = n))
   expect_silent(result_list <- results$get_list())
   expect_equal(lapply(result_list$actions,
                       function(i) lapply(i, function(j) j[["2"]])),
                expected_collated)
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i, function(j) j[["4"]])),
+               lapply(expected_collated,
+                      function(i) lapply(i, function(j) j*0)))
   # multiple replicates
-  n_r <- list()
+  n_r <- list(); n_r2 <- list()
   n[5920:5922] <- (9:11)*5
-  n <- actions$a3$apply(n); n <- actions$a4$apply(n); n_r[[1]] <- n
+  n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2); n_r[[1]] <- n
+  n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4); n_r2[[1]] <- n
   n[5920:5922] <- (10:12)*5
-  n <- actions$a3$apply(n); n <- actions$a4$apply(n); n_r[[2]] <- n
+  n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2); n_r[[2]] <- n
+  n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4); n_r2[[2]] <- n
   n[5920:5922] <- (11:13)*5
-  n <- actions$a3$apply(n); n <- actions$a4$apply(n); n_r[[3]] <- n
+  n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2); n_r[[3]] <- n
+  n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4); n_r2[[3]] <- n
   collated_r <- lapply(n_r, function(n) lapply(actions, function(a) {
     n_a <- attr(n, a$get_label())
     collated <- list(n_a, total = sum(n_a))
@@ -254,9 +266,13 @@ test_that("collates and finalizes action results", {
                                          population_model = population_model,
                                          actions = actions, time_steps = 4,
                                          collation_steps = 2, replicates = 3))
+  expect_silent(zero_results <- results$get_list()$actions)
   expect_silent(results$collate(r = 1, tm = 2, n = n_r[[1]]))
+  expect_silent(results$collate(r = 1, tm = 4, n = n_r2[[1]]))
   expect_silent(results$collate(r = 2, tm = 2, n = n_r[[2]]))
+  expect_silent(results$collate(r = 2, tm = 4, n = n_r2[[2]]))
   expect_silent(results$collate(r = 3, tm = 2, n = n_r[[3]]))
+  expect_silent(results$collate(r = 3, tm = 4, n = n_r2[[3]]))
   expect_silent(results$finalize())
   expect_silent(result_list <- results$get_list())
   expect_equal(lapply(result_list$actions,
@@ -267,4 +283,12 @@ test_that("collates and finalizes action results", {
                       function(i) lapply(i, function(j) j[["2"]]$sd)),
                lapply(collated_arrays, function(i)
                  lapply(i, function(a) apply(a, 2, sd))))
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i, function(j) j[["4"]]$mean)),
+               lapply(zero_results,
+                      function(i) lapply(i, function(j) j[["4"]]$mean)))
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i, function(j) j[["4"]]$sd)),
+               lapply(zero_results,
+                      function(i) lapply(i, function(j) j[["4"]]$sd)))
 })
