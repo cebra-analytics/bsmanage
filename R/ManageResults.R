@@ -172,8 +172,12 @@ ManageResults.Region <- function(region, population_model,
   # Extended collate results
   self$collate <- function(r, tm, n, calc_impacts) {
 
-    # Collate population spread results
-    super$collate(r, tm, n)
+    # Collate population results (without action attributes)
+    n_no_attr <- n
+    for (a in actions) {
+      attr(n_no_attr, a$get_label()) <- NULL
+    }
+    super$collate(r, tm, n_no_attr)
 
     # Use character list index (allows initial time = 0 and collated times)
     tmc <- as.character(tm)

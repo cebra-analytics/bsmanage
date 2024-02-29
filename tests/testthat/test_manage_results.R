@@ -229,6 +229,8 @@ test_that("collates and finalizes action results", {
   n <- actions$a4$apply(n, 4)
   expect_silent(results$collate(r = 1, tm = 4, n = n))
   expect_silent(result_list <- results$get_list())
+  expect_equal(lapply(result_list$collated, function(i) attributes(i)),
+               lapply(result_list$collated, function(i) NULL)) # no attr
   expect_equal(lapply(result_list$actions,
                       function(i) lapply(i, function(j) j[["2"]])),
                expected_collated)

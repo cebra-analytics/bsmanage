@@ -243,6 +243,13 @@ ManageSimulator.Region <- function(region,
 
         # Apply actions
         if (length(actions)) {
+
+          # Clear attributes
+          for (i in 1:length(actions)) {
+            attr(n, actions[[i]]$get_label()) <- NULL
+          }
+
+          # Apply sequentially
           for (i in 1:length(actions)) {
             n <- actions[[i]]$apply(n, tm)
           }
@@ -250,7 +257,13 @@ ManageSimulator.Region <- function(region,
 
         # User-defined function
         if (is.function(user_function)) {
+          n_attr <- attributes(n) # get attributes
           n <- user_function(n)
+          for (i in 1:length(n_attr)) { # restore attributes
+            if (!names(n_attr[i]) %in% names(attributes(n))) {
+              attr(n, names(n_attr[i])) <- n_attr[[i]]
+            }
+          }
         }
 
         # Collate results

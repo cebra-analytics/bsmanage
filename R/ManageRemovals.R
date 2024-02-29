@@ -165,11 +165,19 @@ ManageRemovals.Region <- function(region, population_model,
       }
     }
 
-    # Attach removed as an attribute
+    # Attach or update removed as an attribute
     if (population_model$get_type() == "presence_only") {
-      attr(n, "removed") <- as.logical(removed)
+      if (is.null(attr(n, "removed"))) {
+        attr(n, "removed") <- as.logical(removed)
+      } else {
+        attr(n, "removed") <- attr(n, "removed") | as.logical(removed)
+      }
     } else {
-      attr(n, "removed") <- removed
+      if (is.null(attr(n, "removed"))) {
+        attr(n, "removed") <- removed
+      } else {
+        attr(n, "removed") <- removed + attr(n, "removed")
+      }
     }
 
     return(n)
