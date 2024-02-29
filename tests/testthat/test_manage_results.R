@@ -225,6 +225,7 @@ test_that("collates and finalizes action results", {
                                          actions = actions, time_steps = 4,
                                          collation_steps = 2, replicates = 1))
   expect_silent(results$collate(r = 1, tm = 2, n = n))
+  attributes(n) <- NULL
   n <- actions$a3$apply(n, 4)
   n <- actions$a4$apply(n, 4)
   expect_silent(results$collate(r = 1, tm = 4, n = n))
@@ -242,12 +243,15 @@ test_that("collates and finalizes action results", {
   n_r <- list(); n_r2 <- list()
   n[5920:5922] <- (9:11)*5
   n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2); n_r[[1]] <- n
+  attributes(n) <- NULL
   n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4); n_r2[[1]] <- n
   n[5920:5922] <- (10:12)*5
   n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2); n_r[[2]] <- n
+  attributes(n) <- NULL
   n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4); n_r2[[2]] <- n
   n[5920:5922] <- (11:13)*5
   n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2); n_r[[3]] <- n
+  attributes(n) <- NULL
   n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4); n_r2[[3]] <- n
   collated_r <- lapply(n_r, function(n) lapply(actions, function(a) {
     n_a <- attr(n, a$get_label())
