@@ -130,7 +130,8 @@ ManageSimulator.Region <- function(region,
                               initializer = initializer,
                               population_model = population_model,
                               dispersal_models = dispersal_models,
-                              user_function = user_function, ...)
+                              user_function = user_function,
+                              class = "ManageSimulator", ...)
 
   # Check impact objects
   if (length(impacts) &&
