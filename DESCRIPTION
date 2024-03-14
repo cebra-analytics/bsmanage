@@ -28,6 +28,7 @@ Suggests:
     testthat
 Collate: 
     'ManageActions.R'
+    'ManageContext.R'
     'ManageControls.R'
     'ManageDetection.R'
     'ManageImpacts.R'
