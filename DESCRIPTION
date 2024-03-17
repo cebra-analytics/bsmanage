@@ -30,6 +30,7 @@ Collate:
     'ManageActions.R'
     'ManageContext.R'
     'ManageControls.R'
+    'ManageDesign.R'
     'ManageDetection.R'
     'ManageImpacts.R'
     'ManageRemovals.R'
