@@ -29,8 +29,9 @@ Suggests:
 Collate: 
     'ManageActions.R'
     'ManageContext.R'
-    'ManageControls.R'
     'ManageDesign.R'
+    'ManageControlDesign.R'
+    'ManageControls.R'
     'ManageDetection.R'
     'ManageImpacts.R'
     'ManageRemovals.R'

@@ -90,7 +90,7 @@
 #'     \item{\code{get_divisions()}}{Get divisions object.}
 #'     \item{\code{get_allocation()}}{Get allocated resources via specified
 #'       strategy, utilizing savings, benefits, budget constraints, and/or
-#'       desired detection confidence level.}
+#'       desired overall management success probability level.}
 #'     \item{\code{get_manage_pr()}}{Get the division part management
 #'       effectiveness or success probabilities of the allocated management
 #'       design combined with any existing effectiveness or success
