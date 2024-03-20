@@ -23,6 +23,7 @@ ControlDesign(
   discrete_alloc = FALSE,
   exist_alloc = NULL,
   exist_manage_pr = NULL,
+  previous_control = NULL,
   class = character(),
   ...
 )
@@ -45,6 +46,7 @@ ControlDesign(
   discrete_alloc = FALSE,
   exist_alloc = NULL,
   exist_manage_pr = NULL,
+  previous_control = NULL,
   class = character(),
   ...
 )
@@ -138,6 +140,14 @@ success (or effectiveness) values for existing management resources at
 each division part specified by \code{divisions}. Multiple existing
 management success probabilities may be specified in a list. Default is
 \code{NULL}.}
+
+\item{previous_control}{A vector of control proportion values previously
+applied to each division part specified by \code{divisions}, along with an
+optional attached vector attribute \code{repeats} to indicate that the
+control was applied repeatedly. These values modify the establishment
+likelihood values utilised in the allocation design such that:
+\code{mod_establish_pr = establish_pr*(1 - previous_control)^repeats}.
+Default is \code{NULL}.}
 
 \item{...}{Additional parameters.}
 }

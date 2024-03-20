@@ -189,3 +189,38 @@ test_that("allocates for optimal effectiveness via budget or overall prob.", {
   expect_true(sum(effect_99_alloc) < sum(saving_99_alloc))
   expect_true(effect_99_tot < saving_99_tot)
 })
+
+test_that("resource allocation utilises previous control efforts", {
+  TEST_DIRECTORY <- test_path("test_inputs")
+  template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
+  divisions <- bsdesign::Divisions(template)
+  test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
+  previous_control <- +(test_ref$surv_effort$no_budget > 0.1)
+  repeats <- +previous_control + (test_ref$surv_effort$no_budget > 0.15)
+  previous_control <- previous_control*0.5
+  mod_establish_pr <- test_ref$establish_pr*(1 - previous_control)^repeats
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = mod_establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "saving",
+    benefit = test_ref$cost_undetected - test_ref$cost_detected,
+    budget = NULL,
+    previous_control = NULL))
+  expect_silent(expected_alloc <- control_design$get_allocation())
+  attr(previous_control, "repeats") <- repeats
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "saving",
+    benefit = test_ref$cost_undetected - test_ref$cost_detected,
+    budget = NULL,
+    previous_control = previous_control))
+  expect_silent(mod_alloc <- control_design$get_allocation())
+  expect_equal(mod_alloc, expected_alloc)
+  expect_true(all(mod_alloc[which(repeats > 0)] <
+                    test_ref$surv_effort$no_budget[which(repeats > 0)]))
+})

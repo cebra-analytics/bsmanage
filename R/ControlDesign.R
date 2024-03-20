@@ -79,6 +79,13 @@
 #'   each division part specified by \code{divisions}. Multiple existing
 #'   management success probabilities may be specified in a list. Default is
 #'   \code{NULL}.
+#' @param previous_control A vector of control proportion values previously
+#'   applied to each division part specified by \code{divisions}, along with an
+#'   optional attached vector attribute \code{repeats} to indicate that the
+#'   control was applied repeatedly. These values modify the establishment
+#'   likelihood values utilised in the allocation design such that:
+#'   \code{mod_establish_pr = establish_pr*(1 - previous_control)^repeats}.
+#'   Default is \code{NULL}.
 #' @param ... Additional parameters.
 #' @return A \code{ControlDesign} class object (list) containing functions for
 #'   allocating resources, and calculating (unit and overall) likely management
@@ -162,6 +169,7 @@ ControlDesign <- function(context,
                           discrete_alloc = FALSE,
                           exist_alloc = NULL,
                           exist_manage_pr = NULL,
+                          previous_control = NULL,
                           class = character(), ...) {
   UseMethod("ControlDesign")
 }
@@ -198,6 +206,7 @@ ControlDesign.ManageContext <- function(context,
                                         discrete_alloc = FALSE,
                                         exist_alloc = NULL,
                                         exist_manage_pr = NULL,
+                                        previous_control = NULL,
                                         class = character(), ...) {
 
   # Match dim_type, optimal, alloc_unit, & cost_unit arguments
@@ -263,6 +272,22 @@ ControlDesign.ManageContext <- function(context,
   if (!is.logical(discrete_alloc)) {
     stop("The discrete allocation indicator parameter must be logical.",
          call. = FALSE)
+  }
+
+  # Check and apply previous_control
+  if (!is.null(previous_control) &&
+      (!is.numeric(previous_control) || any(previous_control < 0) ||
+       !length(previous_control) %in% c(1, parts))) {
+    stop(paste("The previous control must be a numeric vector with",
+               "values >= 0 for each division part."), call. = FALSE)
+  }
+  if (!is.null(previous_control)) {
+    repeats <- 1
+    if (!is.null(attr(previous_control, "repeats"))) {
+      repeats <- attr(previous_control, "repeats")
+    }
+    attributes(previous_control) <- NULL
+    establish_pr <- establish_pr*(1 - previous_control)^repeats
   }
 
   # Utilise a (spatial) surveillance design object for Lagrange optimization
