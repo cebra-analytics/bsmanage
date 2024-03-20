@@ -154,4 +154,45 @@ effectiveness).
 Cannon, R. M. (2009). Inspecting and monitoring on a restricted budget -
 where best to look? \emph{Preventive Veterinary Medicine}, 92(1–2),
 163-174. \doi{10.1016/j.prevetmed.2009.06.009}
+
+Hauser, C. E., Runge, M. C., Cooch, E. G., Johnson, F. A., & Harvey,
+I. W. F. (2007). Optimal control of Atlantic population Canada geese.
+\emph{Ecological Modelling}, 201(1), 27–36.
+\doi{10.1016/j.ecolmodel.2006.07.019}
+
+Hauser, C. E., & McCarthy, M. A. (2009). Streamlining 'search and
+destroy': cost-effective surveillance for invasive species management.
+\emph{Ecology Letters}, 12(7), 683–692.
+\doi{10.1111/j.1461-0248.2009.01323.x}
+
+Giljohann, K. M., Hauser, C. E., Williams, N. S. G., & Moore, J. L.
+(2011). Optimizing invasive species control across space: willow invasion
+management in the Australian Alps. \emph{Journal of Applied Ecology},
+48(5), 1286–1294. \doi{10.1111/j.1365-2664.2011.02016.x}
+
+McCarthy, M. A., Thompson, C. J., Hauser, C., Burgman, M. A., Possingham,
+H. P., Moir, M. L., Tiensin, T., & Gilbert, M. (2010). Resource allocation
+for efficient environmental management. \emph{Ecology Letters}, 13(10),
+1280–1289. \doi{10.1111/j.1461-0248.2010.01522.x}
+
+Moore, J. L., Rout, T. M., Hauser, C. E., Moro, D., Jones, M., Wilcox,
+C., & Possingham, H. P. (2010). Protecting islands from pest invasion:
+optimal allocation of biosecurity resources between quarantine and
+surveillance. \emph{Biological Conservation}, 143(5), 1068–1078.
+\doi{10.1016/j.biocon.2010.01.019}
+
+Moore, A. L., McCarthy, M. A., & Lecomte, N. (2016). Optimizing ecological
+survey effort over space and time.
+\emph{Methods in Ecology and Evolution}, 7(8), 891–899.
+\doi{10.1111/2041-210X.12564}
+
+Rout, T. M., Moore, J. L., Possingham, H. P., & McCarthy, M. A. (2011).
+Allocating biosecurity resources between preventing, detecting, and
+eradicating island invasions. \emph{Ecological Economics}, 71, 54–62.
+\doi{10.1016/j.ecolecon.2011.09.009}
+
+Rout, T. M., Moore, J. L., & McCarthy, M. A. (2014). Prevent, search or
+destroy? A partially observable model for invasive species management.
+\emph{Journal of Applied Ecology}, 51(3), 804–813.
+\doi{10.1111/1365-2664.12234}
 }

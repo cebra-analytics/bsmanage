@@ -181,4 +181,24 @@ management success (or effectiveness).
 Cannon, R. M. (2009). Inspecting and monitoring on a restricted budget -
 where best to look? \emph{Preventive Veterinary Medicine}, 92(1–2),
 163-174. \doi{10.1016/j.prevetmed.2009.06.009}
+
+Hauser, C. E., & McCarthy, M. A. (2009). Streamlining 'search and
+destroy': cost-effective surveillance for invasive species management.
+\emph{Ecology Letters}, 12(7), 683–692.
+\doi{10.1111/j.1461-0248.2009.01323.x}
+
+Giljohann, K. M., Hauser, C. E., Williams, N. S. G., & Moore, J. L.
+(2011). Optimizing invasive species control across space: willow invasion
+management in the Australian Alps. \emph{Journal of Applied Ecology},
+48(5), 1286–1294. \doi{10.1111/j.1365-2664.2011.02016.x}
+
+McCarthy, M. A., Thompson, C. J., Hauser, C., Burgman, M. A., Possingham,
+H. P., Moir, M. L., Tiensin, T., & Gilbert, M. (2010). Resource allocation
+for efficient environmental management. \emph{Ecology Letters}, 13(10),
+1280–1289. \doi{10.1111/j.1461-0248.2010.01522.x}
+
+Moore, A. L., McCarthy, M. A., & Lecomte, N. (2016). Optimizing ecological
+survey effort over space and time.
+\emph{Methods in Ecology and Evolution}, 7(8), 891–899.
+\doi{10.1111/2041-210X.12564}
 }
