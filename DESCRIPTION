@@ -27,10 +27,10 @@ Suggests:
     rmarkdown,
     testthat
 Collate: 
-    'ManageActions.R'
     'ManageContext.R'
     'ManageDesign.R'
-    'ManageControlDesign.R'
+    'ControlDesign.R'
+    'ManageActions.R'
     'ManageControls.R'
     'ManageDetection.R'
     'ManageImpacts.R'

@@ -57,29 +57,9 @@ test_that("initializes with context, divisions, and valid parameters", {
                      "with values for each division part."))
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
-                                             optimal = "saving",
-                                             benefit = 1,
-                                             fixed_cost = 1:5),
-               paste("The fixed cost parameter must be a numeric vector with",
-                     "values for each division part."))
-  expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
-                                             divisions = divisions,
                                              optimal = "effectiveness",
                                              budget = 0),
                "The budget parameter must be numeric and > 0.")
-  expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
-                                             divisions = divisions,
-                                             optimal = "effectiveness",
-                                             budget = 1,
-                                             min_alloc = 1:5),
-               paste("The minimum allocation parameter must be a numeric",
-                     "vector with values for each division part."))
-  expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
-                                             divisions = divisions,
-                                             optimal = "effectiveness",
-                                             budget = 1,
-                                             discrete_alloc = NULL),
-               "The discrete allocation indicator parameter must be logical.")
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
                                              optimal = "effectiveness",
@@ -112,14 +92,20 @@ test_that("initializes with context, divisions, and valid parameters", {
                                               divisions = divisions,
                                               optimal = "none"))
   expect_is(manage_design, "ManageDesign")
-  expect_is(manage_design$get_context(), "ManageContext")
-  expect_is(manage_design$get_divisions(), "Divisions")
-  expect_named(manage_design, c("get_context", "get_divisions",
+  expect_named(manage_design, c("get_context", "get_divisions", "get_dim_type",
                                 "get_allocation", "get_manage_pr",
                                 "get_overall_pr", "save_design"))
+  expect_is(manage_design$get_context(), "ManageContext")
+  expect_is(manage_design$get_divisions(), "Divisions")
+  expect_equal(manage_design$get_dim_type(), "spatial")
   expect_null(manage_design$get_allocation())
   expect_null(manage_design$get_manage_pr())
   expect_null(manage_design$get_overall_pr())
+  expect_silent(manage_design <- ManageDesign(context = ManageContext("test"),
+                                              divisions = divisions,
+                                              dim_type = "user_defined",
+                                              optimal = "none"))
+  expect_equal(manage_design$get_dim_type(), "user_defined")
 })
 
 test_that("combines existing management probability/effectiveness via union", {

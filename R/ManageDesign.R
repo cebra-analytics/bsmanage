@@ -4,8 +4,8 @@
 #' effective allocation of management resources across one or more divisions
 #' (management responses, strategies, invasion pathways, invasive species,
 #' spatial locations, time, etc.) via methods that utilize management costs,
-#' savings, benefits, and/or overall management effectiveness or likely success
-#' rate.
+#' savings, benefits, and/or overall management probability of success (or
+#' effectiveness).
 #'
 #' @param context A \code{ManageContext} or inherited class object representing
 #'   the context of a biosecurity management resource allocation design.
@@ -13,99 +13,81 @@
 #'   representing one or more divisions (management responses, strategies,
 #'   invasion pathways, invasive species, spatial locations, time, etc.) for
 #'   the management design.
+#' @param dim_type The type of dimension that the management resources are
+#'   allocated across. One of \code{"spatial"} locations (default),
+#'   \code{"temporal"}, \code{"spatiotemporal"}, invasive \code{"species"},
+#'   invasion \code{"pathways"}, \code{"strategies"}, management
+#'   \code{"responses"}, or other user defined. The dimensions should be
+#'   appropriately configured via the \code{divisions} object.
 #' @param establish_pr A vector of (relative) probability values to represent
-#'   the likelihood of pest establishment at each division part (management
-#'   responses, strategies, invasion pathways, invasive species, spatial
-#'   locations, time, etc.) specified by \code{divisions}. Default is
-#'   \code{NULL}. Values are assumed to be relative when their maximum is
-#'   greater than 1, or an attribute \code{relative = TRUE} is attached to the
-#'   parameter.
+#'   the likelihood of pest establishment at each division part specified by
+#'   \code{divisions}. Default is \code{NULL}. Values are assumed to be
+#'   relative when their maximum is greater than 1, or an attribute
+#'   \code{relative = TRUE} is attached to the parameter.
 #' @param optimal The strategy used for finding an effective management
 #'   resource allocation. One of (maximum) \code{"saving"} (or cost-dependent
 #'   benefit), (maximum) \code{"benefit"} (independent of management resource
-#'   costs), or (maximum) \code{"effectiveness"}, or \code{"none"} for
-#'   representing existing management resource allocation designs only.
+#'   costs), or (maximum) \code{"effectiveness"} (probability of success), or
+#'   \code{"none"} for representing existing management resource allocation
+#'   designs only.
 #' @param alloc_unit The descriptive unit to describe allocated management
 #'   resource quantities. One of \code{"units"}, \code{"hours"},
 #'   \code{"traps"}, \code{"treatments"}, \code{"removals"}, or user specified.
 #' @param cost_unit The descriptive unit to describe allocated management
-#'   resource costs, cost-based benefit savings, and/or fixed costs when
+#'   resource costs, cost-based benefit savings, and/or other costs when
 #'   applicable. One of \code{"$"}, \code{"hours"}, or user specified.
 #' @param benefit A vector of values quantifying the benefit (or cost-based
 #'   saving) associated with allocated management resources at each division
-#'   part (management responses, strategies, invasion pathways, invasive
-#'   species, spatial locations, time, etc.) specified by \code{divisions}.
-#'   Default is \code{NULL}. When the benefit refers to cost-based savings
-#'   (i.e. \code{optimal} is \code{"saving"}), then the units should be
-#'   consistent with the \code{cost_unit} parameter.
+#'   part specified by \code{divisions}. Default is \code{NULL}. When the
+#'   benefit refers to cost-based savings (i.e. \code{optimal} is
+#'   \code{"saving"}), then the units should be consistent with the
+#'   \code{cost_unit} parameter.
 #' @param alloc_cost A vector of cost per unit of allocated management
-#'   resources at each division part (management responses, strategies,
-#'   invasion pathways, invasive species, spatial locations, time, etc.)
-#'   specified by \code{divisions}. Default is \code{NULL}. Units should be
-#'   consistent with the \code{cost_unit} parameter.
-#' @param fixed_cost A vector of fixed costs, such as travel costs or time, at
-#'   each division part (management responses, strategies, invasion pathways,
-#'   invasive species, spatial locations, time, etc.) specified by
-#'   \code{divisions}. Default is \code{NULL}. Units should be consistent with
-#'   \code{alloc_cost} when specified. Otherwise the units should be consistent
-#'   with the \code{alloc_unit} parameter.
+#'   resources at each division part specified by \code{divisions}. Default is
+#'   \code{NULL}. Units should be consistent with the \code{cost_unit}
+#'   parameter.
 #' @param budget The cost budget or constraint for the resource allocation in
 #'   the management design. Default is \code{NULL}. Units should be consistent
 #'   with \code{alloc_cost} when specified. Otherwise the units should be
 #'   consistent with the \code{alloc_unit} parameter.
-#' @param overall_pr The desired (minimum) overall system-wide likely
-#'   management effectiveness or success rate of the management design
-#'   (e.g. 0.8) when \code{optimal} is \code{"effectiveness"}. Default is
-#'   \code{NULL}.
-#' @param min_alloc A vector of minimum permissible allocated management
-#'   resource quantities at each division part (management responses,
-#'   strategies, invasion pathways, invasive species, spatial locations, time,
-#'   etc.) specified by \code{divisions}. Used to avoid impractically low
-#'   allocation quantities. Default is \code{NULL}.
-#' @param discrete_alloc A logical to indicate that the allocated management
-#'   resource quantities at each division part (management responses,
-#'   strategies, invasion pathways, invasive species, spatial locations, time,
-#'   etc.) specified by \code{divisions} should be discrete integers. Used to
-#'   allocate discrete management resource units, such as traps or removals.
-#'   Default is \code{FALSE} for continuous resources quantities, such as
-#'   control hours.
+#' @param overall_pr The desired (minimum) overall system-wide probability of
+#'   success (or effectiveness) of the management design when \code{optimal}
+#'   is \code{"effectiveness"}. Default is \code{NULL}.
 #' @param exist_alloc A vector of existing management resource quantities at
-#'   each division part (management responses, strategies, invasion pathways,
-#'   invasive species, spatial locations, time, etc.) specified by
-#'   \code{divisions}. Should only be used to represent existing management
-#'   resource allocation designs when \code{optimal = "none"}. Default is
+#'   each division part specified by \code{divisions}. Should only be used to
+#'   represent existing management resource allocation designs when
+#'   \code{optimal = "none"}. Default is \code{NULL}.
+#' @param exist_manage_pr A vector, or list of vectors, of probability of
+#'   success (or effectiveness) values for existing management resources at
+#'   each division part specified by \code{divisions}. Multiple existing
+#'   management success probabilities may be specified in a list. Default is
 #'   \code{NULL}.
-#' @param exist_manage_pr A vector, or list of vectors, of existing management
-#'   effectiveness or success probability values for existing management
-#'   resources at each division part (management responses, strategies,
-#'   invasion pathways, invasive species, spatial locations, time, etc.)
-#'   specified by \code{divisions}. Multiple existing management success
-#'   probabilities may be specified in a list. Default is \code{NULL}.
 #' @param ... Additional parameters.
 #' @return A \code{ManageDesign} class object (list) containing functions for
-#'   for allocating resources, and calculating (unit and overall) likely
-#'   management effectiveness or success rates:
+#'   allocating resources, and calculating (unit and overall) likely management
+#'   success probabilities (or effectiveness):
 #'   \describe{
 #'     \item{\code{get_context()}}{Get context object.}
 #'     \item{\code{get_divisions()}}{Get divisions object.}
+#'     \item{\code{get_dim_type()}}{Get dimension type.}
 #'     \item{\code{get_allocation()}}{Get allocated resources via specified
 #'       strategy, utilizing savings, benefits, budget constraints, and/or
 #'       desired overall management success probability level.}
-#'     \item{\code{get_manage_pr()}}{Get the division part management
-#'       effectiveness or success probabilities of the allocated management
-#'       design combined with any existing effectiveness or success
-#'       probabilities specified via \code{exist_manage_pr}.}
-#'     \item{\code{get_overall_pr()}}{Get the overall system-wide likely
-#'       management effectiveness or success rate of the management design.}
+#'     \item{\code{get_manage_pr()}}{Get the probability of success (or
+#'       effectiveness) values at each division part for the allocated
+#'       management design, combined with any existing success probabilities or
+#'       effectiveness specified via \code{exist_manage_pr}.}
+#'     \item{\code{get_overall_pr()}}{Get the overall system-wide probability
+#'       of success (or effectiveness) of the management design.}
 #'     \item{\code{save_design(...)}}{Save the management design as a
 #'       collection of raster TIF and/or comma-separated value (CSV) files,
 #'       appropriate for the \code{divisions} type, including the management
-#'       resource \code{allocation}, the likely management effectiveness or
-#'       success rates (\code{manage_pr}), and a \code{summary} (CSV) of the
-#'       total allocation, total costs (when applicable), and the overall
-#'       system-wide effectiveness or likely management success rate.
-#'       \code{Terra} raster write options may be passed to the function for
-#'       saving grid-based designs.} ####
+#'       resource \code{allocation}, the probability of management success (or
+#'       effectiveness) values (\code{manage_pr}), and a \code{summary} (CSV)
+#'       of the total allocation, costs (when applicable), and the overall
+#'       system-wide probability of success (or effectiveness) of the
+#'       management design (\code{overall_pr}). \code{Terra} raster write
+#'       options may be passed to the function for saving grid-based designs.}
 #'   }
 #' @references
 #'   Cannon, R. M. (2009). Inspecting and monitoring on a restricted budget -
@@ -115,19 +97,32 @@
 #' @export
 ManageDesign <- function(context,
                          divisions,
+                         dim_type = c("spatial",
+                                      "temporal",
+                                      "spatiotemporal",
+                                      "species",
+                                      "pathways",
+                                      "strategies",
+                                      "responses",
+                                      "user"),
                          establish_pr = NULL,
-                         optimal = c("saving", "benefit", "effectiveness",
+                         optimal = c("saving",
+                                     "benefit",
+                                     "effectiveness",
                                      "none"),
-                         alloc_unit = c("units", "hours", "traps",
-                                        "treatments", "removals", "user"),
-                         cost_unit = c("$", "hours", "user"),
+                         alloc_unit = c("units",
+                                        "hours",
+                                        "traps",
+                                        "treatments",
+                                        "removals",
+                                        "user"),
+                         cost_unit = c("$",
+                                       "hours",
+                                       "user"),
                          benefit = NULL,
                          alloc_cost = NULL,
-                         fixed_cost = NULL,
                          budget = NULL,
                          overall_pr = NULL,
-                         min_alloc = NULL,
-                         discrete_alloc = FALSE,
                          exist_alloc = NULL,
                          exist_manage_pr = NULL,
                          class = character(), ...) {
@@ -138,20 +133,32 @@ ManageDesign <- function(context,
 #' @export
 ManageDesign.ManageContext <- function(context,
                                        divisions,
+                                       dim_type = c("spatial",
+                                                    "temporal",
+                                                    "spatiotemporal",
+                                                    "species",
+                                                    "pathways",
+                                                    "strategies",
+                                                    "responses",
+                                                    "user"),
                                        establish_pr = NULL,
-                                       optimal = c("saving", "benefit",
-                                                   "effectiveness", "none"),
-                                       alloc_unit = c("units", "hours",
-                                                      "traps", "treatments",
-                                                      "removals", "user"),
-                                       cost_unit = c("$", "hours", "user"),
+                                       optimal = c("saving",
+                                                   "benefit",
+                                                   "effectiveness",
+                                                   "none"),
+                                       alloc_unit = c("units",
+                                                      "hours",
+                                                      "traps",
+                                                      "treatments",
+                                                      "removals",
+                                                      "user"),
+                                       cost_unit = c("$",
+                                                     "hours",
+                                                     "user"),
                                        benefit = NULL,
                                        alloc_cost = NULL,
-                                       fixed_cost = NULL,
                                        budget = NULL,
                                        overall_pr = NULL,
-                                       min_alloc = NULL,
-                                       discrete_alloc = FALSE,
                                        exist_alloc = NULL,
                                        exist_manage_pr = NULL,
                                        class = character(), ...) {
@@ -183,8 +190,17 @@ ManageDesign.ManageContext <- function(context,
     relative_establish_pr <- FALSE
   }
 
-  # Match optimal arguments
+  # Match dim_type, optimal, alloc_unit, & cost_unit arguments
+  if (!is.character(dim_type) || length(dim_type) > 1) {
+    dim_type <- match.arg(dim_type)
+  }
   optimal <- match.arg(optimal)
+  if (!is.character(alloc_unit) || length(alloc_unit) > 1) {
+    alloc_unit <- match.arg(alloc_unit)
+  }
+  if (!is.character(cost_unit) || length(cost_unit) > 1) {
+    cost_unit <- match.arg(cost_unit)
+  }
 
   # Check benefit, and overall_pr
   if (!is.null(benefit) &&
@@ -217,29 +233,14 @@ ManageDesign.ManageContext <- function(context,
          call. = FALSE)
   }
 
-  # Check alloc_cost, fixed_cost, budget, min_alloc, exist_alloc, &
-  # exist_manage_pr
+  # Check alloc_cost, budget, exist_alloc, & exist_manage_pr
   if (!is.null(alloc_cost) &&
       (!is.numeric(alloc_cost) || !length(alloc_cost) %in% c(1, parts))) {
     stop(paste("The allocation cost parameter must be a numeric vector with",
                "values for each division part."), call. = FALSE)
   }
-  if (!is.null(fixed_cost) &&
-      (!is.numeric(fixed_cost) || !length(fixed_cost) %in% c(1, parts))) {
-    stop(paste("The fixed cost parameter must be a numeric vector with values",
-               "for each division part."), call. = FALSE)
-  }
   if (!is.null(budget) && (!is.numeric(budget) || budget <= 0)) {
     stop("The budget parameter must be numeric and > 0.", call. = FALSE)
-  }
-  if (!is.null(min_alloc) &&
-      (!is.numeric(min_alloc) || !length(min_alloc) %in% c(1, parts))) {
-    stop(paste("The minimum allocation parameter must be a numeric vector",
-               "with values for each division part."), call. = FALSE)
-  }
-  if (!is.logical(discrete_alloc)) {
-    stop("The discrete allocation indicator parameter must be logical.",
-         call. = FALSE)
   }
   if (!is.null(exist_alloc) && optimal != "none") {
     stop(paste("The existing allocation parameter should only be specified",
@@ -271,6 +272,11 @@ ManageDesign.ManageContext <- function(context,
   # Get divisions object
   self$get_divisions <- function() {
     return(divisions)
+  }
+
+  # Get dimension type
+  self$get_dim_type <- function() {
+    return(dim_type)
   }
 
   # Get the allocated surveillance resource quantities of the design
