@@ -5,9 +5,25 @@
 \alias{ManageControls.Region}
 \title{Manage controls class builder}
 \usage{
-ManageControls(region, population_model, stages = NULL, schedule = NULL, ...)
+ManageControls(
+  region,
+  population_model,
+  control_design,
+  control_type = c("search_destroy", "growth", "spread", "establishment"),
+  stages = NULL,
+  schedule = NULL,
+  ...
+)
 
-\method{ManageControls}{Region}(region, population_model, stages = NULL, schedule = NULL, ...)
+\method{ManageControls}{Region}(
+  region,
+  population_model,
+  control_design,
+  control_type = c("search_destroy", "growth", "spread", "establishment"),
+  stages = NULL,
+  schedule = NULL,
+  ...
+)
 }
 \arguments{
 \item{region}{A \code{bsspread::Region} or inherited class object
@@ -17,6 +33,14 @@ simulations.}
 \item{population_model}{A \code{bsspread::Population} or inherited class
 object defining the population representation for the management
 simulations.}
+
+\item{control_design}{A \code{ManageDesign}, \code{ControlDesign}, or
+inherited class object representing the distribution of control resources
+and their success probabilities or effectiveness.}
+
+\item{control_type}{One of \code{"search_destroy"} (default),
+\code{"growth"} (including fertility), \code{"spread"}, or
+\code{"establishment"} to indicate the type of control applied.}
 
 \item{stages}{Numeric vector of population stages (indices) to which
 management controls are applied. Default is all stages (when set to
@@ -48,5 +72,6 @@ newly applied controls.}
 }
 \description{
 Builds a class for simulating the application of invasive species management
-controls, such as suppressing growth, fertility, spread, or establishment.
+controls, such as combined surveillance and removal ("search & destroy"),
+suppressing growth, fertility, spread, or establishment.
 }

@@ -92,19 +92,21 @@ ManageDetection.Region <- function(region, population_model, surveillance,
 
       # Occupied locations
       idx <- which(rowSums(as.matrix(n)) > 0)
+      if (length(idx) > 0) {
 
-      # Get detection sensitivity (probability)
-      detect_pr <- surveillance$get_sensitivity()[idx]
+        # Get detection sensitivity (probability)
+        detect_pr <- surveillance$get_sensitivity()[idx]
 
-      # Sample detections
-      if (population_model$get_type() == "stage_structured") {
-        for (i in self$get_stages()) {
-          detected[idx,i] <- stats::rbinom(length(idx), size = n[idx,i],
-                                           prob = detect_pr)
+        # Sample detections
+        if (population_model$get_type() == "stage_structured") {
+          for (i in self$get_stages()) {
+            detected[idx,i] <- stats::rbinom(length(idx), size = n[idx,i],
+                                             prob = detect_pr)
+          }
+        } else {
+          detected[idx] <- stats::rbinom(length(idx), size = n[idx],
+                                         prob = detect_pr)
         }
-      } else {
-        detected[idx] <- stats::rbinom(length(idx), size = n[idx],
-                                       prob = detect_pr)
       }
     }
 
