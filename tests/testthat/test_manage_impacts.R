@@ -25,11 +25,28 @@ test_that("initializes with impacts, populations and impact stages", {
                                                impact_stages = 3:4),
                paste("Impact stages must be a vector of stage indices",
                      "consistent with the population model."))
+  expect_error(manage_impacts <- ManageImpacts(impacts, population_model,
+                                               calc_total = 1),
+               "Calculate total indicator should be logical.")
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
                                                 impact_stages = 2:3))
   expect_is(manage_impacts, "ManageImpacts")
+  expect_named(manage_impacts, c("get_context", "get_calc_total",
+                                 "includes_combined", "calculate"))
   expect_is(manage_impacts$get_context(), "Context")
   expect_true(manage_impacts$includes_combined())
+  expect_true(manage_impacts$get_calc_total())
+
+  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
+                                                calc_total = FALSE))
+  expect_false(manage_impacts$get_calc_total())
+  context <- bsimpact::Context("My species",
+                               impact_scope = c("aspect1", "aspect2"),
+                               valuation_type = "non-monetary")
+  impacts <- bsimpact::ImpactAnalysis(context, region, incursion,
+                                      impact_layers)
+  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model))
+  expect_false(manage_impacts$get_calc_total())
 })
 
 test_that("calculates impacts including combined", {

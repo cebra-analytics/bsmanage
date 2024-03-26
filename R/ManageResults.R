@@ -204,7 +204,7 @@ ManageResults.Region <- function(region, population_model,
       if (impacts_i$includes_combined()) {
         impact_aspects$combined <- zeros$collated_steps
       }
-      if (impacts_i$get_context()$get_valuation_type() == "monetary") {
+      if (impacts_i$get_calc_total()) {
         impact_aspects$total <- zeros$total_steps
       }
       impact_aspects

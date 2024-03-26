@@ -11,11 +11,18 @@
 #'   defining the population representation for the management simulations.
 #' @param impact_stages Numeric vector of population stages (indices) that
 #'   contribute to impacts. Default is all stages (when set to \code{NULL}).
+#' @param calc_total Logical indicator for whether or not total impacts may
+#'   be (sensibly) calculated by summing across region locations. Default is
+#'   \code{NULL}, whereby totals are only calculated when the impact (context)
+#'   valuation type is \code{"monetary"}. Set to \code{TRUE} if it makes sense
+#'   to sum total \code{"non-monetary"} or \code{"ranking"} impact valuations
+#'   across region locations.
 #' @param ... Additional parameters.
 #' @return A \code{ManageImpacts} class object (list) containing functions for
 #'   getting the impact context and performing impact calculations:
 #'   \describe{
 #'     \item{\code{get_context()}}{Get \code{bsimpact::Context} object.}
+#'     \item{\code{get_calc_total()}}{Get calculate total indicator.}
 #'     \item{\code{includes_combined()}}{Logical indicator for when impacts are
 #'       combined.}
 #'     \item{\code{calculate(n)}}{Perform impact calculations resulting from
@@ -24,7 +31,8 @@
 #'   }
 #' @export
 ManageImpacts <- function(impacts, population_model,
-                          impact_stages = NULL, ...) {
+                          impact_stages = NULL,
+                          calc_total = NULL, ...) {
 
   # Check the impacts object
   if (!is.null(impacts) && !inherits(impacts, "ImpactAnalysis")) {
@@ -54,12 +62,24 @@ ManageImpacts <- function(impacts, population_model,
     }
   }
 
+  # Check and resolve the calculate total indicator
+  if (is.null(calc_total)) {
+    calc_total <- (impacts$get_context()$get_valuation_type() == "monetary")
+  } else if (!is.logical(calc_total)) {
+    stop("Calculate total indicator should be logical.", call. = FALSE)
+  }
+
   # Create a class structure
   self <- structure(list(), class = "ManageImpacts")
 
   # Get context
   self$get_context <- function() {
     return(impacts$get_context())
+  }
+
+  # Get calculate total indicator
+  self$get_calc_total <- function() {
+    return(calc_total)
   }
 
   # Impacts combined?

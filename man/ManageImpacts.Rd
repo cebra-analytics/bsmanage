@@ -4,7 +4,13 @@
 \alias{ManageImpacts}
 \title{Manage impacts class builder}
 \usage{
-ManageImpacts(impacts, population_model, impact_stages = NULL, ...)
+ManageImpacts(
+  impacts,
+  population_model,
+  impact_stages = NULL,
+  calc_total = NULL,
+  ...
+)
 }
 \arguments{
 \item{impacts}{A \code{bsimpact::ImpactAnalysis} or inherited class object
@@ -18,6 +24,13 @@ defining the population representation for the management simulations.}
 \item{impact_stages}{Numeric vector of population stages (indices) that
 contribute to impacts. Default is all stages (when set to \code{NULL}).}
 
+\item{calc_total}{Logical indicator for whether or not total impacts may
+be (sensibly) calculated by summing across region locations. Default is
+\code{NULL}, whereby totals are only calculated when the impact (context)
+valuation type is \code{"monetary"}. Set to \code{TRUE} if it makes sense
+to sum total \code{"non-monetary"} or \code{"ranking"} impact valuations
+across region locations.}
+
 \item{...}{Additional parameters.}
 }
 \value{
@@ -25,6 +38,7 @@ A \code{ManageImpacts} class object (list) containing functions for
 getting the impact context and performing impact calculations:
 \describe{
 \item{\code{get_context()}}{Get \code{bsimpact::Context} object.}
+\item{\code{get_calc_total()}}{Get calculate total indicator.}
 \item{\code{includes_combined()}}{Logical indicator for when impacts are
 combined.}
 \item{\code{calculate(n)}}{Perform impact calculations resulting from
