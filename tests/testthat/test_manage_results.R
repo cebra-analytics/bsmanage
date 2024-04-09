@@ -9,15 +9,14 @@ test_that("initializes inherited object with impacts and actions", {
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   context <- list(bsimpact::Context("My species",
                                     impact_scope = c("aspect1", "aspect2")),
-                  bsimpact::Context("My species",
-                                    impact_scope = c("aspect3", "aspect4")))
+                  bsimpact::Context("My species", impact_scope = "aspect3",
+                                    valuation_type = "non-monetary"))
   incursion <- bsimpact::Incursion(template*0, region, type = "density",
                                    multiplier = 0.2)
   impact_layers <- list(aspect1 = 100*(template > 0.1 & template < 0.3),
                         aspect2 = 200*(template > 0.2 & template < 0.4),
-                        aspect3 = 300*(template > 0.1 & template < 0.3),
-                        aspect4 = 400*(template > 0.2 & template < 0.4))
-  loss_rates <- c(aspect1 = 0.1, aspect2 = 0.2, aspect3 = 0.3, aspect4 = 0.4)
+                        aspect3 = 300*(template > 0.1 & template < 0.3))
+  loss_rates <- c(aspect1 = 0.1, aspect2 = 0.2, aspect3 = 0.3)
   impacts <- list(
     a1 = ManageImpacts(
       bsimpact::ValueImpacts(context[[1]], region, incursion,
@@ -25,8 +24,9 @@ test_that("initializes inherited object with impacts and actions", {
       population_model),
     a2 = ManageImpacts(
       bsimpact::ValueImpacts(context[[2]], region, incursion,
-                             impact_layers[3:4], loss_rates = loss_rates[3:4]),
-      population_model))
+                             impact_layers[3], loss_rates = loss_rates[3],
+                             combine_function = "none"),
+      population_model, calc_total = TRUE))
   surveillance <-
     bsdesign::SpatialSurvDesign(context = bsdesign::Context("test"),
                                 divisions = bsdesign::Divisions(template),
@@ -69,8 +69,7 @@ test_that("initializes inherited object with impacts and actions", {
   expect_equal(lapply(result_list$impacts, function(i) lapply(i, length)),
                list(a1 = list(aspect1 = 6, aspect2 = 6, combined = 6,
                               total = 11),
-                    a2 = list(aspect3 = 6, aspect4 = 6, combined = 6,
-                              total = 11)))
+                    a2 = list(aspect3 = 6, total = 11)))
   expect_equal(lapply(result_list$actions, function(i) lapply(i, length)),
                list(a3 = list(detected = 6, total = 11),
                     a4 = list(removed = 6, total = 11)))
@@ -82,8 +81,7 @@ test_that("initializes inherited object with impacts and actions", {
                       function(i) lapply(i, function(j) sapply(j, length))),
                list(a1 = list(aspect1 = collated, aspect2 = collated,
                               combined = collated, total = totals),
-                    a2 = list(aspect3 = collated, aspect4 = collated,
-                              combined = collated, total = totals)))
+                    a2 = list(aspect3 = collated, total = totals)))
   expect_equal(lapply(result_list$actions,
                       function(i) lapply(i, function(j) sapply(j, length))),
                list(a3 = list(detected = collated, total = totals),
@@ -100,19 +98,18 @@ test_that("collates and finalizes impact results", {
   n[5920:5922] <- 7:9
   context <- list(bsimpact::Context("My species",
                                     impact_scope = c("aspect1", "aspect2")),
-                  bsimpact::Context("My species",
-                                    impact_scope = c("aspect3", "aspect4")))
+                  bsimpact::Context("My species", impact_scope = "aspect3",
+                                    valuation_type = "non-monetary"))
   incursion <- bsimpact::Incursion(template*0, region, type = "density",
                                    multiplier = 0.1)
   aspects <- list(aspect1 = "aspect1", aspect2 = "aspect2",
-                  aspect3 = "aspect3", aspect4 = "aspect4")
+                  aspect3 = "aspect3")
   impact_layers <- list(aspect1 = 100*(template > 0.1 & template < 0.3),
                         aspect2 = 200*(template > 0.2 & template < 0.4),
-                        aspect3 = 300*(template > 0.1 & template < 0.3),
-                        aspect4 = 400*(template > 0.2 & template < 0.4))
+                        aspect3 = 300*(template > 0.1 & template < 0.3))
   impact_layer_vals <- lapply(impact_layers,
                               function(l) l[region$get_indices()][5920:5922,])
-  loss_rates <- c(aspect1 = 0.1, aspect2 = 0.2, aspect3 = 0.3, aspect4 = 0.4)
+  loss_rates <- c(aspect1 = 0.1, aspect2 = 0.2, aspect3 = 0.3)
   impact_names <- list(a1 = "a1", a2 = "a2")
   impacts <- list(
     a1 = ManageImpacts(
@@ -121,8 +118,9 @@ test_that("collates and finalizes impact results", {
       population_model),
     a2 = ManageImpacts(
       bsimpact::ValueImpacts(context[[2]], region, incursion,
-                             impact_layers[3:4], loss_rates = loss_rates[3:4]),
-      population_model))
+                             impact_layers[3], loss_rates = loss_rates[3],
+                             combine_function = "none"),
+      population_model, calc_total = TRUE))
   calc_impacts <- lapply(impacts, function(impacts_i) impacts_i$calculate(n))
   expected_collated <- lapply(calc_impacts, function(i) {
     lapply(i, function(j) j[5920:5922])
@@ -134,12 +132,17 @@ test_that("collates and finalizes impact results", {
                                          collation_steps = 2, replicates = 1))
   expect_silent(results$collate(r = 1, tm = 2, n = n, calc_impacts))
   expect_silent(result_list <- results$get_list())
-  expect_equal(lapply(result_list$impacts, function(i) {
-    lapply(i[1:3], function(j) j[["2"]][5920:5922])
-  }), expected_collated)
-  expect_equal(lapply(result_list$impacts, function(i) {
-    lapply(i[4], function(j) j[["2"]])
-  }), lapply(expected_collated, function(i) list(total = sum(i$combined))))
+
+  expect_equal(lapply(result_list$impacts,
+                      function(i) lapply(i[names(i) != "total"],
+                                         function(j) j[["2"]][5920:5922])),
+               expected_collated)
+  expect_equal(lapply(result_list$impacts,
+                      function(i) lapply(i[names(i) == "total"],
+                                         function(j) j[["2"]])),
+               lapply(expected_collated,
+                      function(i) list(total = sum(
+                        unlist(i[names(i) != "combined"])))))
   # multiple replicates
   expect_silent(results <- ManageResults(region,
                                          population_model = population_model,
@@ -172,22 +175,28 @@ test_that("collates and finalizes impact results", {
   expect_silent(results$collate(r = 3, tm = 2, n = n, calc_impacts[[3]]))
   expect_silent(results$finalize())
   expect_silent(result_list <- results$get_list())
-  expect_equal(lapply(result_list$impacts, function(i) {
-    lapply(i[1:3], function(j) j[["2"]]$mean[5920:5922])
-  }), lapply(calc_impacts_r,
-             function(i) lapply(i, function(a) colMeans(a))))
-  expect_equal(lapply(result_list$impacts, function(i) {
-    lapply(i[1:3], function(j) j[["2"]]$sd[5920:5922])
-    }), lapply(calc_impacts_r,
-               function(i) lapply(i, function(a) apply(a, 2, sd))))
-  expect_equal(lapply(result_list$impacts, function(i) {
-    lapply(i[4], function(j) j[["2"]]$mean)
-  }), lapply(calc_impacts_r,
-             function(i) list(total = mean(rowSums(i$combined)))))
-  expect_equal(lapply(result_list$impacts, function(i) {
-    lapply(i[4], function(j) j[["2"]]$sd)
-  }), lapply(calc_impacts_r,
-             function(i) list(total = sd(rowSums(i$combined)))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) != "total"],
+                              function(j) j[["2"]]$mean[5920:5922])),
+    lapply(calc_impacts_r, function(i) lapply(i, function(a) colMeans(a))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) != "total"],
+                              function(j) j[["2"]]$sd[5920:5922])),
+    lapply(calc_impacts_r, function(i) lapply(i, function(a) apply(a, 2, sd))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"],
+                              function(j) j[["2"]]$mean)),
+    list(a1 = list(total = mean(rowSums(calc_impacts_r$a1$combined))),
+         a2 = list(total = mean(rowSums(calc_impacts_r$a2$aspect3)))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"],
+                              function(j) j[["2"]]$sd)),
+    list(a1 = list(total = sd(rowSums(calc_impacts_r$a1$combined))),
+         a2 = list(total = sd(rowSums(calc_impacts_r$a2$aspect3)))))
 })
 
 test_that("collates and finalizes action results", {

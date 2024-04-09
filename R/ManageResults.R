@@ -258,11 +258,15 @@ ManageResults.Region <- function(region, population_model,
             }
           }
 
-          # Total combined aspects at every time step
-          if ("combined" %in% names(calc_impacts[[i]]) &&
-              "total" %in% names(results$impacts[[i]])) {
+          # Total aspects at every time step
+          if ("total" %in% names(results$impacts[[i]])) {
             previous_mean <- results$impacts[[i]]$total[[tmc]]$mean
-            total_impact <- sum(calc_impacts[[i]]$combined)
+            total_impact <- 0
+            if ("combined" %in% names(calc_impacts[[i]])) {
+              total_impact <- sum(calc_impacts[[i]]$combined)
+            } else if (length(calc_impacts[[i]]) == 1) {
+              total_impact <- sum(calc_impacts[[i]][[1]])
+            }
             results$impacts[[i]]$total[[tmc]]$mean <<-
               previous_mean + (total_impact - previous_mean)/r
             previous_sd <- results$impacts[[i]]$total[[tmc]]$sd
@@ -281,11 +285,14 @@ ManageResults.Region <- function(region, population_model,
             }
           }
 
-          # Total combined aspects at every time step
-          if ("combined" %in% names(calc_impacts[[i]]) &&
-              "total" %in% names(results$impacts[[i]])) {
-            results$impacts[[i]]$total[[tmc]] <<-
-              sum(calc_impacts[[i]]$combined)
+          # Total aspects at every time step
+          if ("total" %in% names(results$impacts[[i]])) {
+            if ("combined" %in% names(calc_impacts[[i]])) {
+              results$impacts[[i]]$total[[tmc]] <<-
+                sum(calc_impacts[[i]]$combined)
+            } else if (length(calc_impacts[[i]]) == 1) {
+              results$impacts[[i]]$total[[tmc]] <<- sum(calc_impacts[[i]][[1]])
+            }
           }
         }
       }

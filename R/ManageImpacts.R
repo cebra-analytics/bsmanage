@@ -16,7 +16,7 @@
 #'   \code{NULL}, whereby totals are only calculated when the impact (context)
 #'   valuation type is \code{"monetary"}. Set to \code{TRUE} if it makes sense
 #'   to sum total \code{"non-monetary"} or \code{"ranking"} impact valuations
-#'   across region locations.
+#'   across region locations (providing multiple aspects can be combined).
 #' @param ... Additional parameters.
 #' @return A \code{ManageImpacts} class object (list) containing functions for
 #'   getting the impact context and performing impact calculations:
@@ -65,6 +65,10 @@ ManageImpacts <- function(impacts, population_model,
   # Check and resolve the calculate total indicator
   if (is.null(calc_total)) {
     calc_total <- (impacts$get_context()$get_valuation_type() == "monetary")
+  } else if (is.logical(calc_total) && calc_total &&
+             length(impacts$get_context()$get_impact_scope()) > 1 &&
+             !("combined_impacts" %in% names(impacts))) {
+    stop("Cannot combine impacts to calculate total.", call. = FALSE)
   } else if (!is.logical(calc_total)) {
     stop("Calculate total indicator should be logical.", call. = FALSE)
   }

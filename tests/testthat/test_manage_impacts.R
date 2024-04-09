@@ -36,7 +36,6 @@ test_that("initializes with impacts, populations and impact stages", {
   expect_is(manage_impacts$get_context(), "Context")
   expect_true(manage_impacts$includes_combined())
   expect_true(manage_impacts$get_calc_total())
-
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
                                                 calc_total = FALSE))
   expect_false(manage_impacts$get_calc_total())
@@ -47,6 +46,22 @@ test_that("initializes with impacts, populations and impact stages", {
                                       impact_layers)
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model))
   expect_false(manage_impacts$get_calc_total())
+  impacts <- bsimpact::ImpactAnalysis(context, region, incursion,
+                                      impact_layers, combine_function = "none")
+  expect_error(manage_impacts <- ManageImpacts(impacts, population_model,
+                                               calc_total = TRUE),
+               "Cannot combine impacts to calculate total.")
+  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
+                                                calc_total = FALSE))
+  expect_false(manage_impacts$get_calc_total())
+  context <- bsimpact::Context("My species", impact_scope = "aspect1",
+                               valuation_type = "non-monetary")
+  impacts <- bsimpact::ImpactAnalysis(context, region, incursion,
+                                      impact_layers[1],
+                                      combine_function = "none")
+  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
+                                                calc_total = TRUE))
+  expect_true(manage_impacts$get_calc_total())
 })
 
 test_that("calculates impacts including combined", {
@@ -77,8 +92,10 @@ test_that("calculates impacts including combined", {
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
                                                 impact_stages = 2:3))
   expected_impacts <- lapply(aspects, function(l) {
-    (rowSums(n[,2:3])*impact_layers[[l]][region$get_indices()][,1]*0.2*
-       loss_rates[l])
+    impact_incursion <- rowSums(n[,2:3])*0.2
+    impact_incursion[which(impact_incursion > 1)] <- 1
+    (impact_incursion*impact_layers[[l]][region$get_indices()][,1]*
+        loss_rates[l])
   })
   expected_impacts$combined <-
     expected_impacts$aspect1 + expected_impacts$aspect2

@@ -29,7 +29,7 @@ be (sensibly) calculated by summing across region locations. Default is
 \code{NULL}, whereby totals are only calculated when the impact (context)
 valuation type is \code{"monetary"}. Set to \code{TRUE} if it makes sense
 to sum total \code{"non-monetary"} or \code{"ranking"} impact valuations
-across region locations.}
+across region locations (providing multiple aspects can be combined).}
 
 \item{...}{Additional parameters.}
 }
