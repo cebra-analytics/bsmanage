@@ -699,7 +699,7 @@ ManageResults.Region <- function(region, population_model,
           if (replicates > 1) { # plot summary mean +/- 2 SD
             totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
                            sd = as.numeric(totals["sd",,drop = FALSE]))
-            grDevices::png(filename = sprintf("impact_totals%s.png", ic[1]))
+            grDevices::png(filename = sprintf("impacts_totals%s.png", ic[1]))
             graphics::plot(0:time_steps, totals$mean, type = "l",
                            main = sprintf("Total impacts%s (mean +/- 2 SD)",
                                           ic[2]),
@@ -713,7 +713,7 @@ ManageResults.Region <- function(region, population_model,
                             lty = "dashed")
             invisible(grDevices::dev.off())
           } else {
-            grDevices::png(filename = sprintf("impact_totals%s.png", ic[1]))
+            grDevices::png(filename = sprintf("impacts_totals%s.png", ic[1]))
             graphics::plot(0:time_steps, totals, type = "l",
                            main = sprintf("Total impacts%s", ic[2]),
                            xlab = plot_x_label,
@@ -750,7 +750,7 @@ ManageResults.Region <- function(region, population_model,
           if (replicates > 1) { # plot summary mean +/- 2 SD
             totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
                            sd = as.numeric(totals["sd",,drop = FALSE]))
-            grDevices::png(filename = sprintf("action_total%s_%s.png", ic[1],
+            grDevices::png(filename = sprintf("actions_total%s_%s.png", ic[1],
                                               label))
             graphics::plot(0:time_steps, totals$mean, type = "l",
                            main = sprintf("Total actions%s %s (mean +/- 2 SD)",
@@ -765,7 +765,7 @@ ManageResults.Region <- function(region, population_model,
                             lty = "dashed")
             invisible(grDevices::dev.off())
           } else {
-            grDevices::png(filename = sprintf("action_total%s_%s.png", ic[1],
+            grDevices::png(filename = sprintf("actions_total%s_%s.png", ic[1],
                                               label))
             graphics::plot(0:time_steps, totals, type = "l",
                            main = sprintf("Total action%s %s", ic[2], label),
