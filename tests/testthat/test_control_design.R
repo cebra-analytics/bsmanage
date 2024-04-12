@@ -219,6 +219,12 @@ test_that("resource allocation utilises previous control efforts", {
     benefit = test_ref$cost_undetected - test_ref$cost_detected,
     budget = NULL,
     previous_control = previous_control))
+  expect_named(
+    control_design,
+    c("get_context", "get_divisions", "get_dim_type", "get_allocation",
+      "get_manage_pr", "get_overall_pr", "save_design",
+      "get_mod_establish_pr"))
+  expect_equal(control_design$get_mod_establish_pr(), mod_establish_pr)
   expect_silent(mod_alloc <- control_design$get_allocation())
   expect_equal(mod_alloc, expected_alloc)
   expect_true(all(mod_alloc[which(repeats > 0)] <

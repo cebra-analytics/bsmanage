@@ -94,6 +94,8 @@
 #'     \item{\code{get_context()}}{Get context object.}
 #'     \item{\code{get_divisions()}}{Get divisions object.}
 #'     \item{\code{get_dim_type()}}{Get dimension type.}
+#'     \item{\code{get_mod_establish_pr()}}{Get the modified establishment
+#'       likelihood (only when previous control is specified).}
 #'     \item{\code{get_allocation()}}{Get allocated resources via specified
 #'       strategy, utilizing savings, benefits, budget constraints, and/or
 #'       desired overall management success probability level.}
@@ -288,6 +290,11 @@ ControlDesign.ManageContext <- function(context,
     }
     attributes(previous_control) <- NULL
     establish_pr <- establish_pr*(1 - previous_control)^repeats
+
+    # Get the modified establishment likelihood
+    self$get_mod_establish_pr <- function() {
+      return(establish_pr)
+    }
   }
 
   # Utilise a (spatial) surveillance design object for Lagrange optimization

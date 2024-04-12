@@ -159,6 +159,8 @@ success probabilities (or effectiveness):
 \item{\code{get_context()}}{Get context object.}
 \item{\code{get_divisions()}}{Get divisions object.}
 \item{\code{get_dim_type()}}{Get dimension type.}
+\item{\code{get_mod_establish_pr()}}{Get the modified establishment
+likelihood (only when previous control is specified).}
 \item{\code{get_allocation()}}{Get allocated resources via specified
 strategy, utilizing savings, benefits, budget constraints, and/or
 desired overall management success probability level.}
