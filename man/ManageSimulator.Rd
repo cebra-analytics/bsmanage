@@ -97,10 +97,10 @@ inherited class object.}
 applying invasive species management actions, such as detection, control,
 and removal.}
 
-\item{user_function}{An optional user-defined \code{function(n)} that is
-applied to the population vector or matrix \code{n} (returning a
-transformed \code{n}) prior to collating the results at each simulation
-time step.}
+\item{user_function}{An optional user-defined \code{function(n, r, tm)} that
+is applied to the population vector or matrix \code{n} (returning a
+transformed \code{n}) prior to collating the results at simulation
+replicate \code{r} and time step \code{tm}.}
 
 \item{...}{Additional parameters.}
 }

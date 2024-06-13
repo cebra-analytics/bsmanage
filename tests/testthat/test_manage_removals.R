@@ -91,7 +91,7 @@ test_that("applies stochastic removals to invasive population", {
                                                   stages = 2:3,
                                                   schedule = 4:6))
   expect_silent(new_n <- manage_removals$apply(n, 4))
-  expect_equal(attr(new_n, "removed")[5920:5922,], n[5920:5922,]*0)
+  expect_equal(attr(new_n, "removed")[5920:5922,], array(0, c(3,3)))
   expect_equal(new_n[5920:5922,], n[5920:5922,])
   # with detected
   attr(n, "detected") <- n*0

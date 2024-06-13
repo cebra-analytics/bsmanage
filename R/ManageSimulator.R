@@ -42,10 +42,10 @@
 #' @param actions A list of \code{ManageActions} or inherited class objects for
 #'   applying invasive species management actions, such as detection, control,
 #'   and removal.
-#' @param user_function An optional user-defined \code{function(n)} that is
-#'   applied to the population vector or matrix \code{n} (returning a
-#'   transformed \code{n}) prior to collating the results at each simulation
-#'   time step.
+#' @param user_function An optional user-defined \code{function(n, r, tm)} that
+#'   is applied to the population vector or matrix \code{n} (returning a
+#'   transformed \code{n}) prior to collating the results at simulation
+#'   replicate \code{r} and time step \code{tm}.
 #' @param ... Additional parameters.
 #' @return A \code{ManageSimulator} class object (list) containing functions for
 #'   setting objects (in the function environment) and running the simulations:
@@ -310,7 +310,11 @@ ManageSimulator.Region <- function(region,
         # User-defined function
         if (is.function(user_function)) {
           n_attr <- attributes(n) # get attributes
-          n <- user_function(n)
+          if (length(formals(user_function)) == 3) {
+            n <- user_function(n, r, tm)
+          } else { # previously just n
+            n <- user_function(n)
+          }
           for (i in 1:length(n_attr)) { # restore attributes
             if (!names(n_attr[i]) %in% names(attributes(n))) {
               attr(n, names(n_attr[i])) <- n_attr[[i]]

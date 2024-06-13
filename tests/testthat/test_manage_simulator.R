@@ -110,8 +110,9 @@ test_that("runs simulator with correct configuration", {
     dispersal_models = list(dispersal),
     impacts = impacts,
     actions = actions,
-    user_function = function(n) {
+    user_function = function(n, r, tm) {
       attr(n, "user") <- c(attr(n, "user"), max(c(attr(n, "user"), 0) + 1))
+      attr(n, "tm") <- c(attr(n, "tm"), tm)
       n
     }))
   expect_silent(results <- simulator$run())
@@ -122,9 +123,9 @@ test_that("runs simulator with correct configuration", {
   expect_equal(unname(sapply(results_list$collated, length)),
                rep(region$get_locations(), 3))
   expect_equal(attributes(results_list$collated[["2"]]),
-               list(growth = 1:2, dispersal = 1:2, user = 1:2))
+               list(growth = 1:2, dispersal = 1:2, user = 1:2, tm = 1:2))
   expect_equal(attributes(results_list$collated[["4"]]),
-               list(growth = 1:4, dispersal = 1:4, user = 1:4))
+               list(growth = 1:4, dispersal = 1:4, user = 1:4, tm = 1:4))
   expect_named(results_list$total, as.character(0:4))
   expect_named(results_list$area, as.character(0:4))
   expect_named(results_list$occupancy, as.character(seq(0, 4, 2)))
