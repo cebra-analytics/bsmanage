@@ -85,6 +85,7 @@ ManageDetection.Region <- function(region, population_model, surveillance,
     detected <- as.numeric(n)*0
     if (population_model$get_type() == "stage_structured") {
       detected <- array(detected, dim(n))
+      colnames(detected) <- attr(population_model$get_growth(), "labels")
     }
 
     # Scheduled time step?

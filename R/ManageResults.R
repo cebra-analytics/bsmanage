@@ -177,19 +177,36 @@ ManageResults.Region <- function(region, population_model,
   }
 
   # Population stages (NULL or number of stages)
-  stages <- population_model$get_stages() # TODO - needed?
+  stages <- population_model$get_stages()
+
+  # Stage labels
+  if (is.numeric(stages) && is.null(combine_stages)) {
+    stage_labels <- attr(population_model$get_growth(), "labels")
+  } else if (is.numeric(combine_stages)) {
+    stage_labels <- "combined"
+  }
 
   # Initialize additional incursion management result lists
   results <- list()
-  zeros <- list(collated = rep(0L, region$get_locations()), total = 0L)
+  zeros <- list(impact = rep(0L, region$get_locations()),
+                action = rep(0L, region$get_locations()), total = 0L)
+  if (is.numeric(stages) && is.null(combine_stages)) {
+    zeros$action <- population_model$make(initial = 0L)
+  } else if (is.numeric(combine_stages)) {
+    zeros$action <- array(0L, c(region$get_locations(), 1))
+    colnames(zeros$action) <- stage_labels
+  }
   if (replicates > 1) { # summaries
-    zeros$collated <- list(mean = zeros$collated, sd = zeros$collated)
+    zeros$impact <- list(mean = zeros$impact, sd = zeros$impact)
+    zeros$action <- list(mean = zeros$action, sd = zeros$action)
     zeros$total <- list(mean = zeros$total, sd = zeros$total)
   }
-  zeros$collated_steps <- list()
+  zeros$impact_steps <- list()
+  zeros$action_steps <- list()
   for (tm in as.character(c(0, seq(collation_steps, time_steps,
                                    by = collation_steps)))) {
-    zeros$collated_steps[[tm]] <- zeros$collated
+    zeros$impact_steps[[tm]] <- zeros$impact
+    zeros$action_steps[[tm]] <- zeros$action
   }
   zeros$total_steps <- list()
   for (tm in as.character(0:time_steps)) {
@@ -199,10 +216,10 @@ ManageResults.Region <- function(region, population_model,
     results$impacts <- lapply(impacts, function(impacts_i) {
       impact_aspects <- list()
       for (a in impacts_i$get_context()$get_impact_scope()) {
-        impact_aspects[[a]] <- zeros$collated_steps
+        impact_aspects[[a]] <- zeros$impact_steps
       }
       if (impacts_i$includes_combined()) {
-        impact_aspects$combined <- zeros$collated_steps
+        impact_aspects$combined <- zeros$impact_steps
       }
       if (impacts_i$get_calc_total()) {
         impact_aspects$total <- zeros$total_steps
@@ -213,7 +230,7 @@ ManageResults.Region <- function(region, population_model,
   if (length(actions) > 0) {
     results$actions <- lapply(actions, function(actions_i) {
       actions_list <- list()
-      actions_list[[actions_i$get_label()]] <- zeros$collated_steps
+      actions_list[[actions_i$get_label()]] <- zeros$action_steps
       actions_list$total <- zeros$total_steps
       actions_list
     })
@@ -308,6 +325,22 @@ ManageResults.Region <- function(region, population_model,
         a <- actions[[i]]$get_label()
         n_a <- attr(n, a)
 
+        # Combine stages when required
+        if (population_model$get_type() == "stage_structured" &&
+            is.numeric(combine_stages)) {
+          n_a <- matrix(rowSums(n_a[,combine_stages, drop = FALSE]), ncol = 1)
+          colnames(n_a) <- stage_labels
+        }
+
+        # Shape total when population is staged and not combined
+        if (population_model$get_type() == "stage_structured" &&
+            is.null(combine_stages)) {
+          total_n_a <- array(colSums(n_a), c(1, ncol(n_a)))
+          colnames(total_n_a) <- stage_labels
+        } else {
+          total_n_a <- sum(n_a)
+        }
+
         if (replicates > 1) { # summaries
 
           # Calculates running mean and standard deviation (note: variance*r is
@@ -327,13 +360,12 @@ ManageResults.Region <- function(region, population_model,
           # Total applied actions at every time step
           if ("total" %in% names(results$actions[[i]])) {
             previous_mean <- results$actions[[i]]$total[[tmc]]$mean
-            total <- sum(n_a)
             results$actions[[i]]$total[[tmc]]$mean <<-
-              previous_mean + (total - previous_mean)/r
+              previous_mean + (total_n_a - previous_mean)/r
             previous_sd <- results$actions[[i]]$total[[tmc]]$sd
             results$actions[[i]]$total[[tmc]]$sd <<-
-              (previous_sd + ((total - previous_mean)*
-                                (total -
+              (previous_sd + ((total_n_a - previous_mean)*
+                                (total_n_a -
                                    results$actions[[i]]$total[[tmc]]$mean)))
           }
 
@@ -346,7 +378,7 @@ ManageResults.Region <- function(region, population_model,
 
           # Total combined aspects at every time step
           if ("total" %in% names(results$actions[[i]])) {
-            results$actions[[i]]$total[[tmc]] <<- sum(n_a)
+            results$actions[[i]]$total[[tmc]] <<- total_n_a
           }
         }
       }
@@ -384,6 +416,31 @@ ManageResults.Region <- function(region, population_model,
             for (tmc in names(results$actions[[i]][[a]])) {
               results$actions[[i]][[a]][[tmc]]$sd <<-
                 sqrt(results$actions[[i]][[a]][[tmc]]$sd/(replicates - 1))
+            }
+          }
+        }
+      }
+    }
+
+    # Add labels to staged populations actions (again)
+    if (population_model$get_type() == "stage_structured") {
+      if (replicates > 1) {
+        summaries <- c("mean", "sd")
+      } else {
+        summaries <- ""
+      }
+      if (length(actions) > 0) {
+        for (i in 1:length(results$actions)) {
+          for (a in names(results$actions[[i]])) {
+            for (tmc in names(results$actions[[i]][[a]])) {
+              for (s in summaries) {
+                if (replicates > 1) {
+                  colnames(results$actions[[i]][[a]][[tmc]][[s]]) <<-
+                    stage_labels
+                } else {
+                  colnames(results$actions[[i]][[a]][[tmc]]) <<- stage_labels
+                }
+              }
             }
           }
         }
@@ -467,27 +524,57 @@ ManageResults.Region <- function(region, population_model,
             for (tmc in names(results$actions[[i]][[a]])) {
               for (s in summaries) {
 
-                # Copy actions into a raster
-                if (replicates > 1) {
-                  output_rast <-
-                    region$get_rast(results$actions[[i]][[a]][[tmc]][[s]])
-                  s <- paste0("_", s)
-                } else {
-                  output_rast <-
-                    region$get_rast(results$actions[[i]][[a]][[tmc]])
+                # Create and save an action results raster per stage
+                if (is.null(stages) || is.numeric(combine_stages)) {
+                  stages <- 1
                 }
+                for (j in 1:stages) {
 
-                # Write raster to file
-                if (length(action_i) == 1 && is.numeric(i)) {
-                  ic <- ""
-                } else {
-                  ic <- paste0("_", i)
+                  # Copy actions into a raster
+                  if (population_model$get_type() == "stage_structured") {
+                    if (replicates > 1) {
+                      output_rast <-
+                        region$get_rast(
+                          results$actions[[i]][[a]][[tmc]][[s]][,j])
+                    } else {
+                      output_rast <-
+                        region$get_rast(results$actions[[i]][[a]][[tmc]][,j])
+                    }
+                    if (is.null(combine_stages)) {
+                      names(output_rast) <- stage_labels[j]
+                      j <- paste0("_", j)
+                    } else if (is.numeric(combine_stages)) {
+                      names(output_rast) <- "combined"
+                      j <- ""
+                    }
+                  } else {
+                    if (replicates > 1) {
+                      output_rast <-
+                        region$get_rast(results$actions[[i]][[a]][[tmc]][[s]])
+                    } else {
+                      output_rast <-
+                        region$get_rast(results$actions[[i]][[a]][[tmc]])
+                    }
+                    j <- ""
+                  }
+
+                  # Write raster to file
+                  if (length(action_i) == 1 && is.numeric(i)) {
+                    ic <- ""
+                  } else {
+                    ic <- paste0("_", i)
+                  }
+                  if (replicates > 1) {
+                    sc <- paste0("_", s)
+                  } else {
+                    sc <- s
+                  }
+                  filename <- sprintf(
+                    paste0("actions%s_%s_t%0", nchar(as.character(time_steps)),
+                           "d%s%s.tif"),
+                    ic, a, as.integer(tmc), sc, j)
+                  terra::writeRaster(output_rast, filename, ...)
                 }
-                filename <- sprintf(
-                  paste0("actions%s_%s_t%0", nchar(as.character(time_steps)),
-                         "d%s.tif"),
-                  ic, a, as.integer(tmc), s)
-                terra::writeRaster(output_rast, filename, ...)
               }
             }
           }

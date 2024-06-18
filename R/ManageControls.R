@@ -94,6 +94,7 @@ ManageControls.Region <- function(region, population_model, control_design,
       controlled <- as.numeric(n)*0
       if (population_model$get_type() == "stage_structured") {
         controlled <- array(controlled, dim(n))
+        colnames(controlled) <- attr(population_model$get_growth(), "labels")
       }
 
       # Scheduled time step?

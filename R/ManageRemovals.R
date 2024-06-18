@@ -105,6 +105,7 @@ ManageRemovals.Region <- function(region, population_model,
     removed <- as.numeric(n)*0
     if (population_model$get_type() == "stage_structured") {
       removed <- array(removed, dim(n))
+      colnames(removed) <- attr(population_model$get_growth(), "labels")
     }
 
     # Scheduled time step?
