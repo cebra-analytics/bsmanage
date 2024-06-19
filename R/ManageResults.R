@@ -189,17 +189,23 @@ ManageResults.Region <- function(region, population_model,
   # Initialize additional incursion management result lists
   results <- list()
   zeros <- list(impact = rep(0L, region$get_locations()),
-                action = rep(0L, region$get_locations()), total = 0L)
+                action = rep(0L, region$get_locations()),
+                total_impact = 0L, total_action = 0L)
   if (is.numeric(stages) && is.null(combine_stages)) {
     zeros$action <- population_model$make(initial = 0L)
+    zeros$total_action <- zeros$action[1,, drop = FALSE]
   } else if (is.numeric(combine_stages)) {
     zeros$action <- array(0L, c(region$get_locations(), 1))
     colnames(zeros$action) <- stage_labels
+    zeros$total_action <- zeros$action[1,, drop = FALSE]
   }
   if (replicates > 1) { # summaries
     zeros$impact <- list(mean = zeros$impact, sd = zeros$impact)
     zeros$action <- list(mean = zeros$action, sd = zeros$action)
-    zeros$total <- list(mean = zeros$total, sd = zeros$total)
+    zeros$total_impact <- list(mean = zeros$total_impact,
+                               sd = zeros$total_impact)
+    zeros$total_action <- list(mean = zeros$total_action,
+                               sd = zeros$total_action)
   }
   zeros$impact_steps <- list()
   zeros$action_steps <- list()
@@ -208,9 +214,11 @@ ManageResults.Region <- function(region, population_model,
     zeros$impact_steps[[tm]] <- zeros$impact
     zeros$action_steps[[tm]] <- zeros$action
   }
-  zeros$total_steps <- list()
+  zeros$total_impact_steps <- list()
+  zeros$total_action_steps <- list()
   for (tm in as.character(0:time_steps)) {
-    zeros$total_steps[[tm]] <- zeros$total
+    zeros$total_impact_steps[[tm]] <- zeros$total_impact
+    zeros$total_action_steps[[tm]] <- zeros$total_action
   }
   if (length(impacts) > 0) {
     results$impacts <- lapply(impacts, function(impacts_i) {
@@ -222,7 +230,7 @@ ManageResults.Region <- function(region, population_model,
         impact_aspects$combined <- zeros$impact_steps
       }
       if (impacts_i$get_calc_total()) {
-        impact_aspects$total <- zeros$total_steps
+        impact_aspects$total <- zeros$total_impact_steps
       }
       impact_aspects
     })
@@ -231,7 +239,7 @@ ManageResults.Region <- function(region, population_model,
     results$actions <- lapply(actions, function(actions_i) {
       actions_list <- list()
       actions_list[[actions_i$get_label()]] <- zeros$action_steps
-      actions_list$total <- zeros$total_steps
+      actions_list$total <- zeros$total_action_steps
       actions_list
     })
   }
