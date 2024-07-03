@@ -340,13 +340,10 @@ ManageResults.Region <- function(region, population_model,
           colnames(n_a) <- stage_labels
         }
 
-        # Shape total when population is staged and not combined
-        if (population_model$get_type() == "stage_structured" &&
-            is.null(combine_stages)) {
+        # Shape total when population is staged
+        if (is.numeric(stages)) {
           total_n_a <- array(colSums(n_a), c(1, ncol(n_a)))
           colnames(total_n_a) <- stage_labels
-        } else {
-          total_n_a <- sum(n_a)
         }
 
         if (replicates > 1) { # summaries
