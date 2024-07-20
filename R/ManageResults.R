@@ -331,7 +331,7 @@ ManageResults.Region <- function(region, population_model,
 
         # Get attribute from n
         a <- actions[[i]]$get_label()
-        n_a <- attr(n, a)
+        n_a <- attr(n, a)*1
 
         # Combine stages when required
         if (population_model$get_type() == "stage_structured" &&
@@ -344,6 +344,8 @@ ManageResults.Region <- function(region, population_model,
         if (is.numeric(stages)) {
           total_n_a <- array(colSums(n_a), c(1, ncol(n_a)))
           colnames(total_n_a) <- stage_labels
+        } else {
+          total_n_a <- sum(n_a)
         }
 
         if (replicates > 1) { # summaries
@@ -664,28 +666,59 @@ ManageResults.Region <- function(region, population_model,
             }
           }
         }
+      }
 
-        # Impact totals when present
-        if (is.list(results$impacts[[i]]$total)) {
+      # Impact totals when present
+      if (replicates > 1) {
+
+        # Totals for each impact
+        for (i in impact_i) {
+
+          # Impact totals when present
+          if (is.list(results$impacts[[i]]$total)) {
+
+            # Include impact name or numeric index
+            if (length(impact_i) == 1 && is.numeric(i)) {
+              ic <- ""
+            } else {
+              ic <- paste0("_", i)
+            }
+
+            # Collect totals at each time step
+            output_df <- sapply(results$impacts[[i]]$total, function(tot) tot)
+            colnames(output_df) <- time_steps_labels
+
+            # Write to CSV file
+            filename <- sprintf("total_impacts%s.csv", ic)
+            utils::write.csv(output_df, filename,
+                             row.names = (length(summaries) > 1))
+          }
+        }
+
+      } else {
+
+        # Combine impact totals when present
+        present <- sapply(results$impacts,
+                          function(aspect) is.list(aspect$total))
+        if (any(present)) {
 
           # Collect totals at each time step
-          if (replicates > 1) {
-            output_df <- sapply(results$impacts[[i]]$total,
-                                function(tot) tot)
-            colnames(output_df) <- time_steps_labels
-          } else {
-            output_df <- results$impacts[[i]]$total
-            names(output_df) <- time_steps_labels
-            output_df <- as.data.frame(output_df)
+          output_df <- t(sapply(results$impacts[present],
+                                function(aspect) aspect$total))
+          colnames(output_df) <- time_steps_labels
+          if (is.numeric(impact_i)) {
+            if (length(impact_i) == 1) {
+              rownames(output_df) <- "impact"
+            } else {
+              rownames(output_df) <- paste("impact", which(present))
+            }
           }
 
           # Write to CSV file
-          filename <- sprintf("impacts%s_totals.csv", ic)
-          utils::write.csv(output_df, filename,
-                           row.names = (length(summaries) > 1))
+          utils::write.csv(output_df, "total_impacts.csv")
         }
       }
-    }
+    } # impacts
 
     # Save actions
     if (length(actions) > 0) {
@@ -697,62 +730,155 @@ ManageResults.Region <- function(region, population_model,
         action_i <- 1:length(results$actions) # indices
       }
 
-      # Results for each action
-      for (i in action_i) {
+      # Resolve result stages
+      result_stages <- stages
+      if (is.null(stages) || is.numeric(combine_stages)) {
+        result_stages <- 1
+        j_fname <- ""
+      } else {
+        j_fname <- paste0("_stage_", 1:result_stages)
+      }
 
-        # Include action name or numeric index
-        if (length(action_i) == 1 && is.numeric(i)) {
-          ic <- ""
-        } else {
-          ic <- paste0("_", i)
-        }
+      # Collated results for patch only
+      if (region$get_type() == "patch") {
 
-        # Collated results for patch only
-        if (region$get_type() == "patch") {
+        # Results for each action
+        for (i in action_i) {
 
-          # Action aspects
-          aspects <- names(results$actions[[i]])
-          for (a in aspects[which(aspects != "total")]) {
+          # Include action name or numeric index
+          if (length(action_i) == 1 && is.numeric(i)) {
+            ic <- ""
+          } else {
+            ic <- paste0("_", i)
+          }
 
-            # Combine coordinates and collated action values
-            output_df <- list()
-            for (s in summaries) {
-              if (replicates > 1) {
-                output_df[[s]] <- lapply(results$actions[[i]][[a]],
-                                         function(a_tm) a_tm[[s]])
-              } else {
-                output_df[[s]] <- results$actions[[i]][[a]]
+          # Save stages separately when applicable
+          for (j in 1:result_stages) {
+
+            # Action aspects
+            aspects <- names(results$actions[[i]])
+            for (a in aspects[which(aspects != "total")]) {
+
+              # Combine coordinates and collated action values
+              output_df <- list()
+              for (s in summaries) {
+                if (population_model$get_type() == "stage_structured") {
+                  if (replicates > 1) {
+                    output_df[[s]] <- lapply(results$actions[[i]][[a]],
+                                             function(a_tm) a_tm[[s]][,j])
+                  } else {
+                    output_df[[s]] <- lapply(results$actions[[i]][[a]],
+                                             function(a_tm) a_tm[,j])
+                  }
+                } else {
+                  if (replicates > 1) {
+                    output_df[[s]] <- lapply(results$actions[[i]][[a]],
+                                             function(a_tm) a_tm[[s]])
+                  } else {
+                    output_df[[s]] <- results$actions[[i]][[a]]
+                  }
+                }
+                names(output_df[[s]]) <- collated_labels
+                output_df[[s]] <- cbind(coords, as.data.frame(output_df[[s]]))
               }
-              names(output_df[[s]]) <- collated_labels
-              output_df[[s]] <- cbind(coords, as.data.frame(output_df[[s]]))
-            }
 
-            # Write to CSV files
-            for (s in summaries) {
-              filename <- sprintf("actions%s_%s%s.csv", ic, a, s_fname[[s]])
-              utils::write.csv(output_df[[s]], filename, row.names = FALSE)
+              # Write to CSV files
+              for (s in summaries) {
+                filename <- sprintf("actions%s_%s%s%s.csv", ic, a, j_fname[j],
+                                    s_fname[[s]])
+                utils::write.csv(output_df[[s]], filename, row.names = FALSE)
+              }
+            }
+          }
+        }
+      }
+
+      # Action totals when present
+      if (replicates > 1 || result_stages > 1) {
+
+        # Totals for each action
+        for (i in action_i) {
+
+          # Action totals when present
+          if (is.list(results$actions[[i]]$total)) {
+
+            # Include action name or numeric index plus label
+            if (length(action_i) == 1 && is.numeric(i)) {
+              ic <- ""
+            } else {
+              ic <- paste0("_", i)
+            }
+            label <- actions[[i]]$get_label()
+
+            # Collect totals at each time step
+            if (replicates > 1 && result_stages > 1) {
+
+              # Save stages separately
+              for (j in 1:result_stages) {
+
+                # Place summaries in rows
+                output_df <- sapply(results$actions[[i]]$total,
+                                    function(tot) as.data.frame(
+                                      lapply(tot, function(m) m[,j])))
+                colnames(output_df) <- time_steps_labels
+
+                # Write to CSV file
+                filename <- sprintf("total_actions%s_%s%s.csv", ic, label,
+                                    j_fname[j])
+                utils::write.csv(output_df, filename)
+              }
+
+            } else {
+
+              # Place either summaries or stages in rows
+              output_df <- sapply(results$actions[[i]]$total,
+                                  function(tot) tot)
+
+              colnames(output_df) <- time_steps_labels
+              if (replicates == 1 && result_stages > 1) {
+                rownames(output_df) <-
+                  attr(population_model$get_growth(), "labels")
+              }
+
+              # Write to CSV file
+              filename <- sprintf("total_actions%s_%s.csv", ic, label)
+              utils::write.csv(output_df, filename)
             }
           }
         }
 
-        # Action totals when present
-        if (is.list(results$actions[[i]]$total)) {
+      } else {
 
-          # Collect totals at each time step
-          if (replicates > 1) {
-            output_df <- sapply(results$actions[[i]]$total,
-                                function(tot) tot)
-            colnames(output_df) <- time_steps_labels
+        # Combine action totals when present
+        present <- sapply(results$actions,
+                          function(aspect) is.list(aspect$total))
+        if (any(present)) {
+
+          # Place actions in rows
+          output_df <- t(sapply(results$actions[present],
+                                function(aspect) aspect$total))
+          colnames(output_df) <- time_steps_labels
+          action_labels <- sapply(actions[present], function(a) a$get_label())
+          if (is.numeric(combine_stages)) {
+            if (length(combine_stages) == 1) {
+              action_labels <- paste(attr(population_model$get_growth(),
+                                          "labels")[combine_stages],
+                                     action_labels)
+            } else {
+              action_labels <- paste(
+                sprintf("stages %s-%s", min(combine_stages),
+                        max(combine_stages)), action_labels)
+            }
+          }
+
+          if (is.numeric(action_i)) {
+            rownames(output_df) <- action_labels
           } else {
-            output_df <- results$actions[[i]]$total
-            names(output_df) <- time_steps_labels
-            output_df <- as.data.frame(output_df)
+            rownames(output_df) <- paste(rownames(output_df), action_labels)
           }
 
           # Write to CSV file
-          filename <- sprintf("actions%s_totals.csv", ic)
-          utils::write.csv(output_df, filename,
-                           row.names = (length(summaries) > 1))
+          utils::write.csv(output_df, "total_actions.csv")
         }
       }
     }
@@ -766,6 +892,30 @@ ManageResults.Region <- function(region, population_model,
 
     # All plots have time steps on x-axis
     plot_x_label <- paste0("Time steps (", step_units, ")")
+
+    # Resolve the number of (combined) stages used in the results
+    result_stages <- stages
+    if (is.null(stages) || is.numeric(combine_stages)) {
+      result_stages <- 1
+    }
+
+    # Stage label for plot headings and files
+    stage_label <- ""
+    stage_file <- ""
+    if (population_model$get_type() == "stage_structured") {
+      if (is.numeric(stages) && is.null(combine_stages)) {
+        stage_label <- paste0(stage_labels, " ")
+        stage_file <- paste0("_stage_", 1:result_stages)
+      } else if (is.numeric(combine_stages)) {
+        if (length(combine_stages) == 1) {
+          stage_label <- paste0(
+            attr(population_model$get_growth(), "labels")[combine_stages], " ")
+        } else {
+          stage_label <- paste0(sprintf("stages %s-%s", min(combine_stages),
+                                        max(combine_stages)), " ")
+        }
+      }
+    }
 
     # Plot impact totals when present
     if (length(impacts) > 0) {
@@ -791,7 +941,7 @@ ManageResults.Region <- function(region, population_model,
           if (replicates > 1) { # plot summary mean +/- 2 SD
             totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
                            sd = as.numeric(totals["sd",,drop = FALSE]))
-            grDevices::png(filename = sprintf("impacts_totals%s.png", ic[1]))
+            grDevices::png(filename = sprintf("total_impacts%s.png", ic[1]))
             graphics::plot(0:time_steps, totals$mean, type = "l",
                            main = sprintf("Total impacts%s (mean +/- 2 SD)",
                                           ic[2]),
@@ -805,7 +955,7 @@ ManageResults.Region <- function(region, population_model,
                             lty = "dashed")
             invisible(grDevices::dev.off())
           } else {
-            grDevices::png(filename = sprintf("impacts_totals%s.png", ic[1]))
+            grDevices::png(filename = sprintf("total_impacts%s.png", ic[1]))
             graphics::plot(0:time_steps, totals, type = "l",
                            main = sprintf("Total impacts%s", ic[2]),
                            xlab = plot_x_label,
@@ -838,33 +988,49 @@ ManageResults.Region <- function(region, population_model,
           }
           # units <- actions[[i]]$get_context()$get_action_measures()
           label <- actions[[i]]$get_label()
-          totals <- sapply(results$actions[[i]]$total, function(tot) tot)
-          if (replicates > 1) { # plot summary mean +/- 2 SD
-            totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
-                           sd = as.numeric(totals["sd",,drop = FALSE]))
-            grDevices::png(filename = sprintf("actions_total%s_%s.png", ic[1],
-                                              label))
-            graphics::plot(0:time_steps, totals$mean, type = "l",
-                           main = sprintf("Total actions%s %s (mean +/- 2 SD)",
-                                          ic[2], label),
-                           xlab = plot_x_label,
-                           ylab = sprintf("Number %s", label),
-                           ylim = c(0, 1.1*max(totals$mean + 2*totals$sd)))
-            graphics::lines(0:time_steps, totals$mean + 2*totals$sd,
-                            lty = "dashed")
-            graphics::lines(0:time_steps,
-                            pmax(0, totals$mean - 2*totals$sd),
-                            lty = "dashed")
-            invisible(grDevices::dev.off())
-          } else {
-            grDevices::png(filename = sprintf("actions_total%s_%s.png", ic[1],
-                                              label))
-            graphics::plot(0:time_steps, totals, type = "l",
-                           main = sprintf("Total action%s %s", ic[2], label),
-                           xlab = plot_x_label,
-                           ylab = sprintf("Number %s", label),
-                           ylim = c(0, 1.1*max(totals)))
-            invisible(grDevices::dev.off())
+
+          # Plot per result stage
+          for (s in 1:result_stages) {
+
+            # Plot action totals for result stage
+            if (replicates > 1) {
+              totals <- sapply(results$actions[[i]]$total,
+                               function(tot) as.data.frame(
+                                 lapply(tot, function(m) m[s])))
+            } else {
+              totals <- sapply(results$actions[[i]]$total,
+                               function(tot) tot[s])
+            }
+            if (replicates > 1) { # plot summary mean +/- 2 SD
+              totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
+                             sd = as.numeric(totals["sd",,drop = FALSE]))
+              grDevices::png(filename = sprintf("total_actions%s_%s%s.png",
+                                                ic[1], label, stage_file[s]))
+              graphics::plot(0:time_steps, totals$mean, type = "l",
+                             main = sprintf(
+                               "Total actions%s %s%s (mean +/- 2 SD)",
+                               ic[2], stage_label[s], label),
+                             xlab = plot_x_label,
+                             ylab = sprintf("Number %s", label),
+                             ylim = c(0, 1.1*max(totals$mean + 2*totals$sd)))
+              graphics::lines(0:time_steps, totals$mean + 2*totals$sd,
+                              lty = "dashed")
+              graphics::lines(0:time_steps,
+                              pmax(0, totals$mean - 2*totals$sd),
+                              lty = "dashed")
+              invisible(grDevices::dev.off())
+            } else {
+
+              grDevices::png(filename = sprintf("total_actions%s_%s%s.png",
+                                                ic[1], label, stage_file[s]))
+              graphics::plot(0:time_steps, totals, type = "l",
+                             main = sprintf("Total actions%s %s%s",
+                                            ic[2], stage_label[s], label),
+                             xlab = plot_x_label,
+                             ylab = sprintf("Number %s", label),
+                             ylim = c(0, 1.1*max(totals)))
+              invisible(grDevices::dev.off())
+            }
           }
         }
       }
