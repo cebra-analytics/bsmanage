@@ -639,8 +639,8 @@ ManageResults.Region <- function(region, population_model,
           ic <- paste0("_", i)
         }
 
-        # Collated results for patch only
-        if (region$get_type() == "patch") {
+        # Collated results for multi-patch only
+        if (region$get_type() == "patch" && !region$spatially_implicit()) {
 
           # Impact aspects
           aspects <- names(results$impacts[[i]])
@@ -689,7 +689,11 @@ ManageResults.Region <- function(region, population_model,
             colnames(output_df) <- time_steps_labels
 
             # Write to CSV file
-            filename <- sprintf("total_impacts%s.csv", ic)
+            if (region$spatially_implicit()) {
+              filename <- sprintf("impacts%s.csv", ic)
+            } else {
+              filename <- sprintf("total_impacts%s.csv", ic)
+            }
             utils::write.csv(output_df, filename,
                              row.names = (length(summaries) > 1))
           }
@@ -715,7 +719,11 @@ ManageResults.Region <- function(region, population_model,
           }
 
           # Write to CSV file
-          utils::write.csv(output_df, "total_impacts.csv")
+          if (region$spatially_implicit()) {
+            utils::write.csv(output_df, "impacts.csv")
+          } else {
+            utils::write.csv(output_df, "total_impacts.csv")
+          }
         }
       }
     } # impacts
@@ -739,8 +747,8 @@ ManageResults.Region <- function(region, population_model,
         j_fname <- paste0("_stage_", 1:result_stages)
       }
 
-      # Collated results for patch only
-      if (region$get_type() == "patch") {
+      # Collated results for multi-patch only
+      if (region$get_type() == "patch" && !region$spatially_implicit()) {
 
         # Results for each action
         for (i in action_i) {
@@ -823,8 +831,13 @@ ManageResults.Region <- function(region, population_model,
                 colnames(output_df) <- time_steps_labels
 
                 # Write to CSV file
-                filename <- sprintf("total_actions%s_%s%s.csv", ic, label,
-                                    j_fname[j])
+                if (region$spatially_implicit()) {
+                  filename <- sprintf("actions%s_%s%s.csv", ic, label,
+                                      j_fname[j])
+                } else {
+                  filename <- sprintf("total_actions%s_%s%s.csv", ic, label,
+                                      j_fname[j])
+                }
                 utils::write.csv(output_df, filename)
               }
 
@@ -841,7 +854,11 @@ ManageResults.Region <- function(region, population_model,
               }
 
               # Write to CSV file
-              filename <- sprintf("total_actions%s_%s.csv", ic, label)
+              if (region$spatially_implicit()) {
+                filename <- sprintf("actions%s_%s.csv", ic, label)
+              } else {
+                filename <- sprintf("total_actions%s_%s.csv", ic, label)
+              }
               utils::write.csv(output_df, filename)
             }
           }
@@ -878,7 +895,11 @@ ManageResults.Region <- function(region, population_model,
           }
 
           # Write to CSV file
-          utils::write.csv(output_df, "total_actions.csv")
+          if (region$spatially_implicit()) {
+            utils::write.csv(output_df, "actions.csv")
+          } else {
+            utils::write.csv(output_df, "total_actions.csv")
+          }
         }
       }
     }
@@ -939,12 +960,18 @@ ManageResults.Region <- function(region, population_model,
           units <- impacts[[i]]$get_context()$get_impact_measures()
           totals <- sapply(results$impacts[[i]]$total, function(tot) tot)
           if (replicates > 1) { # plot summary mean +/- 2 SD
+            if (region$spatially_implicit()) {
+              filename <- sprintf("impacts%s.png", ic[1])
+              main_title <- sprintf("Impacts%s (mean +/- 2 SD)", ic[2])
+            } else {
+              filename <- sprintf("total_impacts%s.png", ic[1])
+              main_title <- sprintf("Total impacts%s (mean +/- 2 SD)", ic[2])
+            }
             totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
                            sd = as.numeric(totals["sd",,drop = FALSE]))
-            grDevices::png(filename = sprintf("total_impacts%s.png", ic[1]))
+            grDevices::png(filename = filename)
             graphics::plot(0:time_steps, totals$mean, type = "l",
-                           main = sprintf("Total impacts%s (mean +/- 2 SD)",
-                                          ic[2]),
+                           main = main_title,
                            xlab = plot_x_label,
                            ylab = sprintf("Impact (%s)", units),
                            ylim = c(0, 1.1*max(totals$mean + 2*totals$sd)))
@@ -955,9 +982,16 @@ ManageResults.Region <- function(region, population_model,
                             lty = "dashed")
             invisible(grDevices::dev.off())
           } else {
-            grDevices::png(filename = sprintf("total_impacts%s.png", ic[1]))
+            if (region$spatially_implicit()) {
+              filename <- sprintf("impacts%s.png", ic[1])
+              main_title <- sprintf("Impacts%s", ic[2])
+            } else {
+              filename <- sprintf("total_impacts%s.png", ic[1])
+              main_title <- sprintf("Total impacts%s", ic[2])
+            }
+            grDevices::png(filename = filename)
             graphics::plot(0:time_steps, totals, type = "l",
-                           main = sprintf("Total impacts%s", ic[2]),
+                           main = main_title,
                            xlab = plot_x_label,
                            ylab = sprintf("Impact (%s)", units),
                            ylim = c(0, 1.1*max(totals)))
@@ -1004,12 +1038,20 @@ ManageResults.Region <- function(region, population_model,
             if (replicates > 1) { # plot summary mean +/- 2 SD
               totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
                              sd = as.numeric(totals["sd",,drop = FALSE]))
-              grDevices::png(filename = sprintf("total_actions%s_%s%s.png",
-                                                ic[1], label, stage_file[s]))
+              if (region$spatially_implicit()) {
+                filename <- sprintf("actions%s_%s%s.png", ic[1], label,
+                                    stage_file[s])
+                main_title <- sprintf("Actions%s %s%s (mean +/- 2 SD)", ic[2],
+                                      stage_label[s], label)
+              } else {
+                filename <- sprintf("total_actions%s_%s%s.png", ic[1], label,
+                                    stage_file[s])
+                main_title <- sprintf("Total actions%s %s%s (mean +/- 2 SD)",
+                                      ic[2], stage_label[s], label)
+              }
+              grDevices::png(filename = filename)
               graphics::plot(0:time_steps, totals$mean, type = "l",
-                             main = sprintf(
-                               "Total actions%s %s%s (mean +/- 2 SD)",
-                               ic[2], stage_label[s], label),
+                             main = main_title,
                              xlab = plot_x_label,
                              ylab = sprintf("Number %s", label),
                              ylim = c(0, 1.1*max(totals$mean + 2*totals$sd)))
@@ -1020,12 +1062,20 @@ ManageResults.Region <- function(region, population_model,
                               lty = "dashed")
               invisible(grDevices::dev.off())
             } else {
-
-              grDevices::png(filename = sprintf("total_actions%s_%s%s.png",
-                                                ic[1], label, stage_file[s]))
+              if (region$spatially_implicit()) {
+                filename <- sprintf("actions%s_%s%s.png", ic[1], label,
+                                    stage_file[s])
+                main_title <- sprintf("Actions%s %s%s", ic[2], stage_label[s],
+                                      label)
+              } else {
+                filename <- sprintf("total_actions%s_%s%s.png", ic[1], label,
+                                    stage_file[s])
+                main_title <- sprintf("Total actions%s %s%s", ic[2],
+                                      stage_label[s], label)
+              }
+              grDevices::png(filename = filename)
               graphics::plot(0:time_steps, totals, type = "l",
-                             main = sprintf("Total actions%s %s%s",
-                                            ic[2], stage_label[s], label),
+                             main = main_title,
                              xlab = plot_x_label,
                              ylab = sprintf("Number %s", label),
                              ylim = c(0, 1.1*max(totals)))
