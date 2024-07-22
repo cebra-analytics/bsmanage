@@ -70,6 +70,7 @@ test_that("applies stochastic detection to invasive population", {
   expected_detected <- array(c(rep(0, 3),
                                stats::rbinom(6, size = n[5920:5922, 2:3],
                                              c(0.5, 0.75, 1))), c(3, 3))
+  colnames(expected_detected) <- colnames(n)
   expect_silent(manage_detection <- ManageDetection(
     region, population_model, surveillance, stages = 2:3, schedule = 4:6))
   set.seed(1234)

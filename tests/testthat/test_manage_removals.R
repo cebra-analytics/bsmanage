@@ -62,11 +62,13 @@ test_that("applies stochastic removals to invasive population", {
   expected_removals <- array(c(rep(0, 3),
                                stats::rbinom(6, size = n[5920:5922,2:3],
                                              c(0.5, 0.75, 1))), c(3, 3))
+  colnames(expected_removals) <- colnames(n)
   new_n <- n[5920:5922,] - expected_removals
   set.seed(1234)
   expected_removals2 <- array(c(rep(0, 3),
                                 stats::rbinom(6, size = new_n[,2:3],
                                               c(0.5, 0.75, 1))), c(3, 3))
+  colnames(expected_removals2) <- colnames(n)
   expect_silent(manage_removals <- ManageRemovals(region, population_model,
                                                   removal_pr = template_vect,
                                                   detected_only = FALSE,
@@ -91,7 +93,7 @@ test_that("applies stochastic removals to invasive population", {
                                                   stages = 2:3,
                                                   schedule = 4:6))
   expect_silent(new_n <- manage_removals$apply(n, 4))
-  expect_equal(attr(new_n, "removed")[5920:5922,], array(0, c(3,3)))
+  expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals*0)
   expect_equal(new_n[5920:5922,], n[5920:5922,])
   # with detected
   attr(n, "detected") <- n*0
@@ -100,6 +102,7 @@ test_that("applies stochastic removals to invasive population", {
   expected_removals <- array(
     c(rep(0, 3), stats::rbinom(6, size = attr(n, "detected")[5920:5922,2:3],
                                c(0.5, 0.75, 1))), c(3, 3))
+  colnames(expected_removals) <- colnames(n)
   set.seed(1234)
   expect_silent(new_n <- manage_removals$apply(n, 4))
   expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals)
@@ -114,6 +117,7 @@ test_that("applies stochastic removals to invasive population", {
   expected_removals <- array(
     c(rep(0, 3), stats::rbinom(6, size = n_detected[5920:5922,2:3],
                                c(0.5, 0.75, 1))), c(3, 3))
+  colnames(expected_removals) <- colnames(n)
   set.seed(1234)
   expect_silent(new_n <- manage_removals$apply(n, 4))
   expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals)
@@ -129,6 +133,7 @@ test_that("applies stochastic removals to invasive population", {
   expected_removals <- rbind(array(0, c(2, 3)), array(
     c(rep(0, 5), stats::rbinom(10, size = n[5918:5922,2:3],
                                template_vect[5918:5922])), c(5, 3)))
+  colnames(expected_removals) <- colnames(n)
   set.seed(1234)
   expect_silent(new_n <- manage_removals$apply(n, 4))
   expect_equal(attr(new_n, "removed")[5916:5922,], expected_removals)

@@ -118,7 +118,7 @@ test_that("runs simulator with correct configuration", {
   expect_silent(results <- simulator$run())
   expect_silent(results_list <- results$get_list())
   expect_named(results_list, c("collated", "total", "area", "occupancy",
-                               "impacts", "actions"))
+                               "total_occup", "impacts", "actions"))
   expect_named(results_list$collated, as.character(seq(0, 4, 2)))
   expect_equal(unname(sapply(results_list$collated, length)),
                rep(region$get_locations(), 3))
@@ -129,6 +129,7 @@ test_that("runs simulator with correct configuration", {
   expect_named(results_list$total, as.character(0:4))
   expect_named(results_list$area, as.character(0:4))
   expect_named(results_list$occupancy, as.character(seq(0, 4, 2)))
+  expect_named(results_list$total_occup, as.character(0:4))
   expect_length(results_list$impacts, 2)
   expect_equal(lapply(results_list$impacts, function(i) lapply(i, length)),
                list(list(aspect1 = 3, combined = 3, total = 5),

@@ -64,8 +64,8 @@ test_that("initializes inherited object with impacts and actions", {
                     combine_stages = NULL))
   expect_silent(result_list <- results$get_list())
   expect_named(result_list,
-               c("collated", "total", "area", "occupancy", "impacts",
-                 "actions"))
+               c("collated", "total", "area", "occupancy", "total_occup",
+                 "impacts", "actions"))
   expect_equal(lapply(result_list$impacts, function(i) lapply(i, length)),
                list(a1 = list(aspect1 = 6, aspect2 = 6, combined = 6,
                               total = 11),

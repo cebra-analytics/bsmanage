@@ -64,6 +64,7 @@ test_that("applies stochastic controls to invasive population", {
   # search and destroy
   set.seed(1234)
   expected_controls <- array(0, dim(n))
+  colnames(expected_controls) <- colnames(n)
   expected_controls[101:150, 2:3] <- stats::rbinom(100, size = n[101:150, 2:3],
                                                    exist_manage_pr[101:150])
   expected_n <- n - expected_controls
