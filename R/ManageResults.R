@@ -50,7 +50,8 @@
 #'     \item{\code{get_params()}}{Get the simulation parameters used.}
 #'     \item{\code{save_rasters(...)}}{Save the collated results as raster TIF
 #'       files when the region is grid-based. \code{Terra} raster write options
-#'       may be passed to the function.}
+#'       may be passed to the function. Returns a list of saved \code{Terra}
+#'       raster layers.}
 #'     \item{\code{save_csv()}}{Save the collated results as comma-separated
 #'       values (CSV) files when the region is patch-based. Also saves the
 #'       population totals and area occupied to CSV files for both grid and
@@ -465,7 +466,7 @@ ManageResults.Region <- function(region, population_model,
     self$save_rasters  <- function(...) {
 
       # Save population spread results
-      super$save_rasters(...)
+      spread_rast_list <- super$save_rasters(...)
 
       # Replicate summaries or single replicate
       if (replicates > 1) {
@@ -473,6 +474,9 @@ ManageResults.Region <- function(region, population_model,
       } else {
         summaries <- ""
       }
+
+      # Output list
+      output_list <- list()
 
       # Save impacts
       if (length(impacts) > 0) {
@@ -484,32 +488,47 @@ ManageResults.Region <- function(region, population_model,
           impact_i <- 1:length(results$impacts) # indices
         }
         for (i in impact_i) {
+
+          # Impacts post-fix
+          if (length(impact_i) == 1 && is.numeric(i)) {
+            ic <- ""
+          } else {
+            ic <- paste0("_", i)
+          }
+
           aspects <- names(results$impacts[[i]])
           for (a in aspects[which(aspects != "total")]) {
-            for (tmc in names(results$impacts[[i]][[a]])) {
-              for (s in summaries) {
+            for (s in summaries) {
+
+              # Summary post-fix
+              if (replicates > 1) {
+                sc <- paste0("_", s)
+              } else {
+                sc <- s
+              }
+
+              # Add nested list to output list
+              output_key <- paste0("impacts", ic, "_", a, sc)
+              output_list[[output_key]] <- list()
+
+              for (tmc in names(results$impacts[[i]][[a]])) {
 
                 # Copy impacts into a raster
                 if (replicates > 1) {
                   output_rast <-
                     region$get_rast(results$impacts[[i]][[a]][[tmc]][[s]])
-                  s <- paste0("_", s)
                 } else {
                   output_rast <-
                     region$get_rast(results$impacts[[i]][[a]][[tmc]])
                 }
 
                 # Write raster to file
-                if (length(impact_i) == 1 && is.numeric(i)) {
-                  ic <- ""
-                } else {
-                  ic <- paste0("_", i)
-                }
                 filename <- sprintf(
                   paste0("impacts%s_%s_t%0", nchar(as.character(time_steps)),
                          "d%s.tif"),
-                  ic, a, as.integer(tmc), s)
-                terra::writeRaster(output_rast, filename, ...)
+                  ic, a, as.integer(tmc), sc)
+                output_list[[output_key]][[tmc]] <-
+                  terra::writeRaster(output_rast, filename, ...)
               }
             }
           }
@@ -526,16 +545,45 @@ ManageResults.Region <- function(region, population_model,
           action_i <- 1:length(results$actions) # indices
         }
         for (i in action_i) {
+
+          # Actions post-fix
+          if (length(action_i) == 1 && is.numeric(i)) {
+            ic <- ""
+          } else {
+            ic <- paste0("_", i)
+          }
+
           aspects <- names(results$actions[[i]])
           for (a in aspects[which(aspects != "total")]) {
-            for (tmc in names(results$actions[[i]][[a]])) {
+
+            # Create and save an action results raster per stage
+            if (is.null(stages) || is.numeric(combine_stages)) {
+              stages <- 1
+            }
+            for (j in 1:stages) {
+
+              # Stage post-fix
+              if (population_model$get_type() == "stage_structured" &&
+                  is.null(combine_stages)) {
+                jc <- paste0("_stage_", i)
+              } else {
+                jc <- ""
+              }
+
               for (s in summaries) {
 
-                # Create and save an action results raster per stage
-                if (is.null(stages) || is.numeric(combine_stages)) {
-                  stages <- 1
+                # Summary post-fix
+                if (replicates > 1) {
+                  sc <- paste0("_", s)
+                } else {
+                  sc <- s
                 }
-                for (j in 1:stages) {
+
+                # Add nested list to output list
+                output_key <- paste0("actions", ic, "_", a, jc, sc)
+                output_list[[output_key]] <- list()
+
+                for (tmc in names(results$actions[[i]][[a]])) {
 
                   # Copy actions into a raster
                   if (population_model$get_type() == "stage_structured") {
@@ -549,10 +597,8 @@ ManageResults.Region <- function(region, population_model,
                     }
                     if (is.null(combine_stages)) {
                       names(output_rast) <- stage_labels[j]
-                      j <- paste0("_", j)
                     } else if (is.numeric(combine_stages)) {
                       names(output_rast) <- "combined"
-                      j <- ""
                     }
                   } else {
                     if (replicates > 1) {
@@ -562,31 +608,27 @@ ManageResults.Region <- function(region, population_model,
                       output_rast <-
                         region$get_rast(results$actions[[i]][[a]][[tmc]])
                     }
-                    j <- ""
                   }
 
                   # Write raster to file
-                  if (length(action_i) == 1 && is.numeric(i)) {
-                    ic <- ""
-                  } else {
-                    ic <- paste0("_", i)
-                  }
-                  if (replicates > 1) {
-                    sc <- paste0("_", s)
-                  } else {
-                    sc <- s
-                  }
                   filename <- sprintf(
-                    paste0("actions%s_%s_t%0", nchar(as.character(time_steps)),
-                           "d%s%s.tif"),
-                    ic, a, as.integer(tmc), sc, j)
-                  terra::writeRaster(output_rast, filename, ...)
+                    paste0("actions%s_%s%s_t%0",
+                           nchar(as.character(time_steps)), "d%s.tif"),
+                    ic, a, jc, as.integer(tmc), sc)
+                  output_list[[output_key]][[tmc]] <-
+                    terra::writeRaster(output_rast, filename, ...)
                 }
               }
             }
           }
         }
       }
+
+      # Return output list as multi-layer rasters
+      return(c(spread_rast_list,
+               lapply(output_list, function(rast_list) {
+                 terra::rast(rast_list)
+               })))
     }
   }
 
