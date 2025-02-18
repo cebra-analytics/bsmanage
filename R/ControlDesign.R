@@ -22,11 +22,18 @@
 #'   \code{divisions}. Values are assumed to be relative when their maximum is
 #'   greater than 1, or an attribute \code{relative = TRUE} is attached to the
 #'   parameter.
-#' @param lambda A vector of efficacy or control rates for each spatial
-#'   location specified by \code{divisions}, such that the probability of
+#' @param lambda A vector of efficacy or control rates for each division part
+#'   specified by \code{divisions}, such that the probability of successful
+#'   control of an incursion when present at a part can be expressed via
+#'  \code{pr(control|presence) = 1 - exp(-lambda*allocation)}, for a given
+#'   continuous allocation of management control resources. Required unless
+#'   \code{phi} is provided for discrete allocation.
+#' @param phi A vector of effectiveness or control rates for each division
+#'   part specified by \code{divisions}, such that the probability of
 #'   successful control of an incursion when present at a part can be expressed
-#'   via \code{pr(control|presence) = 1 - exp(-lambda*allocation)}, for a given
-#'   allocation of management control resources.
+#'   via \code{pr(control|presence) = 1 - (1 - phi)^allocation}, for a given
+#'   discrete allocation of management control resources. Required unless
+#'   \code{lambda} is provided for continuous allocation.
 #' @param optimal The strategy used for finding an effective management
 #'   resource allocation. One of (maximum) \code{"saving"} (or cost-dependent
 #'   benefit), (maximum) \code{"benefit"} (independent of management resource
@@ -148,7 +155,8 @@ ControlDesign <- function(context,
                                        "pathways",
                                        "user"),
                           establish_pr,
-                          lambda,
+                          lambda = NULL,
+                          phi = NULL,
                           optimal = c("saving",
                                       "benefit",
                                       "effectiveness",
@@ -185,7 +193,8 @@ ControlDesign.ManageContext <- function(context,
                                                      "pathways",
                                                      "user"),
                                         establish_pr,
-                                        lambda,
+                                        lambda = NULL,
+                                        phi = NULL,
                                         optimal = c("saving",
                                                     "benefit",
                                                     "effectiveness",
@@ -228,7 +237,6 @@ ControlDesign.ManageContext <- function(context,
                        divisions = divisions,
                        dim_type = dim_type,
                        establish_pr = establish_pr,
-                       lambda = lambda,
                        optimal = optimal,
                        alloc_unit = alloc_unit,
                        cost_unit = cost_unit,
@@ -251,12 +259,34 @@ ControlDesign.ManageContext <- function(context,
     relative_establish_pr <- FALSE
   }
 
-  # Check lambda
-  if (!is.numeric(lambda) || any(lambda < 0) ||
-      !length(lambda) %in% c(1, parts)) {
-    stop(paste("The lambda parameter must be numeric, >= 0, and match the",
-               "number of division parts."), call. = FALSE)
-  } else if (length(lambda) == 1) {
+  # Check lambda (continuous) and phi (discrete)
+  if (is.null(lambda) && is.null(phi)) {
+    stop(paste("Either the lambda (continuous) or phi (discrete) parameter",
+               "must be provided."), call. = FALSE)
+  } else if (!is.null(lambda)) {
+
+    # Check lambda
+    if (!is.numeric(lambda) || any(lambda < 0) ||
+        !length(lambda) %in% c(1, parts)) {
+      stop(paste("The lambda parameter must be numeric, >= 0, and match the",
+                 "number of division parts."), call. = FALSE)
+    }
+
+  } else if (!is.null(phi)) {
+
+    # Check phi
+    if (!is.numeric(phi) || any(phi < 0) ||
+        !length(phi) %in% c(1, parts)) {
+      stop(paste("The phi parameter must be numeric, >= 0, and match the",
+                 "number of division parts."), call. = FALSE)
+    }
+
+    # Convert to lambda
+    lambda <- -1*log(1 - phi)
+  }
+
+  # Lambda value for each part
+  if (length(lambda) == 1) {
     lambda <- rep(lambda, parts)
   }
 
@@ -296,6 +326,9 @@ ControlDesign.ManageContext <- function(context,
       return(establish_pr)
     }
   }
+
+  # TODO ####
+  # Re-implement in full with terminology and system effectiveness
 
   # Utilise a (spatial) surveillance design object for Lagrange optimization
   design_context <- bsdesign::Context(
