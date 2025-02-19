@@ -10,7 +10,8 @@ ControlDesign(
   divisions,
   dim_type = c("spatial", "species", "pathways", "user"),
   establish_pr,
-  lambda,
+  lambda = NULL,
+  unit_pr = NULL,
   optimal = c("saving", "benefit", "effectiveness", "none"),
   alloc_unit = c("units", "hours", "traps", "treatments", "removals", "user"),
   cost_unit = c("$", "hours", "user"),
@@ -33,7 +34,8 @@ ControlDesign(
   divisions,
   dim_type = c("spatial", "species", "pathways", "user"),
   establish_pr,
-  lambda,
+  lambda = NULL,
+  unit_pr = NULL,
   optimal = c("saving", "benefit", "effectiveness", "none"),
   alloc_unit = c("units", "hours", "traps", "treatments", "removals", "user"),
   cost_unit = c("$", "hours", "user"),
@@ -71,11 +73,19 @@ the likelihood of pest establishment at each division part specified by
 greater than 1, or an attribute \code{relative = TRUE} is attached to the
 parameter.}
 
-\item{lambda}{A vector of efficacy or control rates for each spatial
-location specified by \code{divisions}, such that the probability of
-successful control of an incursion when present at a part can be expressed
-via \code{pr(control|presence) = 1 - exp(-lambda*allocation)}, for a given
-allocation of management control resources.}
+\item{lambda}{A vector of efficacy or control rates for each division part
+specified by \code{divisions}, such that the probability of successful
+control of an incursion when present at a part can be expressed via
+\code{pr(control|presence) = 1 - exp(-lambda*allocation)}, for a given
+continuous allocation of management control resources. Required unless
+\code{unit_pr} is provided for discrete allocation.}
+
+\item{unit_pr}{A vector of unit effectiveness for each division part
+specified by \code{divisions}, such that the probability of successful
+control of an incursion when present at a part can be expressed via
+\code{pr(control|presence) = 1 - (1 - unit_pr)^allocation}, for a given
+discrete allocation of management control resources. Required unless
+\code{lambda} is provided for continuous allocation.}
 
 \item{optimal}{The strategy used for finding an effective management
 resource allocation. One of (maximum) \code{"saving"} (or cost-dependent

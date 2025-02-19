@@ -27,11 +27,11 @@
 #'   control of an incursion when present at a part can be expressed via
 #'  \code{pr(control|presence) = 1 - exp(-lambda*allocation)}, for a given
 #'   continuous allocation of management control resources. Required unless
-#'   \code{phi} is provided for discrete allocation.
-#' @param phi A vector of effectiveness or control rates for each division
-#'   part specified by \code{divisions}, such that the probability of
-#'   successful control of an incursion when present at a part can be expressed
-#'   via \code{pr(control|presence) = 1 - (1 - phi)^allocation}, for a given
+#'   \code{unit_pr} is provided for discrete allocation.
+#' @param unit_pr A vector of unit effectiveness for each division part
+#'   specified by \code{divisions}, such that the probability of successful
+#'   control of an incursion when present at a part can be expressed via
+#'   \code{pr(control|presence) = 1 - (1 - unit_pr)^allocation}, for a given
 #'   discrete allocation of management control resources. Required unless
 #'   \code{lambda} is provided for continuous allocation.
 #' @param optimal The strategy used for finding an effective management
@@ -147,6 +147,7 @@
 #'   \emph{Methods in Ecology and Evolution}, 7(8), 891–899.
 #'   \doi{10.1111/2041-210X.12564}
 #' @include ManageDesign.R
+#' @include LagrangeMgmtDesign.R
 #' @export
 ControlDesign <- function(context,
                           divisions,
@@ -156,7 +157,7 @@ ControlDesign <- function(context,
                                        "user"),
                           establish_pr,
                           lambda = NULL,
-                          phi = NULL,
+                          unit_pr = NULL,
                           optimal = c("saving",
                                       "benefit",
                                       "effectiveness",
@@ -194,7 +195,7 @@ ControlDesign.ManageContext <- function(context,
                                                      "user"),
                                         establish_pr,
                                         lambda = NULL,
-                                        phi = NULL,
+                                        unit_pr = NULL,
                                         optimal = c("saving",
                                                     "benefit",
                                                     "effectiveness",
@@ -247,6 +248,7 @@ ControlDesign.ManageContext <- function(context,
                        exist_alloc = exist_alloc,
                        exist_manage_pr = exist_manage_pr,
                        class = "ControlDesign", ...)
+  super <- list(get_manage_pr = self$get_manage_pr)
 
   # Number of division parts
   parts <- divisions$get_parts()
@@ -259,10 +261,10 @@ ControlDesign.ManageContext <- function(context,
     relative_establish_pr <- FALSE
   }
 
-  # Check lambda (continuous) and phi (discrete)
-  if (is.null(lambda) && is.null(phi)) {
-    stop(paste("Either the lambda (continuous) or phi (discrete) parameter",
-               "must be provided."), call. = FALSE)
+  # Check lambda (continuous) and unit_pr (discrete)
+  if (is.null(lambda) && is.null(unit_pr)) {
+    stop(paste("Either the lambda (continuous) or unit_pr (discrete)",
+               "parameter must be provided."), call. = FALSE)
   } else if (!is.null(lambda)) {
 
     # Check lambda
@@ -272,17 +274,17 @@ ControlDesign.ManageContext <- function(context,
                  "number of division parts."), call. = FALSE)
     }
 
-  } else if (!is.null(phi)) {
+  } else if (!is.null(unit_pr)) {
 
-    # Check phi
-    if (!is.numeric(phi) || any(phi < 0) ||
-        !length(phi) %in% c(1, parts)) {
-      stop(paste("The phi parameter must be numeric, >= 0, and match the",
+    # Check unit_pr
+    if (!is.numeric(unit_pr) || any(unit_pr < 0) ||
+        !length(unit_pr) %in% c(1, parts)) {
+      stop(paste("The unit_pr parameter must be numeric, >= 0, and match the",
                  "number of division parts."), call. = FALSE)
     }
 
     # Convert to lambda
-    lambda <- -1*log(1 - phi)
+    lambda <- -1*log(1 - unit_pr)
   }
 
   # Lambda value for each part
@@ -327,39 +329,271 @@ ControlDesign.ManageContext <- function(context,
     }
   }
 
-  # TODO ####
-  # Re-implement in full with terminology and system effectiveness
-
-  # Utilise a (spatial) surveillance design object for Lagrange optimization
-  design_context <- bsdesign::Context(
-    species_name = context$get_species_names()[1],
-    species_type = context$get_species_types()[1],
-    surv_qty_unit = alloc_unit,
-    cost_unit = cost_unit)
-  design_optimal <- optimal
-  if (optimal == "effectiveness") {
-    design_optimal <- "detection"
+  # Resolve alloc_cost, fixed_cost, min_alloc, and exist_manage_pr
+  if (length(alloc_cost) == 1) {
+    alloc_cost <- rep(alloc_cost, parts)
+  } else if (is.null(alloc_cost)) {
+    alloc_cost <- rep(1, parts)
   }
-  surv_design <- bsdesign::SpatialSurvDesign(
-    context = design_context,
-    divisions = divisions,
-    establish_pr = establish_pr,
-    lambda = lambda,
-    optimal = design_optimal,
-    benefit = benefit,
-    alloc_cost = alloc_cost,
-    fixed_cost = fixed_cost,
-    budget = budget,
-    confidence = overall_pr,
-    min_alloc = min_alloc,
-    discrete_alloc = discrete_alloc,
-    exist_alloc = exist_alloc,
-    exist_sens = exist_manage_pr, ...)
+  if (length(fixed_cost) == 1) {
+    fixed_cost <- rep(fixed_cost, parts)
+  } else if (is.null(fixed_cost)) {
+    fixed_cost <- rep(0, parts)
+  }
+  if (!is.null(min_alloc)) {
+    if (length(min_alloc) == 1) {
+      min_alloc <- rep(min_alloc, parts)
+    }
+    if (discrete_alloc) {
+      min_alloc <- pmax(ceiling(min_alloc), 1)
+    }
+  } else {
+    if (discrete_alloc) {
+      min_alloc <- rep(1, parts)
+    } else {
+      min_alloc <- rep(0, parts)
+    }
+  }
+  if (is.null(exist_manage_pr)) {
+    exist_manage_pr <- rep(0, parts)
+  } else {
+    exist_manage_pr <- super$get_manage_pr() # combine via base class
+  }
 
-  # Get the allocated surveillance resource quantities of the design
+  # Uniform benefit when optimal saving or benefit not specified
+  if (!optimal %in% c("saving", "benefit")) {
+    benefit <- 1
+  }
+
+  ## Lagrange optimization of allocated cost per division part x_alloc
+  ## given the management resource quantity allocation qty_alloc
+  ## where qty_alloc = (x_alloc - fixed_cost)/alloc_cost
+
+  # Lagrange optimization parameters/functions
+  f_obj <- NULL # Objective function
+  f_deriv <- NULL # Derivative of objective function
+  f_pos <- NULL # Pseudo-inverse of derivative given marginal benefit alpha
+  alpha_unconstr <- NULL # Unconstrained marginal benefit alpha
+  alpha_min <- NULL # Minimum marginal benefit alpha
+  f_unit_eff <- NULL # Unit effectiveness calculation function
+  f_inv_unit_eff <- NULL # Inverse of unit effectiveness calculation function
+  search_alpha <- NULL # Search alpha for optimal objective
+  set_lagrange_params <- function() {
+
+    # Objective function
+    f_obj <<- function(x_alloc) {
+
+      # Quantity allocation (units)
+      n_alloc <- (x_alloc >= fixed_cost)*(x_alloc - fixed_cost)/alloc_cost
+
+      if (optimal == "effectiveness" && !relative_establish_pr) {
+
+        # maximum effectiveness
+        return(-1*log(1 - (establish_pr*
+                             ((1 - exist_manage_pr)*exp(-1*lambda*n_alloc)))))
+      } else {
+
+        # maximum saving/benefit (benefit = 1 for effectiveness)
+        incl_x <- (optimal == "saving")
+        return(
+          benefit*establish_pr*(1 - exist_manage_pr)*exp(-1*lambda*n_alloc) +
+            (n_alloc > 0)*x_alloc*incl_x)
+      }
+    }
+
+    # Derivative of objective function
+    f_deriv <<- function(x_alloc) {
+
+      # Quantity allocation (units)
+      n_alloc <- (x_alloc >= fixed_cost)*(x_alloc - fixed_cost)/alloc_cost
+
+      if (optimal == "effectiveness" && !relative_establish_pr) {
+
+        # maximum effectiveness
+        return((-1*establish_pr*(1 - exist_manage_pr)*
+                  lambda/alloc_cost*exp(-1*lambda*n_alloc))/
+                 (1 - (establish_pr*(1 - exist_manage_pr)*
+                         exp(-1*lambda*n_alloc))))
+      } else {
+
+        # maximum saving/benefit (benefit = 1 for effectiveness)
+        incl_x <- (optimal == "saving")
+        return((n_alloc > 0)*incl_x -
+                 (benefit*establish_pr*(1 - exist_manage_pr)*
+                    lambda/alloc_cost*exp(-1*lambda*n_alloc)))
+      }
+    }
+
+    # Pseudo-inverse of derivative given marginal benefit alpha
+    f_pos <<- function(alpha) {
+      values <- lambda/alloc_cost*benefit*establish_pr*(1 - exist_manage_pr)
+      idx <- which(values > 0)
+      values[-idx] <- 0
+      if (optimal == "effectiveness" && !relative_establish_pr) {
+
+        # maximum effectiveness
+        values[idx] <- pmax(
+          ((alpha > lambda[idx]/alloc_cost[idx])*
+             (alloc_cost[idx]/lambda[idx]*
+                (log(-1*lambda[idx]/alloc_cost[idx]/alpha + 1) -
+                   log(1/establish_pr[idx]) +
+                   log(1 - exist_manage_pr[idx])))), 0)
+        idx <- which(values > 0)
+        values[idx] <- (pmax(min_alloc[idx]*alloc_cost[idx], values[idx]) +
+                          fixed_cost[idx])
+
+      } else {
+
+        # maximum saving/benefit (benefit = 1 for effectiveness)
+        incl_x <- (optimal == "saving")
+        values[idx] <-
+          (((alpha - 1*incl_x) >= -1*values[idx])*
+             (pmax(min_alloc[idx]*alloc_cost[idx],
+                   (-1*alloc_cost[idx]/lambda[idx]*
+                      log(-1*(alpha - 1*incl_x)/values[idx]))) +
+                fixed_cost[idx]))
+
+        # limit to zero cost allocation via f_obj(0)
+        if (optimal == "saving") {
+          values <-
+            (values < benefit*establish_pr*(1 - exist_manage_pr))*values
+        }
+      }
+
+      return(values)
+    }
+
+    # Unconstrained marginal benefit alpha
+    alpha_unconstr <<- (optimal == "saving") - 1
+
+    # Minimum marginal benefit alpha
+    alpha_min <<- min(f_deriv(fixed_cost))
+
+    # Function for calculating unit effectiveness
+    f_unit_eff <<- function(x_alloc) {
+      return(1 - ((1 - exist_manage_pr)*
+                    exp((-1*lambda*(x_alloc - (x_alloc > 0)*fixed_cost)/
+                           alloc_cost))))
+    }
+
+    # Function for calculating inverse of unit effectiveness
+    f_inv_unit_eff <<- function(unit_eff) {
+      x_alloc <- -1*alloc_cost/lambda*log((1 - unit_eff)/(1 - exist_manage_pr))
+      return(x_alloc + (x_alloc > 0)*fixed_cost)
+    }
+
+    # Search alpha for optimal objective (even when no constraints)
+    search_alpha <<- any(fixed_cost > 0 | min_alloc > 0)
+  }
+  set_lagrange_params()
+
+  # Function for calculating management probabilities or effectiveness
+  calculate_manage_pr <- function(n_alloc) {
+    return(1 - (1 - exist_manage_pr)*exp(-1*lambda*n_alloc))
+  }
+
+  # Function for calculating overall management probability or effectiveness
+  calculate_overall_pr <- function(manage_pr) {
+    if (relative_establish_pr) {
+      return(1 - sum(establish_pr*(1 - manage_pr))/sum(establish_pr))
+    } else {
+      return(1 - ((1 - prod(1 - establish_pr*(1 - manage_pr)))/
+                    (1 - prod(1 - establish_pr))))
+    }
+  }
+
+  # Get the allocated management resource values of the design
   qty_alloc <- NULL
   self$get_allocation <- function() {
-    qty_alloc <<- surv_design$get_allocation()
+    if (optimal != "none" && is.null(qty_alloc)) {
+
+      if (discrete_alloc) {
+
+        # Make a copy of altered parameters
+        fixed_cost_orig <- fixed_cost
+        budget_orig <- budget
+        min_alloc_orig <- min_alloc
+        exist_manage_pr_orig <- exist_manage_pr
+
+        # Initial allocation
+        qty_alloc <<- rep(0, parts)
+      }
+
+      # Iterative addition of discrete allocations or single continuous
+      add_allocation <- TRUE
+      while (add_allocation) {
+
+        # Calculate minimum cost allocation
+        if (any(min_alloc > 0)) {
+          min_x_alloc <- min_alloc*alloc_cost + (min_alloc > 0)*fixed_cost
+        } else {
+          min_x_alloc <- min_alloc
+        }
+
+        # Get cost allocation x_alloc via Lagrange management design
+        lagrangeMgmtDesign <- LagrangeMgmtDesign(context,
+                                                 divisions,
+                                                 establish_pr,
+                                                 f_obj,
+                                                 f_deriv,
+                                                 f_pos,
+                                                 alpha_unconstr,
+                                                 alpha_min,
+                                                 f_unit_eff,
+                                                 f_inv_unit_eff,
+                                                 budget = budget,
+                                                 overall_pr = overall_pr,
+                                                 min_alloc = min_x_alloc,
+                                                 search_alpha = search_alpha)
+        x_alloc <- lagrangeMgmtDesign$get_cost_allocation()
+
+        # Optimal resource allocation
+        if (discrete_alloc) {
+
+          # Add discrete allocation
+          n_alloc <- floor((x_alloc >= fixed_cost)*
+                             (x_alloc - fixed_cost)/alloc_cost)
+          # n_alloc <- (n_alloc*alloc_cost > fixed_cost)*n_alloc
+          qty_alloc <<- qty_alloc + n_alloc
+
+          # Alter parameters and indicate further allocation required
+          fixed_cost[which(qty_alloc > 0)] <<- 0
+          exist_manage_pr <<- calculate_manage_pr(n_alloc)
+          add_allocation <- (sum(x_alloc) > 0)
+          if (is.numeric(budget)) {
+            total_x_alloc <- sum(qty_alloc*alloc_cost +
+                                   (qty_alloc > 0)*fixed_cost_orig)
+            add_allocation <- (total_x_alloc < budget && add_allocation)
+            budget <<- budget - total_x_alloc
+          }
+          if (is.numeric(overall_pr)) {
+            add_allocation <-
+              (calculate_overall_pr(exist_manage_pr) < overall_pr &&
+                 add_allocation)
+          }
+          min_alloc[which(qty_alloc > 0)] <<- 1
+
+          # Reset Lagrange parameters
+          set_lagrange_params()
+
+        } else {
+
+          # Continuous allocation
+          qty_alloc <<- ((x_alloc >= fixed_cost)*
+                           (x_alloc - fixed_cost)/alloc_cost)
+          add_allocation <- FALSE
+        }
+      }
+
+      # Return altered parameters to their original values
+      if (discrete_alloc) {
+        fixed_cost <<- fixed_cost_orig
+        budget <<- budget_orig
+        min_alloc <<- min_alloc_orig
+        exist_manage_pr <<- exist_manage_pr_orig
+      }
+    }
+
     return(qty_alloc)
   }
 
@@ -367,13 +601,30 @@ ControlDesign.ManageContext <- function(context,
   # of the design
   manage_pr <- NULL
   self$get_manage_pr <- function() {
-    manage_pr <<- surv_design$get_sensitivity()
+    if (is.null(manage_pr)) {
+      if (optimal != "none" && !is.null(qty_alloc)) {
+        manage_pr <<- calculate_manage_pr(qty_alloc)
+      } else if (optimal == "none" && !is.null(exist_alloc)) {
+        manage_pr <<- calculate_manage_pr(exist_alloc)
+      } else if (optimal == "none") {
+        manage_pr <<- super$get_manage_pr()
+      }
+    }
     return(manage_pr)
   }
 
   # Get the overall management probability or effectiveness of the design
   self$get_overall_pr <- function() {
-    return(surv_design$get_confidence())
+    system_eff <- NULL
+    manage_pr <- self$get_manage_pr()
+    if (!is.null(manage_pr)) {
+      if (parts == 1) {
+        system_eff <- manage_pr
+      } else if (!is.null(establish_pr)) {
+        system_eff <- calculate_overall_pr(manage_pr)
+      }
+    }
+    return(system_eff)
   }
 
   # Save the management design as a collection of appropriate files

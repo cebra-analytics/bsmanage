@@ -28,6 +28,7 @@ Suggests:
     testthat
 Collate: 
     'ManageContext.R'
+    'LagrangeMgmtDesign.R'
     'ManageDesign.R'
     'ControlDesign.R'
     'ManageActions.R'

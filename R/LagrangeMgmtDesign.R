@@ -33,7 +33,7 @@
 #'   category, etc.) specified by \code{divisions}.
 #' @param alpha_unconstr The marginal benefit value to utilize when the search
 #'   for the optimal resource allocation is not constrained via a \code{budget}
-#'   or a desired \code{confidence}.
+#'   or a desired overall effectiveness \code{overall_pr}.
 #' @param alpha_min The minimum marginal benefit value to utilize when
 #'   searching for the optimal resource allocation.
 #' @param f_unit_eff A function for calculating the unit (division part)
@@ -91,6 +91,7 @@
 #'   survey effort over space and time.
 #'   \emph{Methods in Ecology and Evolution}, 7(8), 891–899.
 #'   \doi{10.1111/2041-210X.12564}
+#' @include ManageContext.R
 #' @export
 LagrangeMgmtDesign <- function(context,
                                divisions,
@@ -111,22 +112,20 @@ LagrangeMgmtDesign <- function(context,
 
 #' @name LagrangeMgmtDesign
 #' @export
-LagrangeMgmtDesign.Context <- function(context,
-                                       divisions,
-                                       establish_pr,
-                                       f_obj,
-                                       f_deriv,
-                                       f_pos,
-                                       alpha_unconstr,
-                                       alpha_min,
-                                       f_unit_eff,
-                                       f_inv_unit_eff,
-                                       budget = NULL,
-                                       overall_pr = NULL,
-                                       min_alloc = NULL,
-                                       search_alpha = FALSE, ...) {
-
-  # TODO ####
+LagrangeMgmtDesign.ManageContext <- function(context,
+                                             divisions,
+                                             establish_pr,
+                                             f_obj,
+                                             f_deriv,
+                                             f_pos,
+                                             alpha_unconstr,
+                                             alpha_min,
+                                             f_unit_eff,
+                                             f_inv_unit_eff,
+                                             budget = NULL,
+                                             overall_pr = NULL,
+                                             min_alloc = NULL,
+                                             search_alpha = FALSE, ...) {
 
   # Check divisions
   if (!inherits(divisions, "Divisions")) {
@@ -158,7 +157,7 @@ LagrangeMgmtDesign.Context <- function(context,
          call. = FALSE)
   }
 
-  # Check f_obj, f_deriv, f_pos, f_unit_sens, and f_inv_unit_sens
+  # Check f_obj, f_deriv, f_pos, f_unit_eff, and f_inv_unit_eff
   if (!is.function(f_obj) || length(formalArgs(f_obj)) != 1) {
     stop("The objective function should have form function(x_alloc).",
          call. = FALSE)
@@ -171,24 +170,24 @@ LagrangeMgmtDesign.Context <- function(context,
     stop(paste("The pseudo-inverse-derivative function should have form",
                "function(alpha)."), call. = FALSE)
   }
-  if (!is.function(f_unit_sens) || length(formalArgs(f_unit_sens)) != 1) {
-    stop("The unit sensitivity function should have form function(x_alloc).",
+  if (!is.function(f_unit_eff) || length(formalArgs(f_unit_eff)) != 1) {
+    stop("The unit effectiveness function should have form function(x_alloc).",
          call. = FALSE)
   }
-  if (!is.function(f_inv_unit_sens) ||
-      length(formalArgs(f_inv_unit_sens)) != 1) {
-    stop(paste("The inverse unit sensitivity function should have form",
-               "function(unit_sens)."), call. = FALSE)
+  if (!is.function(f_inv_unit_eff) ||
+      length(formalArgs(f_inv_unit_eff)) != 1) {
+    stop(paste("The inverse unit effectiveness function should have form",
+               "function(unit_effectiveness)."), call. = FALSE)
   }
 
-  # Check budget, confidence, min_alloc, and search_alpha (indicator)
+  # Check budget, overall_pr, min_alloc, and search_alpha (indicator)
   if (!is.null(budget) && (!is.numeric(budget) || budget <= 0)) {
     stop("The budget parameter must be numeric and > 0.", call. = FALSE)
   }
-  if (!is.null(confidence) &&
-      (!is.numeric(confidence) || confidence < 0 || confidence > 1)) {
-    stop("The detection confidence parameter must be numeric, >= 0 and <= 1.",
-         call. = FALSE)
+  if (!is.null(overall_pr) &&
+      (!is.numeric(overall_pr) || overall_pr < 0 || overall_pr > 1)) {
+    stop(paste("The overall probability/effectiveness parameter must be",
+               "numeric, >= 0 and <= 1."), call. = FALSE)
   }
   if (!is.null(min_alloc) &&
       (!is.numeric(min_alloc) || !length(min_alloc) %in% c(1, parts))) {
@@ -210,17 +209,18 @@ LagrangeMgmtDesign.Context <- function(context,
   }
 
   ## Lagrange optimization of allocated cost per division part x_alloc
-  ## given the surveillance resource quantity allocation qty_alloc
+  ## given the management resource quantity allocation qty_alloc
   ## where qty_alloc = (x_alloc - fixed_cost)/alloc_cost
 
-  # Optimal cost allocation for alpha value within budget or confidence level
+  # Optimal cost allocation for alpha value within budget or overall
+  # effectiveness level
   allocate <- function(alpha) {
 
     # Generate full allocation
     x_alloc <- f_pos(alpha)
 
-    # Optimal within budget or target confidence
-    if (is.numeric(budget) || is.numeric(confidence)) {
+    # Optimal within budget or target overall effectiveness
+    if (is.numeric(budget) || is.numeric(overall_pr)) {
 
       # Order by f(f+(a))/f+(a)
       rank_values <- abs(f_obj(x_alloc)/x_alloc)
@@ -243,65 +243,72 @@ LagrangeMgmtDesign.Context <- function(context,
         }
       }
 
-      # Optimal up to confidence-level
-      if (is.numeric(confidence)) {
+      # Optimal up to overall effectiveness level
+      if (is.numeric(overall_pr)) {
 
-        # Unit sensitivity
-        exist_sens <- f_unit_sens(0)
-        new_sens <- f_unit_sens(x_alloc)
+        # TODO ####
 
-        # Calculate confidence
+        # Unit effectiveness
+        exist_eff <- f_unit_eff(0)
+        new_eff <- f_unit_eff(x_alloc)
+
+        # Calculate overall effectiveness
         if (length(nonzero)) {
           if (relative_establish_pr) {
-            cum_conf <- ((sum(establish_pr*exist_sens) +
-                            cumsum((establish_pr*
-                                      (new_sens - exist_sens))[idx][nonzero]))/
-                           sum(establish_pr))
+            cum_eff <-
+              1 - ((sum(establish_pr*(1 - exist_eff)) +
+                      cumsum(
+                        (establish_pr*((1 - new_eff) - (1 - exist_eff))
+                        )[idx][nonzero]))/
+                     sum(establish_pr))
           } else {
-            cum_conf <-
-              ((1 - (prod(1 - (establish_pr*exist_sens))*
-                       cumprod(
-                         ((1 - establish_pr*new_sens)/
-                            (1 - establish_pr*exist_sens))[idx][nonzero])))/
-                 (1 - prod(1 - establish_pr)))
+            cum_eff <-
+              1 - ((1 - (prod(1 - (establish_pr*(1 - exist_eff)))*
+                           cumprod(
+                             ((1 - establish_pr*(1 - new_eff))/
+                                (1 - establish_pr*(1 - exist_eff))
+                             )[idx][nonzero])))/
+                     (1 - prod(1 - establish_pr)))
           }
         } else {
-          cum_conf <- 0
+          cum_eff <- 0
         }
 
-        # Select allocation up to confidence level
-        over_conf <- which(cum_conf > confidence)
-        if (length(over_conf)) {
-          if (min_alloc[idx][nonzero][over_conf[1]] > 0) {
-            x_alloc[idx][nonzero][over_conf[1]] <-
-              min_alloc[idx][nonzero][over_conf[1]]
+        # Re-implement in full with terminology and system effectiveness ####
+
+        # Select allocation up to overall effectiveness level
+        over_eff <- which(cum_eff > overall_pr)
+        if (length(over_eff)) {
+          if (min_alloc[idx][nonzero][over_eff[1]] > 0) {
+            x_alloc[idx][nonzero][over_eff[1]] <-
+              min_alloc[idx][nonzero][over_eff[1]]
           } else {
             if (relative_establish_pr) {
-              adj_sens <-
-                (confidence*sum(establish_pr) -
-                   sum((establish_pr*new_sens)[idx][-nonzero[over_conf]]))/
-                establish_pr[idx][nonzero][over_conf[1]]
+              adj_eff <-
+                (overall_pr*sum(establish_pr) -
+                   sum((establish_pr*new_eff)[idx][-nonzero[over_eff]]))/
+                establish_pr[idx][nonzero][over_eff[1]]
             } else {
-              adj_sens <-
-                (1 - ((1 - confidence*(1 - prod(1 - establish_pr)))/
-                        prod((1 - establish_pr*new_sens)
-                             [idx][-nonzero[over_conf]])))/
-                establish_pr[idx][nonzero][over_conf[1]]
+              adj_eff <-
+                (1 - ((1 - overall_pr*(1 - prod(1 - establish_pr)))/
+                        prod((1 - establish_pr*new_eff)
+                             [idx][-nonzero[over_eff]])))/
+                establish_pr[idx][nonzero][over_eff[1]]
             }
-            x_alloc[idx][nonzero][over_conf[1]] <-
-              f_inv_unit_sens(adj_sens)[idx][nonzero][over_conf[1]]
+            x_alloc[idx][nonzero][over_eff[1]] <-
+              f_inv_unit_eff(adj_eff)[idx][nonzero][over_eff[1]]
           }
-          x_alloc[idx][nonzero][over_conf[-1]] <- 0
+          x_alloc[idx][nonzero][over_eff[-1]] <- 0
         }
 
-        # Add confidence as an attribute
+        # Add overall effectiveness as an attribute
         if (relative_establish_pr) {
-          conf <- (sum(establish_pr*f_unit_sens(x_alloc))/sum(establish_pr))
+          eff <- (sum(establish_pr*f_unit_eff(x_alloc))/sum(establish_pr))
         } else {
-          conf <- ((1 - prod(1 - establish_pr*f_unit_sens(x_alloc)))/
-                     (1 - prod(1 - establish_pr)))
+          eff <- ((1 - prod(1 - establish_pr*f_unit_eff(x_alloc)))/
+                    (1 - prod(1 - establish_pr)))
         }
-        attr(x_alloc, "confidence") <- conf
+        attr(x_alloc, "overall_pr") <- eff
       }
     }
 
@@ -312,16 +319,16 @@ LagrangeMgmtDesign.Context <- function(context,
   }
 
   # Create a class structure
-  self <- structure(list(), class = "LagrangeSurvDesign")
+  self <- structure(list(), class = "LagrangeMgmtDesign")
 
-  # Get the allocated surveillance resource costs for the design
+  # Get the allocated management resource costs for the design
   self$get_cost_allocation <- function() {
 
     # No constraint
     best_alpha <- alpha_unconstr
 
     # Search for minimum objective via marginal benefit (alpha) values
-    if (is.numeric(budget) || is.numeric(confidence) || search_alpha) {
+    if (is.numeric(budget) || is.numeric(overall_pr) || search_alpha) {
       interval <- (0:100)/100*alpha_min
       alpha_range <- range(interval)[2] - range(interval)[1]
       precision <- 8 # for alpha
@@ -331,11 +338,11 @@ LagrangeMgmtDesign.Context <- function(context,
         alloc <- as.data.frame(t(sapply(interval[-1], function(a) {
           alloc <- allocate(a)
           c(obj = sum(f_obj(alloc)), total = attr(alloc, "total"),
-            confidence = attr(alloc, "confidence"))})))
+            overall_pr = attr(alloc, "overall_pr"))})))
 
         # Choose alpha corresponding to the last repeated minimum objective
-        if (is.numeric(confidence) && max(alloc$confidence) >= confidence) {
-          idx <- which(alloc$confidence >= confidence)
+        if (is.numeric(overall_pr) && max(alloc$overall_pr) >= overall_pr) {
+          idx <- which(alloc$overall_pr >= overall_pr)
           idx <- idx[which(alloc$total[idx] <= min(alloc$total[idx]))]
           if (min(alloc$obj) < 0) {
             i <- max(idx[which(alloc$obj[idx] <=
