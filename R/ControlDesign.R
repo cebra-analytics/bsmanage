@@ -433,7 +433,7 @@ ControlDesign.ManageContext <- function(context,
 
         # maximum effectiveness
         values[idx] <- pmax(
-          ((alpha > lambda[idx]/alloc_cost[idx])*
+          ((1 - lambda[idx]/alloc_cost[idx]/alpha > 0)*
              (alloc_cost[idx]/lambda[idx]*
                 (log(-1*lambda[idx]/alloc_cost[idx]/alpha + 1) -
                    log(1/establish_pr[idx]) +

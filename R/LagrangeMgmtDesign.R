@@ -246,8 +246,6 @@ LagrangeMgmtDesign.ManageContext <- function(context,
       # Optimal up to overall effectiveness level
       if (is.numeric(overall_pr)) {
 
-        # TODO ####
-
         # Unit effectiveness
         exist_eff <- f_unit_eff(0)
         new_eff <- f_unit_eff(x_alloc)
@@ -263,7 +261,7 @@ LagrangeMgmtDesign.ManageContext <- function(context,
                      sum(establish_pr))
           } else {
             cum_eff <-
-              1 - ((1 - (prod(1 - (establish_pr*(1 - exist_eff)))*
+              1 - ((1 - (prod(1 - establish_pr*(1 - exist_eff))*
                            cumprod(
                              ((1 - establish_pr*(1 - new_eff))/
                                 (1 - establish_pr*(1 - exist_eff))
@@ -274,30 +272,25 @@ LagrangeMgmtDesign.ManageContext <- function(context,
           cum_eff <- 0
         }
 
-        # Re-implement in full with terminology and system effectiveness ####
-
         # Select allocation up to overall effectiveness level
         over_eff <- which(cum_eff > overall_pr)
         if (length(over_eff)) {
-          if (min_alloc[idx][nonzero][over_eff[1]] > 0) {
-            x_alloc[idx][nonzero][over_eff[1]] <-
-              min_alloc[idx][nonzero][over_eff[1]]
+          if (relative_establish_pr) {
+            adj_eff <-
+              1 - (((1 - overall_pr)*sum(establish_pr) -
+                      sum((establish_pr*(1 - new_eff))
+                          [idx][-nonzero[over_eff]]))/
+                     establish_pr[idx][nonzero][over_eff[1]])
           } else {
-            if (relative_establish_pr) {
-              adj_eff <-
-                (overall_pr*sum(establish_pr) -
-                   sum((establish_pr*new_eff)[idx][-nonzero[over_eff]]))/
-                establish_pr[idx][nonzero][over_eff[1]]
-            } else {
-              adj_eff <-
-                (1 - ((1 - overall_pr*(1 - prod(1 - establish_pr)))/
-                        prod((1 - establish_pr*new_eff)
-                             [idx][-nonzero[over_eff]])))/
-                establish_pr[idx][nonzero][over_eff[1]]
-            }
-            x_alloc[idx][nonzero][over_eff[1]] <-
-              f_inv_unit_eff(adj_eff)[idx][nonzero][over_eff[1]]
+            adj_eff <-
+              1 - ((1 - (1 - (1 - overall_pr)*(1 - prod(1 - establish_pr))/
+                           prod((1 - establish_pr*(1 - new_eff))
+                                [idx][-nonzero[over_eff]])))/
+                     establish_pr[idx][nonzero][over_eff[1]])
           }
+          x_alloc[idx][nonzero][over_eff[1]] <-
+            max(f_inv_unit_eff(adj_eff)[idx][nonzero][over_eff[1]],
+                min_alloc[idx][nonzero][over_eff[1]])
           x_alloc[idx][nonzero][over_eff[-1]] <- 0
         }
 
