@@ -6,8 +6,8 @@ test_that("initializes with context, divisions, and valid parameters", {
   divisions <- bsdesign::Divisions(template)
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = "invalid"),
-               paste("Divisions parameter must be a 'Divisions' or inherited",
-                     "class object."))
+               paste("Divisions parameter must be a 'bsdesign::Divisions' or",
+                     "inherited class object."))
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
                                              establish_pr = 1:5),
@@ -41,6 +41,14 @@ test_that("initializes with context, divisions, and valid parameters", {
                                              overall_pr = NULL),
                paste("Either the budget or overall probability/effectiveness",
                      "parameter must be specified for optimal benefit."))
+  expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
+                                             divisions = divisions,
+                                             optimal = "successes",
+                                             budget = NULL,
+                                             overall_pr = NULL),
+               paste("Either the budget or overall probability/effectiveness",
+                     "parameter must be specified for optimal management",
+                     "successes."))
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
                                              optimal = "effectiveness",

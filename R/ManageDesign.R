@@ -27,7 +27,8 @@
 #' @param optimal The strategy used for finding an effective management
 #'   resource allocation. One of (maximum) \code{"saving"} (or cost-dependent
 #'   benefit), (maximum) \code{"benefit"} (independent of management resource
-#'   costs), or (maximum) \code{"effectiveness"} (probability of success), or
+#'   costs), (maximum) number of management \code{"successes"}, or (maximum)
+#'   overall system-wide \code{"effectiveness"} (probability of success), or
 #'   \code{"none"} for representing existing management resource allocation
 #'   designs only.
 #' @param alloc_unit The descriptive unit to describe allocated management
@@ -149,6 +150,7 @@ ManageDesign <- function(context,
                          establish_pr = NULL,
                          optimal = c("saving",
                                      "benefit",
+                                     "successes",
                                      "effectiveness",
                                      "none"),
                          alloc_unit = c("units",
@@ -185,6 +187,7 @@ ManageDesign.ManageContext <- function(context,
                                        establish_pr = NULL,
                                        optimal = c("saving",
                                                    "benefit",
+                                                   "successes",
                                                    "effectiveness",
                                                    "none"),
                                        alloc_unit = c("units",
@@ -206,8 +209,8 @@ ManageDesign.ManageContext <- function(context,
 
   # Check divisions
   if (!inherits(divisions, "Divisions")) {
-    stop(paste("Divisions parameter must be a 'Divisions' or inherited class",
-               "object."), call. = FALSE)
+    stop(paste("Divisions parameter must be a 'bsdesign::Divisions' or",
+               "inherited class object."), call. = FALSE)
   }
 
   # Number of division parts
@@ -266,6 +269,11 @@ ManageDesign.ManageContext <- function(context,
              (is.null(budget) && is.null(overall_pr))) {
     stop(paste("Either the budget or overall probability/effectiveness",
                "parameter must be specified for optimal benefit."),
+         call. = FALSE)
+  } else if (optimal == "successes" &&
+             (is.null(budget) && is.null(overall_pr))) {
+    stop(paste("Either the budget or overall probability/effectiveness",
+               "parameter must be specified for optimal management successes."),
          call. = FALSE)
   } else if (optimal == "effectiveness" &&
              (is.null(budget) && is.null(overall_pr))) {

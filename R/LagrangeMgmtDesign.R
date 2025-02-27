@@ -129,8 +129,8 @@ LagrangeMgmtDesign.ManageContext <- function(context,
 
   # Check divisions
   if (!inherits(divisions, "Divisions")) {
-    stop(paste("Divisions parameter must be a 'Divisions' or inherited class",
-               "object."), call. = FALSE)
+    stop(paste("Divisions parameter must be a 'bsdesign::Divisions' or",
+               "inherited class object."), call. = FALSE)
   }
 
   # Number of division parts
@@ -274,32 +274,34 @@ LagrangeMgmtDesign.ManageContext <- function(context,
 
         # Select allocation up to overall effectiveness level
         over_eff <- which(cum_eff > overall_pr)
+        idx_w <- idx[nonzero][-over_eff] # within overall_pr
+        i_th <- idx[nonzero][over_eff[1]] # at threshold
+        idx_o <- c(idx[nonzero][over_eff[-1]], idx[-nonzero]) # over or zero
         if (length(over_eff)) {
           if (relative_establish_pr) {
-            adj_eff <-
+            th_eff <-
               1 - (((1 - overall_pr)*sum(establish_pr) -
-                      sum((establish_pr*(1 - new_eff))
-                          [idx][-nonzero[over_eff]]))/
-                     establish_pr[idx][nonzero][over_eff[1]])
+                      (sum((establish_pr*(1 - new_eff))[idx_w]) +
+                         sum((establish_pr*(1 - exist_eff))[idx_o])))/
+                     establish_pr[i_th])
           } else {
-            adj_eff <-
-              1 - ((1 - (1 - (1 - overall_pr)*(1 - prod(1 - establish_pr))/
-                           prod((1 - establish_pr*(1 - new_eff))
-                                [idx][-nonzero[over_eff]])))/
-                     establish_pr[idx][nonzero][over_eff[1]])
+            th_eff <-
+              1 - ((1 - ((1 - (1 - overall_pr)*(1 - prod(1 - establish_pr)))/
+                           (prod((1 - establish_pr*(1 - new_eff))[idx_w])*
+                              prod((1 - establish_pr*(1 - exist_eff))[idx_o])))
+                    )/establish_pr[i_th])
           }
-          x_alloc[idx][nonzero][over_eff[1]] <-
-            max(f_inv_unit_eff(adj_eff)[idx][nonzero][over_eff[1]],
-                min_alloc[idx][nonzero][over_eff[1]])
-          x_alloc[idx][nonzero][over_eff[-1]] <- 0
+          x_alloc[i_th] <- max(f_inv_unit_eff(th_eff)[i_th], min_alloc[i_th])
+          x_alloc[idx_o] <- 0
         }
 
         # Add overall effectiveness as an attribute
         if (relative_establish_pr) {
-          eff <- (sum(establish_pr*f_unit_eff(x_alloc))/sum(establish_pr))
+          eff <- 1 - (sum(establish_pr*(1 - f_unit_eff(x_alloc)))/
+                        sum(establish_pr))
         } else {
-          eff <- ((1 - prod(1 - establish_pr*f_unit_eff(x_alloc)))/
-                    (1 - prod(1 - establish_pr)))
+          eff <- 1 - ((1 - prod(1 - establish_pr*(1 - f_unit_eff(x_alloc))))/
+                        (1 - prod(1 - establish_pr)))
         }
         attr(x_alloc, "overall_pr") <- eff
       }

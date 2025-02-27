@@ -8,8 +8,8 @@ test_that("initializes with context, divisions, and valid parameters", {
   establish_pr <- test_ref$establish_pr
   expect_error(control_design <- ControlDesign(context = ManageContext("test"),
                                                divisions = "invalid"),
-               paste("Divisions parameter must be a 'Divisions' or inherited",
-                     "class object."))
+               paste("Divisions parameter must be a 'bsdesign::Divisions' or",
+                     "inherited class object."))
   expect_error(control_design <- ControlDesign(context = ManageContext("test"),
                                                divisions = divisions,
                                                establish_pr = establish_pr,
@@ -93,8 +93,9 @@ test_that("allocates resources consistently with reference method", {
   expected_manage_pr <- 1 - exp(-1*test_ref$lambda*with_saving_alloc)
   expect_silent(manage_pr <- control_design$get_manage_pr())
   expect_equal(manage_pr, expected_manage_pr)
-  expected_overall_pr <- ((1 - prod(1 - test_ref$establish_pr*manage_pr))/
-                            (1 - prod(1 - test_ref$establish_pr)))
+  expected_overall_pr <-
+    1 - ((1 - prod(1 - test_ref$establish_pr*(1 - manage_pr)))/
+           (1 - prod(1 - test_ref$establish_pr)))
   expect_silent(overall_pr <- control_design$get_overall_pr())
   expect_equal(overall_pr, expected_overall_pr)
 })
@@ -127,6 +128,32 @@ test_that("facilitates existing allocations and management probabilities", {
     exist_manage_pr = exist_manage_pr))
   expect_equal(control_design$get_manage_pr(),
                c(expected_manage_pr[1:198], rep(0, 199)))
+})
+
+test_that("allocates for optimal number of successes via overall prob.", {
+  TEST_DIRECTORY <- test_path("test_inputs")
+  template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
+  divisions <- bsdesign::Divisions(template)
+  test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "benefit",
+    benefit = 1,
+    overall_pr = 0.99))
+  expect_silent(const_benefit_alloc <- control_design$get_allocation())
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "successes",
+    overall_pr = 0.99))
+  expect_silent(successes_alloc <- control_design$get_allocation())
+  expect_equal(successes_alloc, const_benefit_alloc)
+  expect_equal(control_design$get_overall_pr(), 0.99)
 })
 
 test_that("allocates for optimal effectiveness via budget or overall prob.", {
@@ -168,26 +195,26 @@ test_that("allocates for optimal effectiveness via budget or overall prob.", {
     lambda = test_ref$lambda,
     optimal = "saving",
     benefit = benefit,
-    overall_pr = 0.99))
-  expect_silent(saving_99_alloc <- control_design$get_allocation())
-  expect_silent(saving_99_mgmt_pr <- control_design$get_manage_pr())
-  expect_silent(saving_99_oval_pr <- control_design$get_overall_pr())
-  saving_99_tot <- sum(test_ref$establish_pr*benefit*saving_99_mgmt_pr)
-  expect_equal(saving_99_oval_pr, 0.99)
+    overall_pr = 0.95))
+  expect_silent(saving_95_alloc <- control_design$get_allocation())
+  expect_silent(saving_95_mgmt_pr <- control_design$get_manage_pr())
+  expect_silent(saving_95_oval_pr <- control_design$get_overall_pr())
+  saving_95_tot <- sum(test_ref$establish_pr*benefit*saving_95_mgmt_pr)
+  expect_equal(saving_95_oval_pr, 0.95)
   expect_silent(control_design <- ControlDesign(
     context = ManageContext("test"),
     divisions = divisions,
     establish_pr = test_ref$establish_pr,
     lambda = test_ref$lambda,
     optimal = "effectiveness",
-    overall_pr = 0.99))
-  expect_silent(effect_99_alloc <- control_design$get_allocation())
-  expect_silent(effect_99_mgmt_pr <- control_design$get_manage_pr())
-  expect_silent(effect_99_oval_pr <- control_design$get_overall_pr())
-  effect_99_tot <- sum(test_ref$establish_pr*benefit*effect_99_mgmt_pr)
-  expect_equal(effect_99_oval_pr, 0.99)
-  expect_true(sum(effect_99_alloc) < sum(saving_99_alloc))
-  expect_true(effect_99_tot < saving_99_tot)
+    overall_pr = 0.95))
+  expect_silent(effect_95_alloc <- control_design$get_allocation())
+  expect_silent(effect_95_mgmt_pr <- control_design$get_manage_pr())
+  expect_silent(effect_95_oval_pr <- control_design$get_overall_pr())
+  effect_95_tot <- sum(test_ref$establish_pr*benefit*effect_95_mgmt_pr)
+  expect_equal(effect_95_oval_pr, 0.95)
+  expect_true(sum(effect_95_alloc) < sum(saving_95_alloc))
+  expect_true(effect_95_tot < saving_95_tot)
 })
 
 test_that("resource allocation utilises previous control efforts", {

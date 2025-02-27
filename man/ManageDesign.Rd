@@ -11,7 +11,7 @@ ManageDesign(
   dim_type = c("spatial", "temporal", "spatiotemporal", "species", "pathways",
     "strategies", "responses", "user"),
   establish_pr = NULL,
-  optimal = c("saving", "benefit", "effectiveness", "none"),
+  optimal = c("saving", "benefit", "successes", "effectiveness", "none"),
   alloc_unit = c("units", "hours", "traps", "treatments", "removals", "user"),
   cost_unit = c("$", "hours", "user"),
   benefit = NULL,
@@ -30,7 +30,7 @@ ManageDesign(
   dim_type = c("spatial", "temporal", "spatiotemporal", "species", "pathways",
     "strategies", "responses", "user"),
   establish_pr = NULL,
-  optimal = c("saving", "benefit", "effectiveness", "none"),
+  optimal = c("saving", "benefit", "successes", "effectiveness", "none"),
   alloc_unit = c("units", "hours", "traps", "treatments", "removals", "user"),
   cost_unit = c("$", "hours", "user"),
   benefit = NULL,
@@ -68,7 +68,8 @@ relative when their maximum is greater than 1, or an attribute
 \item{optimal}{The strategy used for finding an effective management
 resource allocation. One of (maximum) \code{"saving"} (or cost-dependent
 benefit), (maximum) \code{"benefit"} (independent of management resource
-costs), or (maximum) \code{"effectiveness"} (probability of success), or
+costs), (maximum) number of management \code{"successes"}, or (maximum)
+overall system-wide \code{"effectiveness"} (probability of success), or
 \code{"none"} for representing existing management resource allocation
 designs only.}
 

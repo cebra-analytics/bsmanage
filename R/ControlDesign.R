@@ -37,7 +37,8 @@
 #' @param optimal The strategy used for finding an effective management
 #'   resource allocation. One of (maximum) \code{"saving"} (or cost-dependent
 #'   benefit), (maximum) \code{"benefit"} (independent of management resource
-#'   costs), or (maximum) \code{"effectiveness"} (probability of success), or
+#'   costs), (maximum) number of management \code{"successes"}, or (maximum)
+#'   overall system-wide \code{"effectiveness"} (probability of success), or
 #'   \code{"none"} for representing existing management resource allocation
 #'   designs only.
 #' @param alloc_unit The descriptive unit to describe allocated management
@@ -160,6 +161,7 @@ ControlDesign <- function(context,
                           unit_pr = NULL,
                           optimal = c("saving",
                                       "benefit",
+                                      "successes",
                                       "effectiveness",
                                       "none"),
                           alloc_unit = c("units",
@@ -198,6 +200,7 @@ ControlDesign.ManageContext <- function(context,
                                         unit_pr = NULL,
                                         optimal = c("saving",
                                                     "benefit",
+                                                    "successes",
                                                     "effectiveness",
                                                     "none"),
                                         alloc_unit = c("units",
@@ -393,7 +396,7 @@ ControlDesign.ManageContext <- function(context,
                              ((1 - exist_manage_pr)*exp(-1*lambda*n_alloc)))))
       } else {
 
-        # maximum saving/benefit (benefit = 1 for effectiveness)
+        # maximum saving/benefit (benefit = 1 for successes)
         incl_x <- (optimal == "saving")
         return(
           benefit*establish_pr*(1 - exist_manage_pr)*exp(-1*lambda*n_alloc) +
@@ -416,7 +419,7 @@ ControlDesign.ManageContext <- function(context,
                          exp(-1*lambda*n_alloc))))
       } else {
 
-        # maximum saving/benefit (benefit = 1 for effectiveness)
+        # maximum saving/benefit (benefit = 1 for successes)
         incl_x <- (optimal == "saving")
         return((n_alloc > 0)*incl_x -
                  (benefit*establish_pr*(1 - exist_manage_pr)*
@@ -428,30 +431,31 @@ ControlDesign.ManageContext <- function(context,
     f_pos <<- function(alpha) {
       values <- lambda/alloc_cost*benefit*establish_pr*(1 - exist_manage_pr)
       idx <- which(values > 0)
-      values[-idx] <- 0
       if (optimal == "effectiveness" && !relative_establish_pr) {
 
         # maximum effectiveness
+        idx <- idx[which(1 - lambda[idx]/alloc_cost[idx]/alpha > 0)]
+        values[-idx] <- 0
         values[idx] <- pmax(
-          ((1 - lambda[idx]/alloc_cost[idx]/alpha > 0)*
-             (alloc_cost[idx]/lambda[idx]*
-                (log(-1*lambda[idx]/alloc_cost[idx]/alpha + 1) -
-                   log(1/establish_pr[idx]) +
-                   log(1 - exist_manage_pr[idx])))), 0)
+          (alloc_cost[idx]/lambda[idx]*
+             (log(-1*lambda[idx]/alloc_cost[idx]/alpha + 1) -
+                log(1/establish_pr[idx]) +
+                log(1 - exist_manage_pr[idx]))), 0)
         idx <- which(values > 0)
         values[idx] <- (pmax(min_alloc[idx]*alloc_cost[idx], values[idx]) +
                           fixed_cost[idx])
 
       } else {
 
-        # maximum saving/benefit (benefit = 1 for effectiveness)
+        # maximum saving/benefit (benefit = 1 for successes)
         incl_x <- (optimal == "saving")
+        idx <- idx[which((alpha - 1*incl_x) >= -1*values[idx])]
+        values[-idx] <- 0
         values[idx] <-
-          (((alpha - 1*incl_x) >= -1*values[idx])*
-             (pmax(min_alloc[idx]*alloc_cost[idx],
-                   (-1*alloc_cost[idx]/lambda[idx]*
-                      log(-1*(alpha - 1*incl_x)/values[idx]))) +
-                fixed_cost[idx]))
+          (pmax(min_alloc[idx]*alloc_cost[idx],
+                (-1*alloc_cost[idx]/lambda[idx]*
+                   log(-1*(alpha - 1*incl_x)/values[idx]))) +
+             fixed_cost[idx])
 
         # limit to zero cost allocation via f_obj(0)
         if (optimal == "saving") {
