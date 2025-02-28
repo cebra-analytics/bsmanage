@@ -412,6 +412,11 @@ ControlDesign.ManageContext <- function(context,
 
       if (optimal == "effectiveness" && !relative_establish_pr) {
 
+        # handle establish_pr of 1 via substituting for close to 1
+        if (any(establish_pr == 1)) {
+          establish_pr[which(establish_pr == 1)] <- 1 - 1e-16
+        }
+
         # maximum effectiveness
         return((-1*establish_pr*(1 - exist_manage_pr)*
                   lambda/alloc_cost*exp(-1*lambda*n_alloc))/

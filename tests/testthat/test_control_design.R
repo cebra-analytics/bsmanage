@@ -217,6 +217,50 @@ test_that("allocates for optimal effectiveness via budget or overall prob.", {
   expect_true(effect_95_tot < saving_95_tot)
 })
 
+test_that("handles establishment probabilities of one", {
+  TEST_DIRECTORY <- test_path("test_inputs")
+  template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
+  divisions <- bsdesign::Divisions(template)
+  test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
+  establish_pr <- test_ref$establish_pr/max(test_ref$establish_pr)
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "successes",
+    budget = test_ref$budget))
+  expect_silent(successes_alloc <- control_design$get_allocation())
+  expect_equal(sum(successes_alloc), test_ref$budget)
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "successes",
+    overall_pr = 0.99))
+  expect_silent(successes_alloc <- control_design$get_allocation())
+  expect_equal(control_design$get_overall_pr(), 0.99)
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "effectiveness",
+    budget = test_ref$budget))
+  expect_silent(effective_alloc <- control_design$get_allocation())
+  expect_equal(sum(effective_alloc), test_ref$budget)
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "effectiveness",
+    overall_pr = 0.99))
+  expect_silent(effective_alloc <- control_design$get_allocation())
+  expect_equal(control_design$get_overall_pr(), 0.99)
+})
+
 test_that("resource allocation utilises previous control efforts", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
