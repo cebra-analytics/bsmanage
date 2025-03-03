@@ -17,6 +17,7 @@ LagrangeMgmtDesign(
   f_unit_eff,
   f_inv_unit_eff,
   budget = NULL,
+  average_pr = NULL,
   overall_pr = NULL,
   min_alloc = NULL,
   search_alpha = FALSE,
@@ -35,6 +36,7 @@ LagrangeMgmtDesign(
   f_unit_eff,
   f_inv_unit_eff,
   budget = NULL,
+  average_pr = NULL,
   overall_pr = NULL,
   min_alloc = NULL,
   search_alpha = FALSE,
@@ -94,9 +96,15 @@ specified by \code{divisions}.}
 \item{budget}{The cost budget or constraint for the resource allocation in
 the management design. Default is \code{NULL}.}
 
+\item{average_pr}{The desired (minimum) weighted average probability of
+success (or effectiveness) of the management design (e.g. 0.95). The
+weighted average is calculated using (relative) establishment probability
+(\code{establish_pr}) values. Default is \code{NULL}.}
+
 \item{overall_pr}{The desired (minimum) overall system-wide probability of
-success (or effectiveness) of the management design (e.g. 0.95). Default
-is \code{NULL}.}
+success (or effectiveness) of the management design (e.g. 0.95). Can only
+be used when actual (not relative) establishment probability
+(\code{establish_pr}) values are provided. Default is \code{NULL}.}
 
 \item{min_alloc}{A vector of minimum permissible allocated management
 resource quantities at each division part (location, category, etc.)

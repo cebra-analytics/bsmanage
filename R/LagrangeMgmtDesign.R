@@ -48,9 +48,14 @@
 #'   specified by \code{divisions}.
 #' @param budget The cost budget or constraint for the resource allocation in
 #'   the management design. Default is \code{NULL}.
+#' @param average_pr The desired (minimum) weighted average probability of
+#'   success (or effectiveness) of the management design (e.g. 0.95). The
+#'   weighted average is calculated using (relative) establishment probability
+#'   (\code{establish_pr}) values. Default is \code{NULL}.
 #' @param overall_pr The desired (minimum) overall system-wide probability of
-#'   success (or effectiveness) of the management design (e.g. 0.95). Default
-#'   is \code{NULL}.
+#'   success (or effectiveness) of the management design (e.g. 0.95). Can only
+#'   be used when actual (not relative) establishment probability
+#'   (\code{establish_pr}) values are provided. Default is \code{NULL}.
 #' @param min_alloc A vector of minimum permissible allocated management
 #'   resource quantities at each division part (location, category, etc.)
 #'   specified by \code{divisions}. Used to avoid impractically low allocation
@@ -104,6 +109,7 @@ LagrangeMgmtDesign <- function(context,
                                f_unit_eff,
                                f_inv_unit_eff,
                                budget = NULL,
+                               average_pr = NULL,
                                overall_pr = NULL,
                                min_alloc = NULL,
                                search_alpha = FALSE, ...) {
@@ -123,6 +129,7 @@ LagrangeMgmtDesign.ManageContext <- function(context,
                                              f_unit_eff,
                                              f_inv_unit_eff,
                                              budget = NULL,
+                                             average_pr = NULL,
                                              overall_pr = NULL,
                                              min_alloc = NULL,
                                              search_alpha = FALSE, ...) {
@@ -180,9 +187,20 @@ LagrangeMgmtDesign.ManageContext <- function(context,
                "function(unit_effectiveness)."), call. = FALSE)
   }
 
-  # Check budget, overall_pr, min_alloc, and search_alpha (indicator)
+  # Check budget, average_pr, overall_pr, min_alloc, and
+  # search_alpha (indicator)
   if (!is.null(budget) && (!is.numeric(budget) || budget <= 0)) {
     stop("The budget parameter must be numeric and > 0.", call. = FALSE)
+  }
+  if (!is.null(average_pr) &&
+      (!is.numeric(average_pr) || average_pr < 0 || average_pr > 1)) {
+    stop(paste("The (weighted) average probability/effectiveness parameter",
+               "must be numeric, >= 0 and <= 1."), call. = FALSE)
+  }
+  if (!is.null(overall_pr) && relative_establish_pr) {
+    stop(paste("The overall probability/effectiveness parameter can only be",
+               "used when actual (not relative) establishment probability",
+               "values are provided."), call. = FALSE)
   }
   if (!is.null(overall_pr) &&
       (!is.numeric(overall_pr) || overall_pr < 0 || overall_pr > 1)) {
@@ -219,8 +237,9 @@ LagrangeMgmtDesign.ManageContext <- function(context,
     # Generate full allocation
     x_alloc <- f_pos(alpha)
 
-    # Optimal within budget or target overall effectiveness
-    if (is.numeric(budget) || is.numeric(overall_pr)) {
+    # Optimal within budget or target average or overall effectiveness
+    if (is.numeric(budget) || is.numeric(average_pr)  ||
+        is.numeric(overall_pr)) {
 
       # Order by f(f+(a))/f+(a)
       rank_values <- abs(f_obj(x_alloc)/x_alloc)
@@ -243,6 +262,43 @@ LagrangeMgmtDesign.ManageContext <- function(context,
         }
       }
 
+      # Optimal up to average effectiveness level
+      if (is.numeric(average_pr)) {
+
+        # Unit effectiveness
+        exist_eff <- f_unit_eff(0)
+        new_eff <- f_unit_eff(x_alloc)
+
+        # Calculate cumulative average effectiveness
+        if (length(nonzero)) {
+          cum_eff <- ((sum(establish_pr*exist_eff) +
+                         cumsum((establish_pr*
+                                   (new_eff - exist_eff))[idx][nonzero]))/
+                        sum(establish_pr))
+        } else {
+          cum_eff <- 0
+        }
+
+        # Select allocation up to average effectiveness level
+        over_eff <- which(cum_eff > average_pr)
+        idx_w <- idx[nonzero][-over_eff] # within average_pr
+        i_th <- idx[nonzero][over_eff[1]] # at threshold
+        idx_o <- c(idx[nonzero][over_eff[-1]], idx[-nonzero]) # over or zero
+        if (length(over_eff)) {
+          th_eff <-
+            (average_pr*sum(establish_pr) -
+               (sum((establish_pr*new_eff)[idx_w]) +
+                  sum((establish_pr*exist_eff)[idx_o])))/
+            establish_pr[i_th]
+          x_alloc[i_th] <- max(f_inv_unit_eff(th_eff)[i_th], min_alloc[i_th])
+          x_alloc[idx_o] <- 0
+        }
+
+        # Add average effectiveness as an attribute
+        attr(x_alloc, "average_pr") <-
+          (sum(establish_pr*f_unit_eff(x_alloc))/sum(establish_pr))
+      }
+
       # Optimal up to overall effectiveness level
       if (is.numeric(overall_pr)) {
 
@@ -252,22 +308,13 @@ LagrangeMgmtDesign.ManageContext <- function(context,
 
         # Calculate overall effectiveness
         if (length(nonzero)) {
-          if (relative_establish_pr) {
-            cum_eff <-
-              1 - ((sum(establish_pr*(1 - exist_eff)) +
-                      cumsum(
-                        (establish_pr*((1 - new_eff) - (1 - exist_eff))
-                        )[idx][nonzero]))/
-                     sum(establish_pr))
-          } else {
-            cum_eff <-
-              1 - ((1 - (prod(1 - establish_pr*(1 - exist_eff))*
-                           cumprod(
-                             ((1 - establish_pr*(1 - new_eff))/
-                                (1 - establish_pr*(1 - exist_eff))
-                             )[idx][nonzero])))/
-                     (1 - prod(1 - establish_pr)))
-          }
+          cum_eff <-
+            1 - ((1 - (prod(1 - establish_pr*(1 - exist_eff))*
+                         cumprod(
+                           ((1 - establish_pr*(1 - new_eff))/
+                              (1 - establish_pr*(1 - exist_eff))
+                           )[idx][nonzero])))/
+                   (1 - prod(1 - establish_pr)))
         } else {
           cum_eff <- 0
         }
@@ -278,32 +325,19 @@ LagrangeMgmtDesign.ManageContext <- function(context,
         i_th <- idx[nonzero][over_eff[1]] # at threshold
         idx_o <- c(idx[nonzero][over_eff[-1]], idx[-nonzero]) # over or zero
         if (length(over_eff)) {
-          if (relative_establish_pr) {
-            th_eff <-
-              1 - (((1 - overall_pr)*sum(establish_pr) -
-                      (sum((establish_pr*(1 - new_eff))[idx_w]) +
-                         sum((establish_pr*(1 - exist_eff))[idx_o])))/
-                     establish_pr[i_th])
-          } else {
-            th_eff <-
-              1 - ((1 - ((1 - (1 - overall_pr)*(1 - prod(1 - establish_pr)))/
-                           (prod((1 - establish_pr*(1 - new_eff))[idx_w])*
-                              prod((1 - establish_pr*(1 - exist_eff))[idx_o])))
-                    )/establish_pr[i_th])
-          }
+          th_eff <-
+            1 - ((1 - ((1 - (1 - overall_pr)*(1 - prod(1 - establish_pr)))/
+                         (prod((1 - establish_pr*(1 - new_eff))[idx_w])*
+                            prod((1 - establish_pr*(1 - exist_eff))[idx_o])))
+                  )/establish_pr[i_th])
           x_alloc[i_th] <- max(f_inv_unit_eff(th_eff)[i_th], min_alloc[i_th])
           x_alloc[idx_o] <- 0
         }
 
         # Add overall effectiveness as an attribute
-        if (relative_establish_pr) {
-          eff <- 1 - (sum(establish_pr*(1 - f_unit_eff(x_alloc)))/
-                        sum(establish_pr))
-        } else {
-          eff <- 1 - ((1 - prod(1 - establish_pr*(1 - f_unit_eff(x_alloc))))/
-                        (1 - prod(1 - establish_pr)))
-        }
-        attr(x_alloc, "overall_pr") <- eff
+        attr(x_alloc, "overall_pr") <-
+          1 - ((1 - prod(1 - establish_pr*(1 - f_unit_eff(x_alloc))))/
+                 (1 - prod(1 - establish_pr)))
       }
     }
 
@@ -323,7 +357,8 @@ LagrangeMgmtDesign.ManageContext <- function(context,
     best_alpha <- alpha_unconstr
 
     # Search for minimum objective via marginal benefit (alpha) values
-    if (is.numeric(budget) || is.numeric(overall_pr) || search_alpha) {
+    if (is.numeric(budget) || is.numeric(average_pr) ||
+        is.numeric(overall_pr) || search_alpha) {
       interval <- (0:100)/100*alpha_min
       alpha_range <- range(interval)[2] - range(interval)[1]
       precision <- 8 # for alpha
@@ -333,11 +368,19 @@ LagrangeMgmtDesign.ManageContext <- function(context,
         alloc <- as.data.frame(t(sapply(interval[-1], function(a) {
           alloc <- allocate(a)
           c(obj = sum(f_obj(alloc)), total = attr(alloc, "total"),
+            average_pr = attr(alloc, "average_pr"),
             overall_pr = attr(alloc, "overall_pr"))})))
 
         # Choose alpha corresponding to the last repeated minimum objective
-        if (is.numeric(overall_pr) && max(alloc$overall_pr) >= overall_pr) {
-          idx <- which(alloc$overall_pr >= overall_pr)
+        if (is.numeric(average_pr) && max(alloc$average_pr) >= average_pr ||
+            is.numeric(overall_pr) && max(alloc$overall_pr) >= overall_pr) {
+          idx <- c()
+          if (is.numeric(average_pr) && max(alloc$average_pr) >= average_pr) {
+            idx <- c(idx, which(alloc$average_pr >= average_pr))
+          }
+          if (is.numeric(overall_pr) && max(alloc$overall_pr) >= overall_pr) {
+            idx <- sort(unique(c(idx, which(alloc$overall_pr >= overall_pr))))
+          }
           idx <- idx[which(alloc$total[idx] <= min(alloc$total[idx]))]
           if (min(alloc$obj) < 0) {
             i <- max(idx[which(alloc$obj[idx] <=

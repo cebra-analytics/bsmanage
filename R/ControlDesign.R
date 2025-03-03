@@ -40,7 +40,9 @@
 #'   costs), (maximum) number of management \code{"successes"}, or (maximum)
 #'   overall system-wide \code{"effectiveness"} (probability of success), or
 #'   \code{"none"} for representing existing management resource allocation
-#'   designs only.
+#'   designs only. Maximum \code{"effectiveness"} can only be used when actual
+#'   (not relative) establishment probability (\code{establish_pr}) values are
+#'   provided.
 #' @param alloc_unit The descriptive unit to describe allocated management
 #'   resource quantities. One of \code{"units"}, \code{"hours"},
 #'   \code{"traps"}, \code{"treatments"}, \code{"removals"}, or user specified.
@@ -66,13 +68,18 @@
 #'   the management design. Default is \code{NULL}. Units should be consistent
 #'   with \code{alloc_cost} when specified. Otherwise the units should be
 #'   consistent with the \code{alloc_unit} parameter.
+#' @param average_pr The desired (minimum) weighted average probability of
+#'   success (or effectiveness) of the management design. The weighted average
+#'   is calculated using (relative) establishment probability
+#'   (\code{establish_pr}) values. Default is \code{NULL}.
+#' @param average_pr The desired (minimum) weighted average probability of
+#'   success (or effectiveness) of the management design (e.g. 0.95). The
+#'   weighted average is calculated using (relative) establishment probability
+#'   (\code{establish_pr}) values. Default is \code{NULL}.
 #' @param overall_pr The desired (minimum) overall system-wide probability of
-#'   success (or effectiveness) of the management design when \code{optimal}
-#'   is \code{"effectiveness"}. Default is \code{NULL}.
-#' @param min_alloc A vector of minimum permissible allocated management
-#'   resource quantities at each division part specified by \code{divisions}.
-#'   Used to avoid impractically low allocation quantities. Default is
-#'   \code{NULL}.
+#'   success (or effectiveness) of the management design (e.g. 0.95). Can only
+#'   be used when actual (not relative) establishment probability
+#'   (\code{establish_pr}) values are provided. Default is \code{NULL}.
 #' @param discrete_alloc A logical to indicate that the allocated management
 #'   resource quantities at each division part specified by \code{divisions}
 #'   should be discrete integers. Used to allocate discrete management resource
@@ -111,15 +118,20 @@
 #'       effectiveness) values at each division part for the allocated
 #'       management design, combined with any existing success probabilities or
 #'       effectiveness specified via \code{exist_manage_pr}.}
+#'     \item{\code{get_average_pr()}}{Get the weighted average probability
+#'       of success (or effectiveness) of the management design. Weighted via
+#'       \code{establish_pr} values.}
 #'     \item{\code{get_overall_pr()}}{Get the overall system-wide probability
-#'       of success (or effectiveness) of the management design.}
+#'       of success (or effectiveness) of the management design. Only available
+#'       when actual (not relative) \code{establish_pr} values are provided.}
 #'     \item{\code{save_design(...)}}{Save the management design as a
 #'       collection of raster TIF and/or comma-separated value (CSV) files,
 #'       appropriate for the \code{divisions} type, including the management
 #'       resource \code{allocation}, the probability of management success (or
 #'       effectiveness) values (\code{manage_pr}), and a \code{summary} (CSV)
-#'       of the total allocation, costs (when applicable), and the overall
-#'       system-wide probability of success (or effectiveness) of the
+#'       of the total allocation, costs (when applicable), the weighted average
+#'       probability of success (\code{average_pr}), and (when available) the
+#'       overall system-wide probability of success (or effectiveness) of the
 #'       management design (\code{overall_pr}). \code{Terra} raster write
 #'       options may be passed to the function for saving grid-based designs.}
 #'   }
@@ -177,6 +189,7 @@ ControlDesign <- function(context,
                           alloc_cost = NULL,
                           fixed_cost = NULL,
                           budget = NULL,
+                          average_pr = NULL,
                           overall_pr = NULL,
                           min_alloc = NULL,
                           discrete_alloc = FALSE,
@@ -216,6 +229,7 @@ ControlDesign.ManageContext <- function(context,
                                         alloc_cost = NULL,
                                         fixed_cost = NULL,
                                         budget = NULL,
+                                        average_pr = NULL,
                                         overall_pr = NULL,
                                         min_alloc = NULL,
                                         discrete_alloc = FALSE,
@@ -247,6 +261,7 @@ ControlDesign.ManageContext <- function(context,
                        benefit = benefit,
                        alloc_cost = alloc_cost,
                        budget = budget,
+                       average_pr = average_pr,
                        overall_pr = overall_pr,
                        exist_alloc = exist_alloc,
                        exist_manage_pr = exist_manage_pr,
@@ -501,14 +516,15 @@ ControlDesign.ManageContext <- function(context,
     return(1 - (1 - exist_manage_pr)*exp(-1*lambda*n_alloc))
   }
 
+  # Function for calculating weighted average management probability
+  calculate_average_pr <- function(manage_pr) {
+    return(sum(establish_pr*manage_pr)/sum(establish_pr))
+  }
+
   # Function for calculating overall management probability or effectiveness
   calculate_overall_pr <- function(manage_pr) {
-    if (relative_establish_pr) {
-      return(1 - sum(establish_pr*(1 - manage_pr))/sum(establish_pr))
-    } else {
-      return(1 - ((1 - prod(1 - establish_pr*(1 - manage_pr)))/
-                    (1 - prod(1 - establish_pr))))
-    }
+    return(1 - ((1 - prod(1 - establish_pr*(1 - manage_pr)))/
+                  (1 - prod(1 - establish_pr))))
   }
 
   # Get the allocated management resource values of the design
@@ -551,6 +567,7 @@ ControlDesign.ManageContext <- function(context,
                                                  f_unit_eff,
                                                  f_inv_unit_eff,
                                                  budget = budget,
+                                                 average_pr = average_pr,
                                                  overall_pr = overall_pr,
                                                  min_alloc = min_x_alloc,
                                                  search_alpha = search_alpha)
@@ -575,7 +592,12 @@ ControlDesign.ManageContext <- function(context,
             add_allocation <- (total_x_alloc < budget && add_allocation)
             budget <<- budget - total_x_alloc
           }
-          if (is.numeric(overall_pr)) {
+          if (is.numeric(average_pr)) {
+            add_allocation <-
+              (calculate_average_pr(exist_manage_pr) < average_pr &&
+                 add_allocation)
+          }
+          if (!relative_establish_pr && is.numeric(overall_pr)) {
             add_allocation <-
               (calculate_overall_pr(exist_manage_pr) < overall_pr &&
                  add_allocation)
@@ -622,18 +644,34 @@ ControlDesign.ManageContext <- function(context,
     return(manage_pr)
   }
 
-  # Get the overall management probability or effectiveness of the design
-  self$get_overall_pr <- function() {
-    system_eff <- NULL
+  # Get the weighted average management probability of success
+  self$get_average_pr <- function() {
+    average_eff <- NULL
     manage_pr <- self$get_manage_pr()
     if (!is.null(manage_pr)) {
       if (parts == 1) {
-        system_eff <- manage_pr
+        average_eff <- manage_pr
       } else if (!is.null(establish_pr)) {
-        system_eff <- calculate_overall_pr(manage_pr)
+        average_eff <- calculate_average_pr(manage_pr)
       }
     }
-    return(system_eff)
+    return(average_eff)
+  }
+
+  # Get the overall management probability or effectiveness of the design
+  if (!relative_establish_pr) {
+    self$get_overall_pr <- function() {
+      system_eff <- NULL
+      manage_pr <- self$get_manage_pr()
+      if (!is.null(manage_pr)) {
+        if (parts == 1) {
+          system_eff <- manage_pr
+        } else if (!is.null(establish_pr)) {
+          system_eff <- calculate_overall_pr(manage_pr)
+        }
+      }
+      return(system_eff)
+    }
   }
 
   # Save the management design as a collection of appropriate files
@@ -669,7 +707,10 @@ ControlDesign.ManageContext <- function(context,
       summary_data$total_saving <- sum(establish_pr*benefit*
                                          self$get_manage_pr())
     }
-    summary_data$overall_pr <- self$get_overall_pr()
+    summary_data$average_pr <- self$get_average_pr()
+    if (relative_establish_pr) {
+      summary_data$overall_pr <- self$get_overall_pr()
+    }
     write.csv(summary_data, file = "summary.csv", row.names = FALSE)
 
     return(summary_data)

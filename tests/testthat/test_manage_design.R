@@ -20,6 +20,20 @@ test_that("initializes with context, divisions, and valid parameters", {
                      "values for each division part."))
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
+                                             average_pr = 1.5),
+               paste("The (weighted) average probability/effectiveness",
+                     "parameter must be numeric, >= 0 and <= 1."),
+               fixed = TRUE)
+  expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
+                                             divisions = divisions,
+                                             establish_pr = 2,
+                                             overall_pr = 0.5),
+               paste("The overall probability/effectiveness parameter can",
+                     "only be used when actual (not relative) establishment",
+                     "probability values are provided."),
+               fixed = TRUE)
+  expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
+                                             divisions = divisions,
                                              overall_pr = 1.5),
                paste("The overall probability/effectiveness parameter must be",
                      "numeric, >= 0 and <= 1."))
@@ -35,27 +49,54 @@ test_that("initializes with context, divisions, and valid parameters", {
                "The benefit parameter must be specified for optimal benefit.")
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
+                                             establish_pr = 0.5,
                                              optimal = "benefit",
                                              benefit = 1,
                                              budget = NULL,
+                                             average_pr = NULL,
                                              overall_pr = NULL),
-               paste("Either the budget or overall probability/effectiveness",
-                     "parameter must be specified for optimal benefit."))
+               paste("Either the budget, or the average or overall",
+                     "probability parameter must be specified for optimal",
+                     "benefit."))
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
+                                             establish_pr = 2,
+                                             optimal = "benefit",
+                                             benefit = 1,
+                                             budget = NULL,
+                                             average_pr = NULL,
+                                             overall_pr = NULL),
+               paste("Either the budget or the average probability parameter",
+                     "must be specified for optimal benefit."))
+  expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
+                                             divisions = divisions,
+                                             establish_pr = 0.5,
                                              optimal = "successes",
                                              budget = NULL,
+                                             average_pr = NULL,
                                              overall_pr = NULL),
-               paste("Either the budget or overall probability/effectiveness",
-                     "parameter must be specified for optimal management",
-                     "successes."))
+               paste("Either the budget, or the average or overall",
+                     "probability parameter must be specified for optimal",
+                     "management successes."))
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
+                                             establish_pr = 2,
+                                             optimal = "successes",
+                                             budget = NULL,
+                                             average_pr = NULL,
+                                             overall_pr = NULL),
+               paste("Either the budget or the average probability parameter",
+                     "must be specified for optimal management successes."))
+  expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
+                                             divisions = divisions,
+                                             establish_pr = 0.5,
                                              optimal = "effectiveness",
                                              budget = NULL,
+                                             average_pr = NULL,
                                              overall_pr = NULL),
-               paste("Either the budget or overall probability/effectiveness",
-                     "parameter must be specified for optimal effectiveness."))
+               paste("Either the budget, or the average or overall",
+                     "probability parameter must be specified for optimal",
+                     "effectiveness."))
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
                                              optimal = "saving",
@@ -98,11 +139,13 @@ test_that("initializes with context, divisions, and valid parameters", {
                      "vectors, with values for each division part."))
   expect_silent(manage_design <- ManageDesign(context = ManageContext("test"),
                                               divisions = divisions,
+                                              establish_pr = 0.5,
                                               optimal = "none"))
   expect_is(manage_design, "ManageDesign")
   expect_named(manage_design, c("get_context", "get_divisions", "get_dim_type",
                                 "get_allocation", "get_manage_pr",
-                                "get_overall_pr", "save_design"))
+                                "get_average_pr", "get_overall_pr",
+                                "save_design"))
   expect_is(manage_design$get_context(), "ManageContext")
   expect_is(manage_design$get_divisions(), "Divisions")
   expect_equal(manage_design$get_dim_type(), "spatial")
@@ -111,8 +154,17 @@ test_that("initializes with context, divisions, and valid parameters", {
   expect_null(manage_design$get_overall_pr())
   expect_silent(manage_design <- ManageDesign(context = ManageContext("test"),
                                               divisions = divisions,
-                                              dim_type = "user_defined",
+                                              establish_pr = 2,
                                               optimal = "none"))
+  expect_named(manage_design, c("get_context", "get_divisions", "get_dim_type",
+                                "get_allocation", "get_manage_pr",
+                                "get_average_pr", "save_design"))
+  expect_silent(manage_design <- ManageDesign(context = ManageContext("test"),
+                                              divisions = divisions,
+                                              dim_type = "user_defined",
+                                              optimal = "none",
+                                              alloc_unit = "other",
+                                              cost_unit = "litres"))
   expect_equal(manage_design$get_dim_type(), "user_defined")
 })
 

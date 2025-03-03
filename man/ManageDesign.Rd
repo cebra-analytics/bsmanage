@@ -17,6 +17,7 @@ ManageDesign(
   benefit = NULL,
   alloc_cost = NULL,
   budget = NULL,
+  average_pr = NULL,
   overall_pr = NULL,
   exist_alloc = NULL,
   exist_manage_pr = NULL,
@@ -36,6 +37,7 @@ ManageDesign(
   benefit = NULL,
   alloc_cost = NULL,
   budget = NULL,
+  average_pr = NULL,
   overall_pr = NULL,
   exist_alloc = NULL,
   exist_manage_pr = NULL,
@@ -71,7 +73,9 @@ benefit), (maximum) \code{"benefit"} (independent of management resource
 costs), (maximum) number of management \code{"successes"}, or (maximum)
 overall system-wide \code{"effectiveness"} (probability of success), or
 \code{"none"} for representing existing management resource allocation
-designs only.}
+designs only. Maximum \code{"effectiveness"} can only be used when actual
+(not relative) establishment probability (\code{establish_pr}) values are
+provided.}
 
 \item{alloc_unit}{The descriptive unit to describe allocated management
 resource quantities. One of \code{"units"}, \code{"hours"},
@@ -98,9 +102,15 @@ the management design. Default is \code{NULL}. Units should be consistent
 with \code{alloc_cost} when specified. Otherwise the units should be
 consistent with the \code{alloc_unit} parameter.}
 
+\item{average_pr}{The desired (minimum) weighted average probability of
+success (or effectiveness) of the management design (e.g. 0.95). The
+weighted average is calculated using (relative) establishment probability
+(\code{establish_pr}) values. Default is \code{NULL}.}
+
 \item{overall_pr}{The desired (minimum) overall system-wide probability of
-success (or effectiveness) of the management design when \code{optimal}
-is \code{"effectiveness"}. Default is \code{NULL}.}
+success (or effectiveness) of the management design (e.g. 0.95). Can only
+be used when actual (not relative) establishment probability
+(\code{establish_pr}) values are provided. Default is \code{NULL}.}
 
 \item{exist_alloc}{A vector of existing management resource quantities at
 each division part specified by \code{divisions}. Should only be used to
@@ -130,15 +140,20 @@ desired overall management success probability level.}
 effectiveness) values at each division part for the allocated
 management design, combined with any existing success probabilities or
 effectiveness specified via \code{exist_manage_pr}.}
+\item{\code{get_average_pr()}}{Get the weighted average probability
+of success (or effectiveness) of the management design. Weighted via
+\code{establish_pr} values.}
 \item{\code{get_overall_pr()}}{Get the overall system-wide probability
-of success (or effectiveness) of the management design.}
+of success (or effectiveness) of the management design. Only available
+when actual (not relative) \code{establish_pr} values are provided.}
 \item{\code{save_design(...)}}{Save the management design as a
 collection of raster TIF and/or comma-separated value (CSV) files,
 appropriate for the \code{divisions} type, including the management
 resource \code{allocation}, the probability of management success (or
 effectiveness) values (\code{manage_pr}), and a \code{summary} (CSV)
-of the total allocation, costs (when applicable), and the overall
-system-wide probability of success (or effectiveness) of the
+of the total allocation, costs (when applicable), the weighted average
+probability of success (\code{average_pr}), and (when available) the
+overall system-wide probability of success (or effectiveness) of the
 management design (\code{overall_pr}). \code{Terra} raster write
 options may be passed to the function for saving grid-based designs.}
 }

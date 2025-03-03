@@ -30,7 +30,9 @@
 #'   costs), (maximum) number of management \code{"successes"}, or (maximum)
 #'   overall system-wide \code{"effectiveness"} (probability of success), or
 #'   \code{"none"} for representing existing management resource allocation
-#'   designs only.
+#'   designs only. Maximum \code{"effectiveness"} can only be used when actual
+#'   (not relative) establishment probability (\code{establish_pr}) values are
+#'   provided.
 #' @param alloc_unit The descriptive unit to describe allocated management
 #'   resource quantities. One of \code{"units"}, \code{"hours"},
 #'   \code{"traps"}, \code{"treatments"}, \code{"removals"}, or user specified.
@@ -51,9 +53,14 @@
 #'   the management design. Default is \code{NULL}. Units should be consistent
 #'   with \code{alloc_cost} when specified. Otherwise the units should be
 #'   consistent with the \code{alloc_unit} parameter.
+#' @param average_pr The desired (minimum) weighted average probability of
+#'   success (or effectiveness) of the management design (e.g. 0.95). The
+#'   weighted average is calculated using (relative) establishment probability
+#'   (\code{establish_pr}) values. Default is \code{NULL}.
 #' @param overall_pr The desired (minimum) overall system-wide probability of
-#'   success (or effectiveness) of the management design when \code{optimal}
-#'   is \code{"effectiveness"}. Default is \code{NULL}.
+#'   success (or effectiveness) of the management design (e.g. 0.95). Can only
+#'   be used when actual (not relative) establishment probability
+#'   (\code{establish_pr}) values are provided. Default is \code{NULL}.
 #' @param exist_alloc A vector of existing management resource quantities at
 #'   each division part specified by \code{divisions}. Should only be used to
 #'   represent existing management resource allocation designs when
@@ -78,15 +85,20 @@
 #'       effectiveness) values at each division part for the allocated
 #'       management design, combined with any existing success probabilities or
 #'       effectiveness specified via \code{exist_manage_pr}.}
+#'     \item{\code{get_average_pr()}}{Get the weighted average probability
+#'       of success (or effectiveness) of the management design. Weighted via
+#'       \code{establish_pr} values.}
 #'     \item{\code{get_overall_pr()}}{Get the overall system-wide probability
-#'       of success (or effectiveness) of the management design.}
+#'       of success (or effectiveness) of the management design. Only available
+#'       when actual (not relative) \code{establish_pr} values are provided.}
 #'     \item{\code{save_design(...)}}{Save the management design as a
 #'       collection of raster TIF and/or comma-separated value (CSV) files,
 #'       appropriate for the \code{divisions} type, including the management
 #'       resource \code{allocation}, the probability of management success (or
 #'       effectiveness) values (\code{manage_pr}), and a \code{summary} (CSV)
-#'       of the total allocation, costs (when applicable), and the overall
-#'       system-wide probability of success (or effectiveness) of the
+#'       of the total allocation, costs (when applicable), the weighted average
+#'       probability of success (\code{average_pr}), and (when available) the
+#'       overall system-wide probability of success (or effectiveness) of the
 #'       management design (\code{overall_pr}). \code{Terra} raster write
 #'       options may be passed to the function for saving grid-based designs.}
 #'   }
@@ -165,6 +177,7 @@ ManageDesign <- function(context,
                          benefit = NULL,
                          alloc_cost = NULL,
                          budget = NULL,
+                         average_pr = NULL,
                          overall_pr = NULL,
                          exist_alloc = NULL,
                          exist_manage_pr = NULL,
@@ -202,6 +215,7 @@ ManageDesign.ManageContext <- function(context,
                                        benefit = NULL,
                                        alloc_cost = NULL,
                                        budget = NULL,
+                                       average_pr = NULL,
                                        overall_pr = NULL,
                                        exist_alloc = NULL,
                                        exist_manage_pr = NULL,
@@ -246,11 +260,21 @@ ManageDesign.ManageContext <- function(context,
     cost_unit <- match.arg(cost_unit)
   }
 
-  # Check benefit, and overall_pr
+  # Check benefit, average_pr, and overall_pr
   if (!is.null(benefit) &&
       (!is.numeric(benefit) || !length(benefit) %in% c(1, parts))) {
     stop(paste("The benefit parameter must be a numeric vector with values",
                "for each division part."), call. = FALSE)
+  }
+  if (!is.null(average_pr) &&
+      (!is.numeric(average_pr) || average_pr < 0 || average_pr > 1)) {
+    stop(paste("The (weighted) average probability/effectiveness parameter",
+               "must be numeric, >= 0 and <= 1."), call. = FALSE)
+  }
+  if (!is.null(overall_pr) && relative_establish_pr) {
+    stop(paste("The overall probability/effectiveness parameter can only be",
+               "used when actual (not relative) establishment probability",
+               "values are provided."), call. = FALSE)
   }
   if (!is.null(overall_pr) &&
       (!is.numeric(overall_pr) || overall_pr < 0 || overall_pr > 1)) {
@@ -265,19 +289,29 @@ ManageDesign.ManageContext <- function(context,
   } else if (optimal == "benefit" && is.null(benefit)) {
     stop("The benefit parameter must be specified for optimal benefit.",
          call. = FALSE)
-  } else if (optimal == "benefit" &&
-             (is.null(budget) && is.null(overall_pr))) {
-    stop(paste("Either the budget or overall probability/effectiveness",
+  } else if (optimal == "benefit" && !relative_establish_pr &&
+             (is.null(budget) && is.null(average_pr) && is.null(overall_pr))) {
+    stop(paste("Either the budget, or the average or overall probability",
                "parameter must be specified for optimal benefit."),
          call. = FALSE)
-  } else if (optimal == "successes" &&
+  } else if (optimal == "benefit" && relative_establish_pr &&
+             (is.null(budget) && is.null(average_pr))) {
+    stop(paste("Either the budget or the average probability parameter must",
+               "be specified for optimal benefit."),
+         call. = FALSE)
+  } else if (optimal == "successes" && !relative_establish_pr &&
              (is.null(budget) && is.null(overall_pr))) {
-    stop(paste("Either the budget or overall probability/effectiveness",
+    stop(paste("Either the budget, or the average or overall probability",
                "parameter must be specified for optimal management successes."),
+         call. = FALSE)
+  } else if (optimal == "successes" && relative_establish_pr &&
+             (is.null(budget) && is.null(overall_pr))) {
+    stop(paste("Either the budget or the average probability parameter must",
+               "be specified for optimal management successes."),
          call. = FALSE)
   } else if (optimal == "effectiveness" &&
              (is.null(budget) && is.null(overall_pr))) {
-    stop(paste("Either the budget or overall probability/effectiveness",
+    stop(paste("Either the budget, or the average or overall probability",
                "parameter must be specified for optimal effectiveness."),
          call. = FALSE)
   }
@@ -357,9 +391,16 @@ ManageDesign.ManageContext <- function(context,
     return(manage_pr)
   }
 
-  # Get the overall management probability or effectiveness of the design
-  self$get_overall_pr <- function() {
+  # Get the weighted average management probability of success
+  self$get_average_pr <- function() {
     # overridden in inherited classes
+  }
+
+  # Get the overall management probability or effectiveness of the design
+  if (!relative_establish_pr) {
+    self$get_overall_pr <- function() {
+      # overridden in inherited classes
+    }
   }
 
   # Save the management design as a collection of appropriate files

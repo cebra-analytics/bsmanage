@@ -53,12 +53,13 @@ test_that("initializes with context, divisions, and valid parameters", {
   expect_named(
     control_design,
     c("get_context", "get_divisions", "get_dim_type", "get_allocation",
-      "get_manage_pr", "get_overall_pr", "save_design"))
+      "get_manage_pr", "get_average_pr", "get_overall_pr", "save_design"))
   expect_is(control_design$get_context(), "ManageContext")
   expect_is(control_design$get_divisions(), "Divisions")
   expect_equal(control_design$get_dim_type(), "spatial")
   expect_null(control_design$get_allocation())
   expect_null(control_design$get_manage_pr())
+  expect_null(control_design$get_average_pr())
   expect_null(control_design$get_overall_pr())
 })
 
@@ -130,11 +131,57 @@ test_that("facilitates existing allocations and management probabilities", {
                c(expected_manage_pr[1:198], rep(0, 199)))
 })
 
-test_that("allocates for optimal number of successes via overall prob.", {
+test_that("allocates for optimal number of successes via constraints", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
   divisions <- bsdesign::Divisions(template)
   test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "benefit",
+    benefit = 1,
+    budget = 30))
+  expect_silent(const_benefit_alloc <- control_design$get_allocation())
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "successes",
+    budget = 30,
+    average_pr = 0.9995,
+    overall_pr = 0.995))
+  expect_silent(successes_alloc <- control_design$get_allocation())
+  expect_equal(successes_alloc, const_benefit_alloc)
+  expect_equal(sum(successes_alloc), 30)
+  expect_true(control_design$get_average_pr() < 0.9995)
+  expect_true(control_design$get_overall_pr() < 0.995)
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "benefit",
+    benefit = 1,
+    average_pr = 0.998))
+  expect_silent(const_benefit_alloc <- control_design$get_allocation())
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "successes",
+    budget = 35,
+    average_pr = 0.998,
+    overall_pr = 0.99))
+  expect_silent(successes_alloc <- control_design$get_allocation())
+  expect_equal(successes_alloc, const_benefit_alloc)
+  expect_true(sum(successes_alloc) < 35)
+  expect_equal(control_design$get_average_pr(), 0.998)
+  expect_true(control_design$get_overall_pr() < 0.99)
   expect_silent(control_design <- ControlDesign(
     context = ManageContext("test"),
     divisions = divisions,
@@ -150,13 +197,17 @@ test_that("allocates for optimal number of successes via overall prob.", {
     establish_pr = test_ref$establish_pr,
     lambda = test_ref$lambda,
     optimal = "successes",
+    budget = 35,
+    average_pr = 0.9995,
     overall_pr = 0.99))
   expect_silent(successes_alloc <- control_design$get_allocation())
   expect_equal(successes_alloc, const_benefit_alloc)
+  expect_true(sum(successes_alloc) < 35)
+  expect_true(control_design$get_average_pr() < 0.9995)
   expect_equal(control_design$get_overall_pr(), 0.99)
 })
 
-test_that("allocates for optimal effectiveness via budget or overall prob.", {
+test_that("allocates for optimal effectiveness via constraints", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
   divisions <- bsdesign::Divisions(template)
@@ -293,7 +344,7 @@ test_that("resource allocation utilises previous control efforts", {
   expect_named(
     control_design,
     c("get_context", "get_divisions", "get_dim_type", "get_allocation",
-      "get_manage_pr", "get_overall_pr", "save_design",
+      "get_manage_pr", "get_average_pr", "get_overall_pr", "save_design",
       "get_mod_establish_pr"))
   expect_equal(control_design$get_mod_establish_pr(), mod_establish_pr)
   expect_silent(mod_alloc <- control_design$get_allocation())
