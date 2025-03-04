@@ -69,10 +69,6 @@
 #'   with \code{alloc_cost} when specified. Otherwise the units should be
 #'   consistent with the \code{alloc_unit} parameter.
 #' @param average_pr The desired (minimum) weighted average probability of
-#'   success (or effectiveness) of the management design. The weighted average
-#'   is calculated using (relative) establishment probability
-#'   (\code{establish_pr}) values. Default is \code{NULL}.
-#' @param average_pr The desired (minimum) weighted average probability of
 #'   success (or effectiveness) of the management design (e.g. 0.95). The
 #'   weighted average is calculated using (relative) establishment probability
 #'   (\code{establish_pr}) values. Default is \code{NULL}.
