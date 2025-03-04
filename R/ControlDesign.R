@@ -704,7 +704,7 @@ ControlDesign.ManageContext <- function(context,
                                          self$get_manage_pr())
     }
     summary_data$average_pr <- self$get_average_pr()
-    if (relative_establish_pr) {
+    if (!relative_establish_pr) {
       summary_data$overall_pr <- self$get_overall_pr()
     }
     write.csv(summary_data, file = "summary.csv", row.names = FALSE)
