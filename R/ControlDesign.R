@@ -124,10 +124,12 @@
 #'       collection of raster TIF and/or comma-separated value (CSV) files,
 #'       appropriate for the \code{divisions} type, including the management
 #'       resource \code{allocation}, the probability of management success (or
-#'       effectiveness) values (\code{manage_pr}), and a \code{summary} (CSV)
-#'       of the total allocation, costs (when applicable), the weighted average
-#'       probability of success (\code{average_pr}), and (when available) the
-#'       overall system-wide probability of success (or effectiveness) of the
+#'       effectiveness) values (\code{manage_pr}), and the modified
+#'       establishment likelihood (\code{mod_establish_pr}) when previous
+#'       control is specified, as well as a \code{summary} (CSV) of the total
+#'       allocation, costs (when applicable), the weighted average probability
+#'       of success (\code{average_pr}), and (when available) the overall
+#'       system-wide probability of success (or effectiveness) of the
 #'       management design (\code{overall_pr}). \code{Terra} raster write
 #'       options may be passed to the function for saving grid-based designs.}
 #'   }
@@ -679,16 +681,36 @@ ControlDesign.ManageContext <- function(context,
                          "allocation.tif", ...)
       terra::writeRaster(divisions$get_rast(self$get_manage_pr()),
                          "manage_pr.tif", ...)
+      if (!is.null(previous_control)) {
+        terra::writeRaster(divisions$get_rast(self$get_mod_establish_pr()),
+                           "mod_establish_pr.tif", ...)
+      }
     } else if (divisions$get_type() == "patch") {
-      write.csv(cbind(divisions$get_coords(extra_cols = TRUE),
-                      allocation = self$get_allocation(),
-                      manage_pr = self$get_manage_pr()),
-                file = "design.csv", row.names = FALSE)
+      if (!is.null(previous_control)) {
+        write.csv(cbind(divisions$get_coords(extra_cols = TRUE),
+                        mod_establish_pr = self$get_mod_establish_pr(),
+                        allocation = self$get_allocation(),
+                        manage_pr = self$get_manage_pr()),
+                  file = "design.csv", row.names = FALSE)
+      } else {
+        write.csv(cbind(divisions$get_coords(extra_cols = TRUE),
+                        allocation = self$get_allocation(),
+                        manage_pr = self$get_manage_pr()),
+                  file = "design.csv", row.names = FALSE)
+      }
     } else if (divisions$get_type() == "other") {
-      write.csv(cbind(divisions$get_data(),
-                      allocation = self$get_allocation(),
-                      manage_pr = self$get_manage_pr()),
-                file = "design.csv", row.names = FALSE)
+      if (!is.null(previous_control)) {
+        write.csv(cbind(divisions$get_data(),
+                        mod_establish_pr = self$get_mod_establish_pr(),
+                        allocation = self$get_allocation(),
+                        manage_pr = self$get_manage_pr()),
+                  file = "design.csv", row.names = FALSE)
+      } else {
+        write.csv(cbind(divisions$get_data(),
+                        allocation = self$get_allocation(),
+                        manage_pr = self$get_manage_pr()),
+                  file = "design.csv", row.names = FALSE)
+      }
     }
 
     # Save summary

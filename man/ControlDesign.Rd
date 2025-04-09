@@ -194,10 +194,12 @@ when actual (not relative) \code{establish_pr} values are provided.}
 collection of raster TIF and/or comma-separated value (CSV) files,
 appropriate for the \code{divisions} type, including the management
 resource \code{allocation}, the probability of management success (or
-effectiveness) values (\code{manage_pr}), and a \code{summary} (CSV)
-of the total allocation, costs (when applicable), the weighted average
-probability of success (\code{average_pr}), and (when available) the
-overall system-wide probability of success (or effectiveness) of the
+effectiveness) values (\code{manage_pr}), and the modified
+establishment likelihood (\code{mod_establish_pr}) when previous
+control is specified, as well as a \code{summary} (CSV) of the total
+allocation, costs (when applicable), the weighted average probability
+of success (\code{average_pr}), and (when available) the overall
+system-wide probability of success (or effectiveness) of the
 management design (\code{overall_pr}). \code{Terra} raster write
 options may be passed to the function for saving grid-based designs.}
 }
