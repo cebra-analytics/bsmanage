@@ -73,11 +73,15 @@ ManageRemovals.Region <- function(region, population_model,
                         class = "ManageRemovals")
 
   # Validate removal probability and radius
-  if (!is.null(removal_pr) &&
-      (!is.numeric(removal_pr) ||
-       !length(removal_pr) %in% c(1, region$get_locations()))) {
+  if (is.null(removal_pr) ||
+      (!is.null(removal_pr) &&
+       (!is.numeric(removal_pr) ||
+        !length(removal_pr) %in% c(1, region$get_locations())))) {
     stop(paste("Removal probability should be a vector with a value for each",
                "region location."), call. = FALSE)
+  }
+  if (length(removal_pr) == 1) {
+    removal_pr <- rep(removal_pr, region$get_locations())
   }
   if (!is.null(radius) && (!is.numeric(radius) || radius < 0)) {
     stop("The radius (m) parameter must be numeric and >= 0.", call. = FALSE)
