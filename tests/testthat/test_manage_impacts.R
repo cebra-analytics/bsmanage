@@ -48,9 +48,8 @@ test_that("initializes with impacts, populations and impact stages", {
   expect_false(manage_impacts$get_calc_total())
   impacts <- bsimpact::ImpactAnalysis(context, region, incursion,
                                       impact_layers, combine_function = "none")
-  expect_error(manage_impacts <- ManageImpacts(impacts, population_model,
-                                               calc_total = TRUE),
-               "Cannot combine impacts to calculate total.")
+  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
+                                               calc_total = TRUE))
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
                                                 calc_total = FALSE))
   expect_false(manage_impacts$get_calc_total())
