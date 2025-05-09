@@ -123,7 +123,7 @@ ManageRemovals.Region <- function(region, population_model,
 
         # Individuals to which to apply removal
         if (detected_only) {
-          n_apply <- attr(n, "detected")
+          n_apply <- pmin(as.numeric(n), attr(n, "detected"))
         } else {
           n_apply <- as.numeric(n)
         }
