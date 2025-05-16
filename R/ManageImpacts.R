@@ -90,10 +90,26 @@ ManageImpacts <- function(impacts, population_model,
   # Calculate impacts
   self$calculate <- function(n) {
 
+    # Use area-based impacts for spatially implicit regions
+    if (population_model$get_region()$spatially_implicit()) {
+      if (is.numeric(attr(n, "diffusion_radius"))) {
+        total_area <- pi*(attr(n, "diffusion_radius"))^2
+      } else if (is.numeric(attr(n, "spread_area"))) {
+        total_area <- attr(n, "spread_area")
+      } else {
+        stop("Cannot calculate spatially implicit impacts without area occupied.", call. = FALSE)
+      }
+    }
+
     # Combine impact stage populations
     if (population_model$get_type() == "stage_structured" &&
         is.numeric(impact_stages)) {
       n <- rowSums(n[,impact_stages, drop = FALSE])
+    }
+
+    # Use total area occupied when spatially implicit when impacting population is present
+    if (population_model$get_region()$spatially_implicit()) {
+      n <- (sum(n) > 0)*total_area
     }
 
     # Set incursion values within impact object

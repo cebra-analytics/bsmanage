@@ -102,3 +102,37 @@ test_that("calculates impacts including combined", {
   expect_named(calc_impacts, c("aspect1", "aspect2", "combined"))
   expect_equal(calc_impacts, expected_impacts)
 })
+
+test_that("calculates spatially implicit impacts via area occupied", {
+  context <- bsimpact::Context("My species",
+                               impact_scope = c("aspect1", "aspect2"))
+  incursion <- bsimpact::Incursion(0, bsimpact::Region(), type = "area")
+  aspects <- list(aspect1 = "aspect1", aspect2 = "aspect2")
+  impact_layers <- list(aspect1 = 100, aspect2 = 200)
+  loss_rates <- c(aspect1 = 0.3, aspect2 = 0.4)
+  impacts <- bsimpact::ValueImpacts(context, bsimpact::Region(), incursion,
+                                    impact_layers, loss_rates = loss_rates)
+  stage_matrix <- matrix(c(0.0, 2.0, 5.0,
+                           0.3, 0.0, 0.0,
+                           0.0, 0.6, 0.8),
+                         nrow = 3, ncol = 3, byrow = TRUE)
+  region <- bsspread::Region()
+  population_model <- bsspread::StagedPopulation(region, stage_matrix)
+  initializer <- bsspread::Initializer(20, region = region,
+                                       population_model = population_model)
+  n <- initializer$initialize()
+  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
+                                                impact_stages = 2:3))
+  expect_error(calc_impacts <- manage_impacts$calculate(n),
+               paste("Cannot calculate spatially implicit impacts without",
+                     "area occupied."))
+  attr(n, "spread_area") <- 50
+  expect_silent(calc_impacts <- manage_impacts$calculate(n))
+  expect_named(calc_impacts, c("aspect1", "aspect2", "combined"))
+  expect_equal(lapply(calc_impacts, as.numeric),
+               list(aspect1 = 100*50*0.3,
+                    aspect2 = 200*50*0.4,
+                    combined = 100*50*0.3 + 200*50*0.4))
+})
+
+
