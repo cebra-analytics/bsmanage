@@ -565,7 +565,7 @@ ManageResults.Region <- function(region, population_model,
               # Stage post-fix
               if (population_model$get_type() == "stage_structured" &&
                   is.null(combine_stages)) {
-                jc <- paste0("_stage_", i)
+                jc <- paste0("_stage_", j)
               } else {
                 jc <- ""
               }
