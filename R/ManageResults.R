@@ -51,13 +51,16 @@
 #'     \item{\code{save_rasters(...)}}{Save the collated results as raster TIF
 #'       files when the region is grid-based. \code{Terra} raster write options
 #'       may be passed to the function. Returns a list of saved \code{Terra}
-#'       raster layers.}
+#'       raster layers with attached attributes indicating if each layer
+#'       contains non-zero values.}
 #'     \item{\code{save_csv()}}{Save the collated results as comma-separated
 #'       values (CSV) files when the region is patch-based. Also saves the
 #'       population totals and area occupied to CSV files for both grid and
 #'       patch-based region types.}
-#'     \item{\code{save_plots()}}{Save plots of the population (staged) totals
-#'       and the area occupied as PNG files.}
+#'     \item{\code{save_plots(width = 480, height = 480)}}{Save plots of the
+#'       population (staged) totals, the area occupied, total impacts (where
+#'       applicable), and total actions as PNG files having specified
+#'       \code{width} and \code{height} in pixels.}
 #'   }
 #' @references
 #'   Baker, C. M., Bower, S., Tartaglia, E., Bode, M., Bower, H., & Pressey,
@@ -475,8 +478,9 @@ ManageResults.Region <- function(region, population_model,
         summaries <- ""
       }
 
-      # Output list
+      # Output and non-zero indicator lists
       output_list <- list()
+      nonzero_list <- list()
 
       # Save impacts
       if (length(impacts) > 0) {
@@ -511,15 +515,24 @@ ManageResults.Region <- function(region, population_model,
               output_key <- paste0("impacts", ic, "_", a, sc)
               output_list[[output_key]] <- list()
 
+              # Initialise non-zero indicator
+              nonzero_list[[output_key]] <- FALSE
+
               for (tmc in names(results$impacts[[i]][[a]])) {
 
-                # Copy impacts into a raster
+                # Copy impacts into a raster & update non-zero indicator
                 if (replicates > 1) {
                   output_rast <-
                     region$get_rast(results$impacts[[i]][[a]][[tmc]][[s]])
+                  nonzero_list[[output_key]] <-
+                    (nonzero_list[[output_key]] |
+                       sum(results$impacts[[i]][[a]][[tmc]][[s]]) > 0)
                 } else {
                   output_rast <-
                     region$get_rast(results$impacts[[i]][[a]][[tmc]])
+                  nonzero_list[[output_key]] <-
+                    (nonzero_list[[output_key]] |
+                       sum(results$impacts[[i]][[a]][[tmc]]) > 0)
                 }
 
                 # Write raster to file
@@ -530,6 +543,10 @@ ManageResults.Region <- function(region, population_model,
                 output_list[[output_key]][[tmc]] <-
                   terra::writeRaster(output_rast, filename, ...)
               }
+
+              # Add non-zero indicator as an attribute
+              attr(output_list[[output_key]], "nonzero") <-
+                nonzero_list[[output_key]]
             }
           }
         }
@@ -583,6 +600,9 @@ ManageResults.Region <- function(region, population_model,
                 output_key <- paste0("actions", ic, "_", a, jc, sc)
                 output_list[[output_key]] <- list()
 
+                # Initialise non-zero indicator
+                nonzero_list[[output_key]] <- FALSE
+
                 for (tmc in names(results$actions[[i]][[a]])) {
 
                   # Copy actions into a raster
@@ -610,6 +630,17 @@ ManageResults.Region <- function(region, population_model,
                     }
                   }
 
+                  # Update non-zero indicator
+                  if (replicates > 1) {
+                    nonzero_list[[output_key]] <-
+                      (nonzero_list[[output_key]] |
+                         sum(results$actions[[i]][[a]][[tmc]][[s]]) > 0)
+                  } else {
+                    nonzero_list[[output_key]] <-
+                      (nonzero_list[[output_key]] |
+                         sum(results$actions[[i]][[a]][[tmc]]) > 0)
+                  }
+
                   # Write raster to file
                   filename <- sprintf(
                     paste0("actions%s_%s%s_t%0",
@@ -618,6 +649,10 @@ ManageResults.Region <- function(region, population_model,
                   output_list[[output_key]][[tmc]] <-
                     terra::writeRaster(output_rast, filename, ...)
                 }
+
+                # Add non-zero indicator as an attribute
+                attr(output_list[[output_key]], "nonzero") <-
+                  nonzero_list[[output_key]]
               }
             }
           }
@@ -627,7 +662,9 @@ ManageResults.Region <- function(region, population_model,
       # Return output list as multi-layer rasters
       return(c(spread_rast_list,
                lapply(output_list, function(rast_list) {
-                 terra::rast(rast_list)
+                 raster_layers <- terra::rast(rast_list)
+                 attr(raster_layers, "nonzero") <- attr(rast_list, "nonzero")
+                 raster_layers
                })))
     }
   }
@@ -948,10 +985,10 @@ ManageResults.Region <- function(region, population_model,
   }
 
   # Extended save plots as PNG files
-  self$save_plots  <- function() {
+  self$save_plots  <- function(width = 480, height = 480) {
 
     # Save population spread results
-    super$save_plots()
+    super$save_plots(width = width, height = height)
 
     # All plots have time steps on x-axis
     plot_x_label <- paste0("Time steps (", step_units, ")")
@@ -1011,7 +1048,7 @@ ManageResults.Region <- function(region, population_model,
             }
             totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
                            sd = as.numeric(totals["sd",,drop = FALSE]))
-            grDevices::png(filename = filename)
+            grDevices::png(filename = filename, width = width, height = height)
             graphics::plot(0:time_steps, totals$mean, type = "l",
                            main = main_title,
                            xlab = plot_x_label,
@@ -1031,7 +1068,7 @@ ManageResults.Region <- function(region, population_model,
               filename <- sprintf("total_impacts%s.png", ic[1])
               main_title <- sprintf("Total impacts%s", ic[2])
             }
-            grDevices::png(filename = filename)
+            grDevices::png(filename = filename, width = width, height = height)
             graphics::plot(0:time_steps, totals, type = "l",
                            main = main_title,
                            xlab = plot_x_label,
@@ -1091,7 +1128,7 @@ ManageResults.Region <- function(region, population_model,
                 main_title <- sprintf("Total actions%s %s%s (mean +/- 2 SD)",
                                       ic[2], stage_label[s], label)
               }
-              grDevices::png(filename = filename)
+              grDevices::png(filename = filename, width = width, height = height)
               graphics::plot(0:time_steps, totals$mean, type = "l",
                              main = main_title,
                              xlab = plot_x_label,
@@ -1115,7 +1152,7 @@ ManageResults.Region <- function(region, population_model,
                 main_title <- sprintf("Total actions%s %s%s", ic[2],
                                       stage_label[s], label)
               }
-              grDevices::png(filename = filename)
+              grDevices::png(filename = filename, width = width, height = height)
               graphics::plot(0:time_steps, totals, type = "l",
                              main = main_title,
                              xlab = plot_x_label,
