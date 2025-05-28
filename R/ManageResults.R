@@ -605,15 +605,21 @@ ManageResults.Region <- function(region, population_model,
 
                 for (tmc in names(results$actions[[i]][[a]])) {
 
-                  # Copy actions into a raster
+                  # Copy actions into a raster and update non-zero indicator
                   if (population_model$get_type() == "stage_structured") {
                     if (replicates > 1) {
                       output_rast <-
                         region$get_rast(
                           results$actions[[i]][[a]][[tmc]][[s]][,j])
+                      nonzero_list[[output_key]] <-
+                        (nonzero_list[[output_key]] |
+                           sum(results$actions[[i]][[a]][[tmc]][[s]][,j]) > 0)
                     } else {
                       output_rast <-
                         region$get_rast(results$actions[[i]][[a]][[tmc]][,j])
+                      nonzero_list[[output_key]] <-
+                        (nonzero_list[[output_key]] |
+                           sum(results$actions[[i]][[a]][[tmc]][,j]) > 0)
                     }
                     if (is.null(combine_stages)) {
                       names(output_rast) <- stage_labels[j]
@@ -624,21 +630,16 @@ ManageResults.Region <- function(region, population_model,
                     if (replicates > 1) {
                       output_rast <-
                         region$get_rast(results$actions[[i]][[a]][[tmc]][[s]])
+                      nonzero_list[[output_key]] <-
+                        (nonzero_list[[output_key]] |
+                           sum(results$actions[[i]][[a]][[tmc]][[s]]) > 0)
                     } else {
                       output_rast <-
                         region$get_rast(results$actions[[i]][[a]][[tmc]])
+                      nonzero_list[[output_key]] <-
+                        (nonzero_list[[output_key]] |
+                           sum(results$actions[[i]][[a]][[tmc]]) > 0)
                     }
-                  }
-
-                  # Update non-zero indicator
-                  if (replicates > 1) {
-                    nonzero_list[[output_key]] <-
-                      (nonzero_list[[output_key]] |
-                         sum(results$actions[[i]][[a]][[tmc]][[s]]) > 0)
-                  } else {
-                    nonzero_list[[output_key]] <-
-                      (nonzero_list[[output_key]] |
-                         sum(results$actions[[i]][[a]][[tmc]]) > 0)
                   }
 
                   # Write raster to file
