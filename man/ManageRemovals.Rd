@@ -9,6 +9,7 @@ ManageRemovals(
   region,
   population_model,
   removal_pr = 1,
+  remove_always = FALSE,
   detected_only = FALSE,
   radius = NULL,
   stages = NULL,
@@ -20,6 +21,7 @@ ManageRemovals(
   region,
   population_model,
   removal_pr = 1,
+  remove_always = FALSE,
   detected_only = FALSE,
   radius = NULL,
   stages = NULL,
@@ -42,6 +44,14 @@ of removal at locations where the invasive species has been detected, as
 indicated via a population attribute when present, else removal is applied
 at all locations. Default is \code{1}, indicating all (detected)
 occurrences are removed.}
+
+\item{remove_always}{A logical indication of whether or not removal is
+always to applied to locations where invasive species are present (even
+when they are not detected by explicit surveillance). Default is
+\code{FALSE}, indicating that removal is dependent on detection when
+surveillance actions are present. Set to \code{TRUE} for locations where
+some removal is likely regardless of explicit management efforts (e.g.
+via the general public or property owners).}
 
 \item{detected_only}{A logical indication of whether or not removal is only
 applied to detected individuals (e.g. via traps). Default is \code{FALSE},

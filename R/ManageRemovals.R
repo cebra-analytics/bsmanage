@@ -15,6 +15,13 @@
 #'   indicated via a population attribute when present, else removal is applied
 #'   at all locations. Default is \code{1}, indicating all (detected)
 #'   occurrences are removed.
+#' @param remove_always A logical indication of whether or not removal is
+#'   always to applied to locations where invasive species are present (even
+#'   when they are not detected by explicit surveillance). Default is
+#'   \code{FALSE}, indicating that removal is dependent on detection when
+#'   surveillance actions are present. Set to \code{TRUE} for locations where
+#'   some removal is likely regardless of explicit management efforts (e.g.
+#'   via the general public or property owners).
 #' @param detected_only A logical indication of whether or not removal is only
 #'   applied to detected individuals (e.g. via traps). Default is \code{FALSE},
 #'   indicating that removal is applied to all individuals at locations where
@@ -50,6 +57,7 @@
 #' @export
 ManageRemovals <- function(region, population_model,
                            removal_pr = 1,
+                           remove_always = FALSE,
                            detected_only = FALSE,
                            radius = NULL,
                            stages = NULL, schedule = NULL, ...) {
@@ -60,6 +68,7 @@ ManageRemovals <- function(region, population_model,
 #' @export
 ManageRemovals.Region <- function(region, population_model,
                                   removal_pr = 1,
+                                  remove_always = FALSE,
                                   detected_only = FALSE,
                                   radius = NULL,
                                   stages = NULL, schedule = NULL, ...) {
@@ -116,7 +125,7 @@ ManageRemovals.Region <- function(region, population_model,
     if (is.null(schedule) || tm %in% schedule) {
 
       # Detection-based removal
-      if ("detected" %in% names(attributes(n))) {
+      if (!remove_always && "detected" %in% names(attributes(n))) {
 
         # Removal locations
         idx <- which(rowSums(as.matrix(attr(n, "detected"))) > 0)
@@ -131,7 +140,7 @@ ManageRemovals.Region <- function(region, population_model,
       } else {
 
         # Removal locations
-        if (detected_only) {
+        if (!remove_always && detected_only) {
           idx <- c() # none detected
         } else {
           idx <- which(rowSums(as.matrix(n)) > 0)
