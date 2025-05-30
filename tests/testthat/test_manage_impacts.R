@@ -77,7 +77,8 @@ test_that("calculates impacts including combined", {
                         aspect2 = 200*(template > 0.2 & template < 0.4))
   loss_rates <- c(aspect1 = 0.3, aspect2 = 0.4)
   impacts <- bsimpact::ValueImpacts(context, region, incursion,
-                                    impact_layers, loss_rates = loss_rates)
+                                    impact_layers, loss_rates = loss_rates,
+                                    discount_rate = 0.05)
   stage_matrix <- matrix(c(0.0, 2.0, 5.0,
                            0.3, 0.0, 0.0,
                            0.0, 0.6, 0.8),
@@ -94,11 +95,11 @@ test_that("calculates impacts including combined", {
     impact_incursion <- rowSums(n[,2:3])*0.2
     impact_incursion[which(impact_incursion > 1)] <- 1
     (impact_incursion*impact_layers[[l]][region$get_indices()][,1]*
-        loss_rates[l])
+        loss_rates[l]/(1.05^4))
   })
   expected_impacts$combined <-
     expected_impacts$aspect1 + expected_impacts$aspect2
-  expect_silent(calc_impacts <- manage_impacts$calculate(n))
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
   expect_named(calc_impacts, c("aspect1", "aspect2", "combined"))
   expect_equal(calc_impacts, expected_impacts)
 })
@@ -123,11 +124,11 @@ test_that("calculates spatially implicit impacts via area occupied", {
   n <- initializer$initialize()
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
                                                 impact_stages = 2:3))
-  expect_error(calc_impacts <- manage_impacts$calculate(n),
+  expect_error(calc_impacts <- manage_impacts$calculate(n, 4),
                paste("Cannot calculate spatially implicit impacts without",
                      "area occupied."))
   attr(n, "spread_area") <- 50
-  expect_silent(calc_impacts <- manage_impacts$calculate(n))
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
   expect_named(calc_impacts, c("aspect1", "aspect2", "combined"))
   expect_equal(lapply(calc_impacts, as.numeric),
                list(aspect1 = 100*50*0.3,

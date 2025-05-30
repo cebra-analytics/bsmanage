@@ -306,7 +306,7 @@ ManageSimulator.Region <- function(region,
         # Calculate impacts
         if (length(impacts)) {
           calc_impacts <- lapply(impacts, function(impacts_i) {
-            impacts_i$calculate(n)
+            impacts_i$calculate(n, tm)
           })
         }
 

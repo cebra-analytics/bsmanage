@@ -41,9 +41,10 @@ getting the impact context and performing impact calculations:
 \item{\code{get_calc_total()}}{Get calculate total indicator.}
 \item{\code{includes_combined()}}{Logical indicator for when impacts are
 combined.}
-\item{\code{calculate(n)}}{Perform impact calculations resulting from
-incursion population vector or matrix \code{n}, and return a list
-of impact values, including combined impacts when applicable.}
+\item{\code{calculate(n, tm)}}{Perform impact calculations resulting
+from incursion population vector or matrix \code{n} at time step
+\code{tm}, and return a list of impact values, including combined
+impacts when applicable.}
 }
 }
 \description{
