@@ -59,9 +59,9 @@ test_that("runs simulator with correct configuration", {
   template_vect <- template[region$get_indices()][,1]
   population_model <- bsspread::UnstructPopulation(region, growth = 2)
   population_model_grow <- population_model$grow
-  population_model$grow <- function(n) {
+  population_model$grow <- function(n, tm) {
     attr(n, "growth") <- c(attr(n, "growth"), max(c(attr(n, "growth"), 0) + 1))
-    population_model_grow(n)
+    population_model_grow(n, tm)
   }
   initial_n <- rep(0, region$get_locations())
   initial_n[5920:5922] <- (10:12)*5
@@ -69,11 +69,11 @@ test_that("runs simulator with correct configuration", {
                                        population_model = population_model)
   dispersal <- bsspread::Dispersal(region, population_model)
   dispersal_disperse <- dispersal$disperse
-  dispersal$disperse <- function(n) {
+  dispersal$disperse <- function(n, tm) {
     attr(n$relocated, "dispersal") <-
       c(attr(n$relocated, "dispersal"),
         max(c(attr(n$relocated, "dispersal"), 0) + 1))
-    dispersal_disperse(n)
+    dispersal_disperse(n, tm)
   }
   incursion <- bsimpact::Incursion(template*0, region, type = "density")
   impacts <- list(ManageImpacts(
