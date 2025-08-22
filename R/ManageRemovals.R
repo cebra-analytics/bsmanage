@@ -26,11 +26,11 @@
 #'   applied to detected individuals (e.g. via traps). Default is \code{FALSE},
 #'   indicating that removal is applied to all individuals at locations where
 #'   the invasive species has been detected (e.g. via treatment).
-#' @param radius The radius (m) of the removal. Stochastic removal is applied
-#'   to all locations within the specified radius of each location where the
-#'   invasive species has been detected. Default is \code{NULL}, indicating
-#'   that removal is only applied at detected locations (when specified via a
-#'   population attribute).
+#' @param radius Optional radius (m) of the removal. Stochastic removal is
+#'   applied to all locations within the specified radius of each location
+#'   where the invasive species has been detected. Default is \code{NULL},
+#'   indicating that removal is only applied at detected locations (when
+#'   specified via a population attribute).
 #' @param stages Numeric vector of population stages (indices) to which
 #'   management removals are applied. Default is all stages (when set to
 #'   \code{NULL}).
@@ -85,9 +85,10 @@ ManageRemovals.Region <- function(region, population_model,
   if (is.null(removal_pr) ||
       (!is.null(removal_pr) &&
        (!is.numeric(removal_pr) ||
+        any(removal_pr < 0) || any(removal_pr > 1) ||
         !length(removal_pr) %in% c(1, region$get_locations())))) {
-    stop(paste("Removal probability should be a vector with a value for each",
-               "region location."), call. = FALSE)
+    stop(paste("Removal probability should be a vector with a value 0-1 for",
+               "each region location."), call. = FALSE)
   }
   if (length(removal_pr) == 1) {
     removal_pr <- rep(removal_pr, region$get_locations())

@@ -10,10 +10,14 @@ test_that("initializes with region, population, and other parameters", {
                            0.0, 0.6, 0.8),
                          nrow = 3, ncol = 3, byrow = TRUE)
   population_model <- bsspread::StagedPopulation(region, stage_matrix)
-  expect_error(manage_removals <- ManageRemovals(region, population_model,
-                                                 removal_pr = 1:10),
-               paste("Removal probability should be a vector with a value for",
-                     "each region location."))
+  expect_error(ManageRemovals(region, population_model,
+                              removal_pr = (0:10)/10),
+               paste("Removal probability should be a vector with a value 0-1",
+                     "for each region location."))
+  expect_error(ManageRemovals(region, population_model,
+                              removal_pr = 2),
+               paste("Removal probability should be a vector with a value 0-1",
+                     "for each region location."))
   expect_error(manage_removals <- ManageRemovals(region, population_model,
                                                  radius = -1),
                "The radius (m) parameter must be numeric and >= 0.",

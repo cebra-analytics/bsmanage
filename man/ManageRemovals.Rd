@@ -58,11 +58,11 @@ applied to detected individuals (e.g. via traps). Default is \code{FALSE},
 indicating that removal is applied to all individuals at locations where
 the invasive species has been detected (e.g. via treatment).}
 
-\item{radius}{The radius (m) of the removal. Stochastic removal is applied
-to all locations within the specified radius of each location where the
-invasive species has been detected. Default is \code{NULL}, indicating
-that removal is only applied at detected locations (when specified via a
-population attribute).}
+\item{radius}{Optional radius (m) of the removal. Stochastic removal is
+applied to all locations within the specified radius of each location
+where the invasive species has been detected. Default is \code{NULL},
+indicating that removal is only applied at detected locations (when
+specified via a population attribute).}
 
 \item{stages}{Numeric vector of population stages (indices) to which
 management removals are applied. Default is all stages (when set to

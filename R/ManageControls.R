@@ -2,7 +2,7 @@
 #'
 #' Builds a class for simulating the application of invasive species management
 #' controls, such as combined surveillance and removal ("search & destroy"),
-#' suppressing growth, fertility, spread, or establishment.
+#' suppressing growth, reproduction, spread, or establishment.
 #'
 #' @param region A \code{bsspread::Region} or inherited class object
 #'   representing the spatial region (template) for the incursion management
@@ -10,15 +10,40 @@
 #' @param population_model A \code{bsspread::Population} or inherited class
 #'   object defining the population representation for the management
 #'   simulations.
+#' @param control_type One of \code{"search_destroy"} (default),
+#'   \code{"growth"} (including reproduction), \code{"spread"}, or
+#'   \code{"establishment"} to indicate the type of control applied.
 #' @param control_design A \code{ManageDesign}, \code{ControlDesign}, or
 #'   inherited class object representing the distribution of control resources
-#'   and their success probabilities or effectiveness.
-#' @param control_type One of \code{"search_destroy"} (default),
-#'   \code{"growth"} (including fertility), \code{"spread"}, or
-#'   \code{"establishment"} to indicate the type of control applied.
+#'   and their success probabilities or effectiveness. Required for combined
+#'   surveillance and removal approaches ("search & destroy", traps, etc.).
+#'   Alternatively, optionally utilise for the probability of application of
+#'   suppression of growth, spread, or establishment, at existing, known, or
+#'   scheduled treatment locations.
+#' @param suppress_mult Suppression multipliers or rates required for control
+#'   types \code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be
+#'   a single value (0-1), or vector of values for each location specified by
+#'   the \code{region}. Suppression control is applied at existing, known, or
+#'   scheduled treatment locations (when specified with probabilities of
+#'   application via \code{"control_design"}), and at locations (and optionally
+#'   surroundings) where the invasive species has been detected (when specified
+#'   via a population attribute).
+#' @param radius Optional radius (m) of the applied control for types
+#'   \code{"growth"}, \code{"spread"}, or \code{"establishment"} only.
+#'   Control is applied to all locations within the specified radius of each
+#'   location where the invasive species has been detected. Default is
+#'   \code{NULL}, indicating that control is only applied at existing, known,
+#'   or scheduled treatment locations, and/or at detected locations (when
+#'   specified via a population attribute).
 #' @param stages Numeric vector of population stages (indices) to which
 #'   management controls are applied. Default is all stages (when set to
 #'   \code{NULL}).
+#' @param apply_to Optional label for growth control to indicate that it should
+#'   be only be applied to reproduction or survival rates. If applicable, set
+#'   to either \code{"reproductions"} or \code{"survivals"}. If not specified,
+#'   control is applied to both reproductions and survivals. The \code{stages}
+#'   and \code{apply_to} parameters may be utilised together, for example, to
+#'   control the seasonal survival rates of specified life stages.
 #' @param schedule Vector of discrete simulation time steps in which to apply
 #'   management controls. Default is all time steps (when set to \code{NULL}).
 #' @param ... Additional parameters.
@@ -40,24 +65,32 @@
 #'       newly applied controls.}
 #'   }
 #' @export
-ManageControls <- function(region, population_model, control_design,
+ManageControls <- function(region, population_model,
                            control_type = c("search_destroy",
                                             "growth",
                                             "spread",
                                             "establishment"),
+                           control_design = NULL,
+                           suppress_mult = NULL,
+                           radius = NULL,
                            stages = NULL,
+                           apply_to = NULL,
                            schedule = NULL, ...) {
   UseMethod("ManageControls")
 }
 
 #' @name ManageControls
 #' @export
-ManageControls.Region <- function(region, population_model, control_design,
+ManageControls.Region <- function(region, population_model,
                                   control_type = c("search_destroy",
                                                    "growth",
                                                    "spread",
                                                    "establishment"),
+                                  control_design = NULL,
+                                  suppress_mult = NULL,
+                                  radius = NULL,
                                   stages = NULL,
+                                  apply_to = NULL,
                                   schedule = NULL, ...) {
 
   # Build via base class
@@ -68,15 +101,45 @@ ManageControls.Region <- function(region, population_model, control_design,
                         schedule = schedule,
                         class = "ManageControls")
 
+  control_type <- match.arg(control_type)
+
   # Check the control design object
   if (!is.null(control_design) &&
       !inherits(control_design, "ManageDesign")) {
     stop(paste("Control design object must be a 'ControlDesign',",
                "'ManageDesign', or inherited class object."), call. = FALSE)
-  } else if (control_design$get_divisions()$get_parts() !=
-             region$get_locations()) {
+  } else if (is.null(control_design) && control_type == "search_destroy") {
+    stop("Control design object is required for 'search & destroy' control.",
+         call. = FALSE)
+  } else if (!is.null(control_design) &&
+             (control_design$get_divisions()$get_parts() !=
+              region$get_locations())) {
     stop("Control design must be compatible with the region object.",
          call. = FALSE)
+  }
+
+  # Validate suppression multiplier, radius, and growth apply to
+  if (is.null(suppress_mult) &&
+      control_type %in% c("growth", "spread", "establishment")) {
+    stop(paste("Suppression multiplier is required for growth, spread, and",
+               "establishment control."), call. = FALSE)
+  } else if (!is.null(suppress_mult) &&
+             (!is.numeric(suppress_mult) ||
+              any(suppress_mult < 0) || any(suppress_mult > 1) ||
+              !length(suppress_mult) %in% c(1, region$get_locations()))) {
+    stop(paste("Suppression multiplier should be a vector with a value 0-1",
+               "for each region location."), call. = FALSE)
+  }
+  if (!is.null(radius) && (!is.numeric(radius) || radius < 0)) {
+    stop("The radius (m) parameter must be numeric and >= 0.", call. = FALSE)
+  }
+  if (!is.null(apply_to)) {
+    if (!apply_to %in% c("reproductions", "survivals")) {
+      stop(paste("Growth control 'apply to' attribute should be",
+                 "'reproductions' or 'survivals'."), call. = FALSE)
+    }
+  } else {
+   apply_to <- "both"
   }
 
   # Get results label
@@ -101,7 +164,7 @@ ManageControls.Region <- function(region, population_model, control_design,
       if (is.null(schedule) || tm %in% schedule) {
 
         # Occupied locations
-        idx <- which(rowSums(as.matrix(n)) > 0)
+        idx <- which(rowSums(as.matrix(n)[,self$get_stages()]) > 0)
         if (length(idx) > 0) {
 
           # Get control effectiveness (probability)
@@ -132,9 +195,59 @@ ManageControls.Region <- function(region, population_model, control_design,
       } else {
         attr(n, self$get_label()) <- controlled
       }
+    }
 
-    } else { # growth, spread, or establishment
-      attr(n, self$get_label()) <- control_design$get_manage_pr()
+    # Growth spread, or establishment suppression
+    if (control_type %in% c("growth", "spread", "establishment")) {
+
+      # Initial zero suppressions
+      n_apply <- as.numeric(n)*0
+
+      # Scheduled time step?
+      if (is.null(schedule) || tm %in% schedule) {
+
+        # Apply suppression to existing/known/scheduled treatment locations
+        if (!is.null(control_design)) {
+
+          # Occupied locations
+          idx <- which(rowSums(as.matrix(n)[,self$get_stages()]) > 0)
+          if (length(idx) > 0) {
+
+            # Get suppression application probability
+            suppress_pr <- control_design$get_manage_pr()[idx]
+
+            # Sample suppression locations
+            n_apply[idx] <- stats::rbinom(length(idx), size = 1,
+                                          prob = suppress_pr)
+          }
+        }
+
+        # Detection-based suppression
+        if ("detected" %in% names(attributes(n))) {
+
+          # Detected locations
+          idx <- which(rowSums(as.matrix(attr(n, "detected"))) > 0)
+
+          # Expand suppression locations via radius
+          if (is.numeric(radius) && length(idx) > 0) {
+            region$calculate_paths(idx)
+            idx <- sort(unique(c(idx, unname(unlist(region$get_paths(idx)$idx)))))
+            idx <- idx[which(rowSums(as.matrix(n))[idx] > 0)]
+          }
+
+          # Set/update suppression locations
+          if (length(idx) > 0) {
+            n_apply[idx] <- 1
+          }
+        }
+      }
+
+      # Add suppression as attributes to process in growth or spread models
+      attr(n, self$get_label()) <- n_apply*suppress_mult
+      attr(attr(n, self$get_label()), "stages") <- self$get_stages()
+      if (control_type == "growth") {
+        attr(attr(n, self$get_label()), "apply_to") <- apply_to
+      }
     }
 
     return(n)
