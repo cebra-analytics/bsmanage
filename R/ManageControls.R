@@ -17,24 +17,24 @@
 #'   inherited class object representing the distribution of control resources
 #'   and their success probabilities or effectiveness. Required for combined
 #'   surveillance and removal approaches ("search & destroy", traps, etc.).
-#'   Alternatively, optionally utilise for the probability of application of
-#'   suppression of growth, spread, or establishment, at existing, known, or
-#'   scheduled treatment locations.
+#'   Alternatively, optionally utilise to specify the distribution of existing,
+#'   known, or scheduled treatment locations for the suppression of growth,
+#'   spread, or establishment.
 #' @param suppress_mult Suppression multipliers or rates required for control
 #'   types \code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be
 #'   a single value (0-1), or vector of values for each location specified by
 #'   the \code{region}. Suppression control is applied at existing, known, or
-#'   scheduled treatment locations (when specified with probabilities of
-#'   application via \code{"control_design"}), and at locations (and optionally
-#'   surroundings) where the invasive species has been detected (when specified
-#'   via a population attribute).
+#'   scheduled treatment locations (when specified via
+#'   \code{"control_design"}), and at locations (and optionally surroundings)
+#'   where the invasive species has been detected (when specified via a
+#'   population attribute).
 #' @param radius Optional radius (m) of the applied control for types
 #'   \code{"growth"}, \code{"spread"}, or \code{"establishment"} only.
-#'   Control is applied to all locations within the specified radius of each
-#'   location where the invasive species has been detected. Default is
-#'   \code{NULL}, indicating that control is only applied at existing, known,
-#'   or scheduled treatment locations, and/or at detected locations (when
-#'   specified via a population attribute).
+#'   Control is applied to all surrounding locations within the specified
+#'   radius of each location where the invasive species has been detected.
+#'   Default is \code{NULL}, indicating that control is only applied at
+#'   existing, known, or scheduled treatment locations, and/or at detected
+#'   locations (when specified via a population attribute).
 #' @param stages Numeric vector of population stages (indices) to which
 #'   management controls are applied. Default is all stages (when set to
 #'   \code{NULL}).
@@ -201,24 +201,21 @@ ManageControls.Region <- function(region, population_model,
     if (control_type %in% c("growth", "spread", "establishment")) {
 
       # Initial zero suppressions
-      n_apply <- as.numeric(n)*0
+      n_apply <- rep(0, region$get_locations())
 
       # Scheduled time step?
       if (is.null(schedule) || tm %in% schedule) {
 
         # Apply suppression to existing/known/scheduled treatment locations
-        if (!is.null(control_design)) {
+        if (!is.null(control_design) &&
+            !is.null(control_design$get_allocation())) {
 
           # Occupied locations
           idx <- which(rowSums(as.matrix(n)[,self$get_stages()]) > 0)
           if (length(idx) > 0) {
 
-            # Get suppression application probability
-            suppress_pr <- control_design$get_manage_pr()[idx]
-
-            # Sample suppression locations
-            n_apply[idx] <- stats::rbinom(length(idx), size = 1,
-                                          prob = suppress_pr)
+            # Get suppression application locations
+            n_apply[idx] <- +(control_design$get_allocation()[idx] > 0)
           }
         }
 
@@ -231,8 +228,10 @@ ManageControls.Region <- function(region, population_model,
           # Expand suppression locations via radius
           if (is.numeric(radius) && length(idx) > 0) {
             region$calculate_paths(idx)
-            idx <- sort(unique(c(idx, unname(unlist(region$get_paths(idx)$idx)))))
-            idx <- idx[which(rowSums(as.matrix(n))[idx] > 0)]
+            idx <- sort(unique(c(idx,
+                                 unname(unlist(region$get_paths(idx)$idx)))))
+            idx <- idx[which(
+              rowSums(as.matrix(n)[,self$get_stages()])[idx] > 0)]
           }
 
           # Set/update suppression locations

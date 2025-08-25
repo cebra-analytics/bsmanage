@@ -364,7 +364,7 @@ ManageDesign.ManageContext <- function(context,
 
   # Get the allocated surveillance resource quantities of the design
   self$get_allocation <- function() {
-    # overridden in inherited classes
+    return(exist_alloc)
   }
 
   # Get the management probabilities or effectiveness for each division part

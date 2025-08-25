@@ -102,11 +102,6 @@ ManageRemovals.Region <- function(region, population_model,
     message("Radius is not used when only detected individuals are removed.")
   }
 
-  # Configure region paths via removal radius
-  if (is.numeric(radius)) {
-    region$configure_paths(max_distance = radius)
-  }
-
   # Get results label
   self$get_label <- function() {
     return("removed")
@@ -154,9 +149,12 @@ ManageRemovals.Region <- function(region, population_model,
       # Expand removal locations via radius
       if ("detected" %in% names(attributes(n)) && is.numeric(radius) &&
           length(idx) > 0) {
-        region$calculate_paths(idx)
-        idx <- sort(unique(c(idx, unname(unlist(region$get_paths(idx)$idx)))))
-        idx <- idx[which(rowSums(as.matrix(n))[idx] > 0)]
+        if (region$get_type() == "grid") {
+          idx <- region$get_nearby(idx, radius)
+          idx <- idx[which(rowSums(as.matrix(n)[,self$get_stages()])[idx] > 0)]
+        } else if (region$get_type() == "patch") {
+
+        }
       }
 
       # Sample and apply removals
