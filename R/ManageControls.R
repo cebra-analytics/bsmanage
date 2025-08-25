@@ -226,10 +226,9 @@ ManageControls.Region <- function(region, population_model,
           idx <- which(rowSums(as.matrix(attr(n, "detected"))) > 0)
 
           # Expand suppression locations via radius
-          if (is.numeric(radius) && length(idx) > 0) {
-            region$calculate_paths(idx)
-            idx <- sort(unique(c(idx,
-                                 unname(unlist(region$get_paths(idx)$idx)))))
+          if (is.numeric(radius) && length(idx) > 0 &&
+              region$get_type() %in% c("grid", "patch")) {
+            idx <- region$get_nearby(idx, radius)
             idx <- idx[which(
               rowSums(as.matrix(n)[,self$get_stages()])[idx] > 0)]
           }

@@ -126,15 +126,34 @@ test_that("applies stochastic controls to invasive population", {
   expect_equal(new_n, expected_n)
   expect_equal(attr(new_n, "control_search_destroy"), expected_controls)
   # growth, spread, or establishment
-  expected_n <- n
-  attr(expected_n, "control_growth") <- exist_manage_pr
+  control_design <- ManageDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    optimal = "none",
+    exist_alloc = +(exist_manage_pr > 0.95))
+  exist_mask <- rowSums(n[,2:3])*control_design$get_allocation() > 0
+  detected <- n*0
+  detected[,2:3] <- round((n[,2:3] > 80)*n[,2:3]*0.7)
+  attr(n, "detected") <- detected
+  detected_mask <- +(rowSums(detected) > 0 | NA)
+  detected_mask <- rowSums(n[,2:3])*terra::buffer(
+    region$get_rast(detected_mask), width = 1500)[region$get_indices()][,1] > 0
   expect_silent(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "growth",
                                       control_design = control_design,
-                                      stages = 2:3, schedule = 4:6))
-  set.seed(1234)
+                                      radius = 1500,
+                                      suppress_mult = 0.7,
+                                      stages = 2:3,
+                                      apply_to = "survivals",
+                                      schedule = 4:6))
   expect_silent(new_n <- manage_controls$apply(n, 4))
-  expect_equal(new_n, expected_n)
-  expect_equal(attr(new_n, "control_growth"), exist_manage_pr)
+  expect_equal(as.numeric(new_n), as.numeric(n))
+  expect_equal(dim(new_n), dim(n))
+  expect_named(new_n, names(n))
+  expect_equal(attr(new_n, "detected"), detected)
+  expect_equal(as.numeric(attr(new_n, "control_growth")),
+               (exist_mask | detected_mask)*0.7)
+  expect_equal(attr(attr(new_n, "control_growth"), "stages"), 2:3)
+  expect_equal(attr(attr(new_n, "control_growth"), "apply_to"), "survivals")
 })
