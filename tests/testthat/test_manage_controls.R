@@ -98,6 +98,7 @@ test_that("applies stochastic controls to invasive population", {
   initial_n[101:150] <- (11:60)*10
   initializer <- bsspread::Initializer(initial_n, region = region,
                                        population_model = population_model)
+  set.seed(1234)
   n <- initializer$initialize()
   set.seed(1234)
   exist_manage_pr <- runif(divisions$get_parts())
@@ -114,6 +115,7 @@ test_that("applies stochastic controls to invasive population", {
   colnames(expected_controls) <- colnames(n)
   expected_controls[101:150, 2:3] <- stats::rbinom(100, size = n[101:150, 2:3],
                                                    exist_manage_pr[101:150])
+  attr(n, "attachment") <- "extra"
   expected_n <- n - expected_controls
   attr(expected_n, "control_search_destroy") <- expected_controls
   expect_silent(
@@ -125,6 +127,8 @@ test_that("applies stochastic controls to invasive population", {
   expect_silent(new_n <- manage_controls$apply(n, 4))
   expect_equal(new_n, expected_n)
   expect_equal(attr(new_n, "control_search_destroy"), expected_controls)
+  expect_equal(attr(new_n, "attachment"), "extra")
+  attr(n, "attachment") <- NULL
   # growth, spread, or establishment
   control_design <- ManageDesign(
     context = ManageContext("test"),

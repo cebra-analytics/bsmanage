@@ -122,10 +122,14 @@ test_that("applies stochastic removals to invasive population", {
     c(rep(0, 3), stats::rbinom(6, size = attr(n, "detected")[5920:5922,2:3],
                                c(0.5, 0.75, 1))), c(3, 3))
   colnames(expected_removals) <- colnames(n)
+  attr(n, "attachment") <- "extra"
   set.seed(1234)
   expect_silent(new_n <- manage_removals$apply(n, 4))
   expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals)
   expect_equal(new_n[5920:5922,], n[5920:5922,] - expected_removals)
+  expect_equal(attr(new_n, "attachment"), "extra")
+  expect_equal(attr(new_n, "detected"), attr(n, "detected"))
+  attr(n, "attachment") <- NULL
   expect_silent(manage_removals <- ManageRemovals(region, population_model,
                                                   removal_pr = template_vect,
                                                   detected_only = FALSE,
