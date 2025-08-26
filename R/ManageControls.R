@@ -36,8 +36,8 @@
 #'   existing, known, or scheduled treatment locations, and/or at detected
 #'   locations (when specified via a population attribute).
 #' @param stages Numeric vector of population stages (indices) to which
-#'   management controls are applied. Default is all stages (when set to
-#'   \code{NULL}).
+#'   search & destroy or growth management controls are applied. Default is all
+#'   stages (when set to \code{NULL}).
 #' @param apply_to Optional label for growth control to indicate that it should
 #'   be only be applied to reproduction or survival rates. If applicable, set
 #'   to either \code{"reproductions"} or \code{"survivals"}. If not specified,
@@ -243,8 +243,8 @@ ManageControls.Region <- function(region, population_model,
       # Add suppression as attributes to process in growth or spread models
       attr(n, self$get_label()) <- n_apply*suppress_mult
       if (population_model$get_type() == "stage_structured") {
-        attr(attr(n, self$get_label()), "stages") <- self$get_stages()
         if (control_type == "growth") {
+          attr(attr(n, self$get_label()), "stages") <- self$get_stages()
           attr(attr(n, self$get_label()), "apply_to") <- apply_to
         }
       }

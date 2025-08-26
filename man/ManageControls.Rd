@@ -70,8 +70,8 @@ existing, known, or scheduled treatment locations, and/or at detected
 locations (when specified via a population attribute).}
 
 \item{stages}{Numeric vector of population stages (indices) to which
-management controls are applied. Default is all stages (when set to
-\code{NULL}).}
+search & destroy or growth management controls are applied. Default is all
+stages (when set to \code{NULL}).}
 
 \item{apply_to}{Optional label for growth control to indicate that it should
 be only be applied to reproduction or survival rates. If applicable, set
