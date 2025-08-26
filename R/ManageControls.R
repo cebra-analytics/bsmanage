@@ -242,9 +242,11 @@ ManageControls.Region <- function(region, population_model,
 
       # Add suppression as attributes to process in growth or spread models
       attr(n, self$get_label()) <- n_apply*suppress_mult
-      attr(attr(n, self$get_label()), "stages") <- self$get_stages()
-      if (control_type == "growth") {
-        attr(attr(n, self$get_label()), "apply_to") <- apply_to
+      if (population_model$get_type() == "stage_structured") {
+        attr(attr(n, self$get_label()), "stages") <- self$get_stages()
+        if (control_type == "growth") {
+          attr(attr(n, self$get_label()), "apply_to") <- apply_to
+        }
       }
     }
 
