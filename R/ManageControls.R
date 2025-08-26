@@ -197,7 +197,7 @@ ManageControls.Region <- function(region, population_model,
       }
     }
 
-    # Growth spread, or establishment suppression
+    # Growth, spread, or establishment suppression
     if (control_type %in% c("growth", "spread", "establishment")) {
 
       # Initial zero suppressions
