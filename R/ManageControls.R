@@ -2,7 +2,7 @@
 #'
 #' Builds a class for simulating the application of invasive species management
 #' controls, such as combined surveillance and removal ("search & destroy"),
-#' suppressing growth, reproduction, spread, or establishment.
+#' and reducing or suppressing growth, reproduction, spread, or establishment.
 #'
 #' @param region A \code{bsspread::Region} or inherited class object
 #'   representing the spatial region (template) for the incursion management
@@ -18,16 +18,16 @@
 #'   and their success probabilities or effectiveness. Required for combined
 #'   surveillance and removal approaches ("search & destroy", traps, etc.).
 #'   Alternatively, optionally utilise to specify the distribution of existing,
-#'   known, or scheduled treatment locations for the suppression of growth,
-#'   spread, or establishment.
-#' @param suppress_mult Suppression multipliers or rates required for control
-#'   types \code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be
-#'   a single value (0-1), or vector of values for each location specified by
-#'   the \code{region}. Suppression control is applied at existing, known, or
-#'   scheduled treatment locations (when specified via
-#'   \code{"control_design"}), and at locations (and optionally surroundings)
-#'   where the invasive species has been detected (when specified via a
-#'   population attribute).
+#'   known, or scheduled treatment locations for the reduction or suppression
+#'   of growth, spread, or establishment.
+#' @param control_mult Control multipliers or rates required for control types
+#'   \code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be a
+#'   single value (0-1), or vector of values for each location specified by
+#'   the \code{region}. Control multipliers are applied to reduce or suppress
+#'   growth, spread, or establishment at existing, known, or scheduled
+#'   treatment locations (when specified via \code{"control_design"}), and at
+#'   locations (and optionally surroundings) where the invasive species has
+#'   been detected (when specified via a population attribute).
 #' @param radius Optional radius (m) of the applied control for types
 #'   \code{"growth"}, \code{"spread"}, or \code{"establishment"} only.
 #'   Control is applied to all surrounding locations within the specified
@@ -40,8 +40,8 @@
 #'   stages (when set to \code{NULL}).
 #' @param apply_to Optional label for growth control to indicate that it should
 #'   be only be applied to reproduction or survival rates. If applicable, set
-#'   to either \code{"reproductions"} or \code{"survivals"}. If not specified,
-#'   control is applied to both reproductions and survivals. The \code{stages}
+#'   to either \code{"reproduction"} or \code{"survival"}. If not specified,
+#'   control is applied to both reproduction and survival. The \code{stages}
 #'   and \code{apply_to} parameters may be utilised together, for example, to
 #'   control the seasonal survival rates of specified life stages.
 #' @param schedule Vector of discrete simulation time steps in which to apply
@@ -71,7 +71,7 @@ ManageControls <- function(region, population_model,
                                             "spread",
                                             "establishment"),
                            control_design = NULL,
-                           suppress_mult = NULL,
+                           control_mult = NULL,
                            radius = NULL,
                            stages = NULL,
                            apply_to = NULL,
@@ -87,7 +87,7 @@ ManageControls.Region <- function(region, population_model,
                                                    "spread",
                                                    "establishment"),
                                   control_design = NULL,
-                                  suppress_mult = NULL,
+                                  control_mult = NULL,
                                   radius = NULL,
                                   stages = NULL,
                                   apply_to = NULL,
@@ -118,25 +118,25 @@ ManageControls.Region <- function(region, population_model,
          call. = FALSE)
   }
 
-  # Validate suppression multiplier, radius, and growth apply to
-  if (is.null(suppress_mult) &&
+  # Validate control multiplier, radius, and growth apply to
+  if (is.null(control_mult) &&
       control_type %in% c("growth", "spread", "establishment")) {
-    stop(paste("Suppression multiplier is required for growth, spread, and",
+    stop(paste("Control multiplier is required for growth, spread, and",
                "establishment control."), call. = FALSE)
-  } else if (!is.null(suppress_mult) &&
-             (!is.numeric(suppress_mult) ||
-              any(suppress_mult < 0) || any(suppress_mult > 1) ||
-              !length(suppress_mult) %in% c(1, region$get_locations()))) {
-    stop(paste("Suppression multiplier should be a vector with a value 0-1",
+  } else if (!is.null(control_mult) &&
+             (!is.numeric(control_mult) ||
+              any(control_mult < 0) || any(control_mult > 1) ||
+              !length(control_mult) %in% c(1, region$get_locations()))) {
+    stop(paste("Control multiplier should be a vector with a value 0-1",
                "for each region location."), call. = FALSE)
   }
   if (!is.null(radius) && (!is.numeric(radius) || radius < 0)) {
     stop("The radius (m) parameter must be numeric and >= 0.", call. = FALSE)
   }
   if (!is.null(apply_to)) {
-    if (!apply_to %in% c("reproductions", "survivals")) {
+    if (!apply_to %in% c("reproduction", "survival")) {
       stop(paste("Growth control 'apply to' attribute should be",
-                 "'reproductions' or 'survivals'."), call. = FALSE)
+                 "'reproduction' or 'survival'."), call. = FALSE)
     }
   } else {
    apply_to <- "both"
@@ -197,7 +197,7 @@ ManageControls.Region <- function(region, population_model,
       }
     }
 
-    # Growth, spread, or establishment suppression
+    # Growth, spread, or establishment control
     if (control_type %in% c("growth", "spread", "establishment")) {
 
       # Initial zero suppressions
@@ -206,7 +206,7 @@ ManageControls.Region <- function(region, population_model,
       # Scheduled time step?
       if (is.null(schedule) || tm %in% schedule) {
 
-        # Apply suppression to existing/known/scheduled treatment locations
+        # Apply control to existing/known/scheduled treatment locations
         if (!is.null(control_design) &&
             !is.null(control_design$get_allocation())) {
 
@@ -214,18 +214,18 @@ ManageControls.Region <- function(region, population_model,
           idx <- which(rowSums(as.matrix(n)[,self$get_stages()]) > 0)
           if (length(idx) > 0) {
 
-            # Get suppression application locations
+            # Get control application locations
             n_apply[idx] <- +(control_design$get_allocation()[idx] > 0)
           }
         }
 
-        # Detection-based suppression
+        # Detection-based control
         if ("detected" %in% names(attributes(n))) {
 
           # Detected locations
           idx <- which(rowSums(as.matrix(attr(n, "detected"))) > 0)
 
-          # Expand suppression locations via radius
+          # Expand control locations via radius
           if (is.numeric(radius) && length(idx) > 0 &&
               region$get_type() %in% c("grid", "patch")) {
             idx <- region$get_nearby(idx, radius)
@@ -233,15 +233,15 @@ ManageControls.Region <- function(region, population_model,
               rowSums(as.matrix(n)[,self$get_stages()])[idx] > 0)]
           }
 
-          # Set/update suppression locations
+          # Set/update control locations
           if (length(idx) > 0) {
             n_apply[idx] <- 1
           }
         }
       }
 
-      # Add suppression as attributes to process in growth or spread models
-      attr(n, self$get_label()) <- n_apply*suppress_mult
+      # Add control as attributes to process in growth or spread models
+      attr(n, self$get_label()) <- n_apply*control_mult
       if (population_model$get_type() == "stage_structured") {
         if (control_type == "growth") {
           attr(attr(n, self$get_label()), "stages") <- self$get_stages()

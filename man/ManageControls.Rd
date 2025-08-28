@@ -10,7 +10,7 @@ ManageControls(
   population_model,
   control_type = c("search_destroy", "growth", "spread", "establishment"),
   control_design = NULL,
-  suppress_mult = NULL,
+  control_mult = NULL,
   radius = NULL,
   stages = NULL,
   apply_to = NULL,
@@ -23,7 +23,7 @@ ManageControls(
   population_model,
   control_type = c("search_destroy", "growth", "spread", "establishment"),
   control_design = NULL,
-  suppress_mult = NULL,
+  control_mult = NULL,
   radius = NULL,
   stages = NULL,
   apply_to = NULL,
@@ -49,17 +49,17 @@ inherited class object representing the distribution of control resources
 and their success probabilities or effectiveness. Required for combined
 surveillance and removal approaches ("search & destroy", traps, etc.).
 Alternatively, optionally utilise to specify the distribution of existing,
-known, or scheduled treatment locations for the suppression of growth,
-spread, or establishment.}
+known, or scheduled treatment locations for the reduction or suppression
+of growth, spread, or establishment.}
 
-\item{suppress_mult}{Suppression multipliers or rates required for control
-types \code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be
-a single value (0-1), or vector of values for each location specified by
-the \code{region}. Suppression control is applied at existing, known, or
-scheduled treatment locations (when specified via
-\code{"control_design"}), and at locations (and optionally surroundings)
-where the invasive species has been detected (when specified via a
-population attribute).}
+\item{control_mult}{Control multipliers or rates required for control types
+\code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be a
+single value (0-1), or vector of values for each location specified by
+the \code{region}. Control multipliers are applied to reduce or suppress
+growth, spread, or establishment at existing, known, or scheduled
+treatment locations (when specified via \code{"control_design"}), and at
+locations (and optionally surroundings) where the invasive species has
+been detected (when specified via a population attribute).}
 
 \item{radius}{Optional radius (m) of the applied control for types
 \code{"growth"}, \code{"spread"}, or \code{"establishment"} only.
@@ -75,8 +75,8 @@ stages (when set to \code{NULL}).}
 
 \item{apply_to}{Optional label for growth control to indicate that it should
 be only be applied to reproduction or survival rates. If applicable, set
-to either \code{"reproductions"} or \code{"survivals"}. If not specified,
-control is applied to both reproductions and survivals. The \code{stages}
+to either \code{"reproduction"} or \code{"survival"}. If not specified,
+control is applied to both reproduction and survival. The \code{stages}
 and \code{apply_to} parameters may be utilised together, for example, to
 control the seasonal survival rates of specified life stages.}
 
@@ -107,5 +107,5 @@ newly applied controls.}
 \description{
 Builds a class for simulating the application of invasive species management
 controls, such as combined surveillance and removal ("search & destroy"),
-suppressing growth, reproduction, spread, or establishment.
+and reducing or suppressing growth, reproduction, spread, or establishment.
 }

@@ -45,41 +45,41 @@ test_that("initializes with region, population, and other parameters", {
   expect_error(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "growth"),
-    paste("Suppression multiplier is required for growth, spread, and",
+    paste("Control multiplier is required for growth, spread, and",
           "establishment control."))
   expect_error(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "growth",
-                                      suppress_mult = (0:10)/10),
-    paste("Suppression multiplier should be a vector with a value 0-1 for",
+                                      control_mult = (0:10)/10),
+    paste("Control multiplier should be a vector with a value 0-1 for",
           "each region location."))
   expect_error(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "growth",
-                                      suppress_mult = 2),
-    paste("Suppression multiplier should be a vector with a value 0-1 for",
+                                      control_mult = 2),
+    paste("Control multiplier should be a vector with a value 0-1 for",
           "each region location."))
   expect_error(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "growth",
-                                      suppress_mult = 0.7,
+                                      control_mult = 0.7,
                                       radius = -1),
     "The radius (m) parameter must be numeric and >= 0.", fixed = TRUE)
   expect_error(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "growth",
-                                      suppress_mult = 0.7,
+                                      control_mult = 0.7,
                                       apply_to = "dummy"),
-    paste("Growth control 'apply to' attribute should be 'reproductions' or",
-          "'survivals'."))
+    paste("Growth control 'apply to' attribute should be 'reproduction' or",
+          "'survival'."))
   expect_silent(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "growth",
                                       control_design = control_design,
                                       radius = 1000,
-                                      suppress_mult = 0.7,
+                                      control_mult = 0.7,
                                       stages = 2:3,
-                                      apply_to = "survivals",
+                                      apply_to = "survival",
                                       schedule = 4:6))
   expect_equal(manage_controls$get_label(), "control_growth")
 })
@@ -147,9 +147,9 @@ test_that("applies stochastic controls to invasive population", {
                                       control_type = "growth",
                                       control_design = control_design,
                                       radius = 1500,
-                                      suppress_mult = 0.7,
+                                      control_mult = 0.7,
                                       stages = 2:3,
-                                      apply_to = "survivals",
+                                      apply_to = "survival",
                                       schedule = 4:6))
   expect_silent(new_n <- manage_controls$apply(n, 4))
   expect_equal(as.numeric(new_n), as.numeric(n))
@@ -159,5 +159,5 @@ test_that("applies stochastic controls to invasive population", {
   expect_equal(as.numeric(attr(new_n, "control_growth")),
                (exist_mask | detected_mask)*0.7)
   expect_equal(attr(attr(new_n, "control_growth"), "stages"), 2:3)
-  expect_equal(attr(attr(new_n, "control_growth"), "apply_to"), "survivals")
+  expect_equal(attr(attr(new_n, "control_growth"), "apply_to"), "survival")
 })
