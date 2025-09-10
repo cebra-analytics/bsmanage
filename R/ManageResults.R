@@ -190,42 +190,38 @@ ManageResults.Region <- function(region, population_model,
     stage_labels <- "combined"
   }
 
+  # Include collated and totals?
+  include_collated <- (region$get_locations() > 1)
+
   # Initialize additional incursion management result lists
   results <- list()
-  zeros <- list(impact = rep(0L, region$get_locations()),
-                action = rep(0L, region$get_locations()),
-                total_impact = 0L, total_action = 0L)
-  if (is.numeric(stages) && is.null(combine_stages)) {
-    zeros$action <- population_model$make(initial = 0L)
-    zeros$total_action <- zeros$action[1,, drop = FALSE]
-  } else if (is.numeric(combine_stages)) {
-    zeros$action <- array(0L, c(region$get_locations(), 1))
-    colnames(zeros$action) <- stage_labels
-    zeros$total_action <- zeros$action[1,, drop = FALSE]
-  }
-  if (replicates > 1) { # summaries
-    zeros$impact <- list(mean = zeros$impact, sd = zeros$impact)
-    zeros$action <- list(mean = zeros$action, sd = zeros$action)
-    zeros$total_impact <- list(mean = zeros$total_impact,
-                               sd = zeros$total_impact)
-    zeros$total_action <- list(mean = zeros$total_action,
-                               sd = zeros$total_action)
-  }
-  zeros$impact_steps <- list()
-  zeros$action_steps <- list()
-  for (tm in as.character(c(0, seq(collation_steps, time_steps,
-                                   by = collation_steps)))) {
-    zeros$impact_steps[[tm]] <- zeros$impact
-    zeros$action_steps[[tm]] <- zeros$action
-  }
-  zeros$total_impact_steps <- list()
-  zeros$total_action_steps <- list()
-  for (tm in as.character(0:time_steps)) {
-    zeros$total_impact_steps[[tm]] <- zeros$total_impact
-    zeros$total_action_steps[[tm]] <- zeros$total_action
-  }
   if (length(impacts) > 0) {
+
     results$impacts <- lapply(impacts, function(impacts_i) {
+      zeros <- list()
+      zeros$impact <- rep(0L, region$get_locations())
+      zeros$total_impact <- 0L
+      if (replicates > 1) { # summaries
+        zeros$impact <- list(mean = zeros$impact, sd = zeros$impact)
+        zeros$total_impact <- list(mean = zeros$total_impact,
+                                   sd = zeros$total_impact)
+      }
+      zeros$impact_steps <- list()
+      zeros$total_impact_steps <- list()
+      if (include_collated) {
+        for (tm in as.character(c(0, seq(collation_steps, time_steps,
+                                         by = collation_steps)))) {
+          zeros$impact_steps[[tm]] <- zeros$impact
+        }
+        for (tm in as.character(0:time_steps)) {
+          zeros$total_impact_steps[[tm]] <- zeros$total_impact
+        }
+      } else {
+        for (tm in as.character(0:time_steps)) {
+          zeros$impact_steps[[tm]] <- zeros$impact
+          zeros$total_impact_steps[[tm]] <- zeros$total_impact
+        }
+      }
       impact_aspects <- list()
       for (a in impacts_i$get_context()$get_impact_scope()) {
         impact_aspects[[a]] <- zeros$impact_steps
@@ -241,13 +237,52 @@ ManageResults.Region <- function(region, population_model,
   }
   if (length(actions) > 0) {
     results$actions <- lapply(actions, function(actions_i) {
+      zeros <- list()
+      direct_action <- (actions_i$get_label() %in%
+                          c("detected", "control_search_destroy", "removed"))
+      if (is.numeric(stages) && direct_action) {
+        if (is.numeric(combine_stages)) {
+          zeros$action <- array(0L, c(region$get_locations(), 1))
+          colnames(zeros$action) <- stage_labels
+          zeros$total_action <- zeros$action[1,, drop = FALSE]
+        } else {
+          zeros$action <- population_model$make(initial = 0L)
+          zeros$total_action <- zeros$action[1,, drop = FALSE]
+        }
+      } else {
+        zeros$action <- rep(0L, region$get_locations())
+        zeros$total_action <- 0L
+      }
+      if (replicates > 1) { # summaries
+        zeros$action <- list(mean = zeros$action)
+        if (direct_action) {
+          zeros$action$sd <- zeros$action$mean
+        }
+        zeros$total_action <- list(mean = zeros$total_action)
+        if (include_collated || direct_action) {
+          zeros$total_action$sd <- zeros$total_action$mean
+        }
+      }
       actions_list <- list()
-      actions_list[[actions_i$get_label()]] <- zeros$action_steps
-      actions_list$total <- zeros$total_action_steps
+      actions_list[[actions_i$get_label()]] <- list()
+      actions_list$total <- list()
+      if (include_collated) {
+        for (tm in as.character(c(0, seq(collation_steps, time_steps,
+                                         by = collation_steps)))) {
+          actions_list[[actions_i$get_label()]][[tm]] <- zeros$action
+        }
+        for (tm in as.character(0:time_steps)) {
+          actions_list$total[[tm]] <- zeros$total_action
+        }
+      } else {
+        for (tm in as.character(0:time_steps)) {
+          actions_list[[actions_i$get_label()]][[tm]] <- zeros$action
+          actions_list$total[[tm]] <- zeros$total_action
+        }
+      }
       actions_list
     })
   }
-  rm(zeros)
 
   # Extended collate results
   self$collate <- function(r, tm, n, calc_impacts) {
@@ -273,8 +308,8 @@ ManageResults.Region <- function(region, population_model,
           # Calculates running mean and standard deviation (note: variance*r is
           # stored as SD and transformed at the final replicate and time step)
 
-          # All calculated impact aspects recorded in collation steps only
-          if (tm %% collation_steps == 0) {
+          # All calculated impact aspects recorded in specified time steps
+          if (!include_collated || tm %% collation_steps == 0) {
             for (a in names(calc_impacts[[i]])) {
               previous_mean <- results$impacts[[i]][[a]][[tmc]]$mean
               results$impacts[[i]][[a]][[tmc]]$mean <<-
@@ -307,10 +342,11 @@ ManageResults.Region <- function(region, population_model,
 
         } else {
 
-          # All calculated impact aspects recorded in collation steps only
-          if (tm %% collation_steps == 0) {
+          # All calculated impact aspects recorded in specified time steps
+          if (!include_collated || tm %% collation_steps == 0) {
             for (a in names(calc_impacts[[i]])) {
-              results$impacts[[i]][[a]][[tmc]] <<- calc_impacts[[i]][[a]]
+              results$impacts[[i]][[a]][[tmc]] <<-
+                unname(calc_impacts[[i]][[a]])
             }
           }
 
@@ -336,16 +372,24 @@ ManageResults.Region <- function(region, population_model,
         # Get attribute from n
         a <- actions[[i]]$get_label()
         n_a <- attr(n, a)*1
+        direct_action <-
+          (a %in% c("detected", "control_search_destroy", "removed"))
 
         # Combine stages when required
         if (population_model$get_type() == "stage_structured" &&
-            is.numeric(combine_stages)) {
+            direct_action && is.numeric(combine_stages)) {
           n_a <- matrix(rowSums(n_a[,combine_stages, drop = FALSE]), ncol = 1)
           colnames(n_a) <- stage_labels
         }
 
+        # Binarize growth, spread, & establishment control (indirect actions)
+        if (a %in%  c("control_growth", "control_spread",
+                      "control_establishment")) {
+          n_a <- +(n_a > 0)
+        }
+
         # Shape total when population is staged
-        if (is.numeric(stages)) {
+        if (is.numeric(stages) && direct_action) {
           total_n_a <- array(colSums(n_a), c(1, ncol(n_a)))
           colnames(total_n_a) <- stage_labels
         } else {
@@ -357,15 +401,18 @@ ManageResults.Region <- function(region, population_model,
           # Calculates running mean and standard deviation (note: variance*r is
           # stored as SD and transformed at the final replicate and time step)
 
-          # All applied actions recorded in collation steps only
-          if (tm %% collation_steps == 0) {
+          # All applied actions recorded in specified time steps
+          if (!include_collated || tm %% collation_steps == 0) {
             previous_mean <- results$actions[[i]][[a]][[tmc]]$mean
             results$actions[[i]][[a]][[tmc]]$mean <<-
               previous_mean + (n_a - previous_mean)/r
-            previous_sd <- results$actions[[i]][[a]][[tmc]]$sd
-            results$actions[[i]][[a]][[tmc]]$sd <<-
-              (previous_sd + ((n_a - previous_mean)*
-                                (n_a - results$actions[[i]][[a]][[tmc]]$mean)))
+            if (direct_action) {
+              previous_sd <- results$actions[[i]][[a]][[tmc]]$sd
+              results$actions[[i]][[a]][[tmc]]$sd <<-
+                (previous_sd +
+                   ((n_a - previous_mean)*
+                      (n_a - results$actions[[i]][[a]][[tmc]]$mean)))
+            }
           }
 
           # Total applied actions at every time step
@@ -373,17 +420,19 @@ ManageResults.Region <- function(region, population_model,
             previous_mean <- results$actions[[i]]$total[[tmc]]$mean
             results$actions[[i]]$total[[tmc]]$mean <<-
               previous_mean + (total_n_a - previous_mean)/r
-            previous_sd <- results$actions[[i]]$total[[tmc]]$sd
-            results$actions[[i]]$total[[tmc]]$sd <<-
-              (previous_sd + ((total_n_a - previous_mean)*
-                                (total_n_a -
-                                   results$actions[[i]]$total[[tmc]]$mean)))
+            if (include_collated || direct_action) {
+              previous_sd <- results$actions[[i]]$total[[tmc]]$sd
+              results$actions[[i]]$total[[tmc]]$sd <<-
+                (previous_sd + ((total_n_a - previous_mean)*
+                                  (total_n_a -
+                                     results$actions[[i]]$total[[tmc]]$mean)))
+            }
           }
 
         } else {
 
-          # All applied actions recorded in collation steps only
-          if (tm %% collation_steps == 0) {
+          # All applied actions recorded in specified time steps
+          if (!include_collated || tm %% collation_steps == 0) {
             results$actions[[i]][[a]][[tmc]] <<- n_a
           }
 
@@ -424,9 +473,12 @@ ManageResults.Region <- function(region, population_model,
         # Transform action standard deviations
         for (i in 1:length(results$actions)) {
           for (a in names(results$actions[[i]])) {
-            for (tmc in names(results$actions[[i]][[a]])) {
-              results$actions[[i]][[a]][[tmc]]$sd <<-
-                sqrt(results$actions[[i]][[a]][[tmc]]$sd/(replicates - 1))
+            if (include_collated && a == "total" ||
+                a %in% c("detected", "control_search_destroy", "removed")) {
+              for (tmc in names(results$actions[[i]][[a]])) {
+                results$actions[[i]][[a]][[tmc]]$sd <<-
+                  sqrt(results$actions[[i]][[a]][[tmc]]$sd/(replicates - 1))
+              }
             }
           }
         }
@@ -443,13 +495,15 @@ ManageResults.Region <- function(region, population_model,
       if (length(actions) > 0) {
         for (i in 1:length(results$actions)) {
           for (a in names(results$actions[[i]])) {
-            for (tmc in names(results$actions[[i]][[a]])) {
-              for (s in summaries) {
-                if (replicates > 1) {
-                  colnames(results$actions[[i]][[a]][[tmc]][[s]]) <<-
-                    stage_labels
-                } else {
-                  colnames(results$actions[[i]][[a]][[tmc]]) <<- stage_labels
+            if (a %in%  c("detected", "control_search_destroy", "removed")) {
+              for (tmc in names(results$actions[[i]][[a]])) {
+                for (s in summaries) {
+                  if (replicates > 1) {
+                    colnames(results$actions[[i]][[a]][[tmc]][[s]]) <<-
+                      stage_labels
+                  } else {
+                    colnames(results$actions[[i]][[a]][[tmc]]) <<- stage_labels
+                  }
                 }
               }
             }
@@ -471,19 +525,19 @@ ManageResults.Region <- function(region, population_model,
       # Save population spread results
       spread_rast_list <- super$save_rasters(...)
 
-      # Replicate summaries or single replicate
-      if (replicates > 1) {
-        summaries <- c("mean", "sd")
-      } else {
-        summaries <- ""
-      }
-
       # Output and non-zero indicator lists
       output_list <- list()
       nonzero_list <- list()
 
       # Save impacts
       if (length(impacts) > 0) {
+
+        # Replicate summaries or single replicate
+        if (replicates > 1) {
+          summaries <- c("mean", "sd")
+        } else {
+          summaries <- ""
+        }
 
         # Save rasters for each impact aspect at each time step
         if (!is.null(names(results$impacts))) {
@@ -573,18 +627,33 @@ ManageResults.Region <- function(region, population_model,
           aspects <- names(results$actions[[i]])
           for (a in aspects[which(aspects != "total")]) {
 
+            direct_action <-
+              (a %in%  c("detected", "control_search_destroy", "removed"))
+
             # Create and save an action results raster per stage
-            if (is.null(stages) || is.numeric(combine_stages)) {
+            if (is.null(stages) || is.numeric(combine_stages) ||
+                !direct_action) {
               stages <- 1
             }
             for (j in 1:stages) {
 
               # Stage post-fix
               if (population_model$get_type() == "stage_structured" &&
-                  is.null(combine_stages)) {
+                  is.null(combine_stages) && direct_action) {
                 jc <- paste0("_stage_", j)
               } else {
                 jc <- ""
+              }
+
+              # Replicate summaries or single replicate
+              if (replicates > 1) {
+                if (direct_action) {
+                  summaries <- c("mean", "sd")
+                } else {
+                  summaries <- c("mean")
+                }
+              } else {
+                summaries <- ""
               }
 
               for (s in summaries) {
@@ -606,7 +675,8 @@ ManageResults.Region <- function(region, population_model,
                 for (tmc in names(results$actions[[i]][[a]])) {
 
                   # Copy actions into a raster and update non-zero indicator
-                  if (population_model$get_type() == "stage_structured") {
+                  if (population_model$get_type() == "stage_structured" &&
+                      direct_action) {
                     if (replicates > 1) {
                       output_rast <-
                         region$get_rast(
@@ -676,12 +746,7 @@ ManageResults.Region <- function(region, population_model,
     # Save population spread results
     super$save_csv()
 
-    # Replicate summaries or single replicate
-    if (replicates > 1) {
-      summaries <- c("mean", "sd")
-    } else {
-      summaries <- 1
-    }
+    # Filename parts summaries or single replicate
     s_fname <- list("", mean = "_mean", sd = "_sd")
 
     # Time step labels
@@ -693,7 +758,7 @@ ManageResults.Region <- function(region, population_model,
       c(0, seq(collation_steps, time_steps, by = collation_steps)))
 
     # Location coordinates and labels
-    if (region$get_type() == "patch") {
+    if (include_collated && region$get_type() == "patch") {
       coords <- region$get_coords(extra_cols = TRUE)
       coords <- coords[, c("lon", "lat",
                            names(which(sapply(coords, is.character))))]
@@ -719,90 +784,103 @@ ManageResults.Region <- function(region, population_model,
           ic <- paste0("_", i)
         }
 
-        # Collated results for multi-patch only
-        if (region$get_type() == "patch" && !region$spatially_implicit()) {
+        # Results for single or multi-patch only
+        if (region$get_type() == "patch") {
 
-          # Impact aspects
-          aspects <- names(results$impacts[[i]])
-          for (a in aspects[which(aspects != "total")]) {
-
-            # Combine coordinates and collated impact values
-            output_df <- list()
-            for (s in summaries) {
+          # Save impact CSV file(s)
+          if (include_collated) {
+            aspects <- names(results$impacts[[i]])
+            for (a in aspects[which(aspects != "total")]) {
+              output_df <- list()
               if (replicates > 1) {
-                output_df[[s]] <- lapply(results$impacts[[i]][[a]],
-                                         function(a_tm) a_tm[[s]])
+                summaries <- c("mean", "sd")
               } else {
-                output_df[[s]] <- results$impacts[[i]][[a]]
+                summaries <- 1
               }
-              names(output_df[[s]]) <- collated_labels
-              output_df[[s]] <- cbind(coords, as.data.frame(output_df[[s]]))
+              for (s in summaries) {
+                if (replicates > 1) {
+                  output_df[[s]] <- lapply(results$impacts[[i]][[a]],
+                                           function(a_tm) a_tm[[s]])
+                } else {
+                  output_df[[s]] <- results$impacts[[i]][[a]]
+                }
+                names(output_df[[s]]) <- collated_labels
+                output_df[[s]] <- cbind(coords, as.data.frame(output_df[[s]]))
+                filename <- sprintf("impacts%s_%s%s.csv", ic, a, s_fname[[s]])
+                utils::write.csv(output_df[[s]], filename, row.names = FALSE)
+              }
             }
-
-            # Write to CSV files
-            for (s in summaries) {
-              filename <- sprintf("impacts%s_%s%s.csv", ic, a, s_fname[[s]])
-              utils::write.csv(output_df[[s]], filename, row.names = FALSE)
+          } else {
+            aspects <- names(results$impacts[[i]])
+            if (replicates > 1) {
+              for (a in aspects[which(aspects != "total")]) {
+                output_df <- sapply(results$impacts[[i]][[a]],
+                                  function(imp) as.data.frame(imp))
+                colnames(output_df) <- time_steps_labels
+                filename <- sprintf("impacts%s_%s.csv", ic, a)
+                utils::write.csv(output_df, filename, row.names = TRUE)
+              }
+            } else {
+              output_df <- t(sapply(
+                results$impacts[[i]][which(aspects != "total")],
+                function(a) a))
+              colnames(output_df) <- time_steps_labels
+              filename <- sprintf("impacts%s.csv", ic)
+              utils::write.csv(output_df, filename, row.names = TRUE)
             }
           }
         }
       }
 
       # Impact totals when present
-      if (replicates > 1) {
+      if (include_collated) {
+        if (replicates > 1) {
 
-        # Totals for each impact
-        for (i in impact_i) {
+          # Totals for each impact
+          for (i in impact_i) {
 
-          # Impact totals when present
-          if (is.list(results$impacts[[i]]$total)) {
+            # Impact totals when present
+            if (is.list(results$impacts[[i]]$total)) {
 
-            # Include impact name or numeric index
-            if (length(impact_i) == 1 && is.numeric(i)) {
-              ic <- ""
-            } else {
-              ic <- paste0("_", i)
+              # Include impact name or numeric index
+              if (length(impact_i) == 1 && is.numeric(i)) {
+                ic <- ""
+              } else {
+                ic <- paste0("_", i)
+              }
+
+              # Collect totals at each time step
+              output_df <- sapply(results$impacts[[i]]$total,
+                                  function(tot) tot)
+              colnames(output_df) <- time_steps_labels
+
+              # Write to CSV file
+              filename <- sprintf("total_impacts%s.csv", ic)
+              utils::write.csv(output_df, filename, row.names = TRUE)
             }
+          }
+
+        } else {
+
+          # Combine impact totals when present
+          present <- sapply(results$impacts,
+                            function(aspect) is.list(aspect$total))
+          if (any(present)) {
 
             # Collect totals at each time step
-            output_df <- sapply(results$impacts[[i]]$total, function(tot) tot)
+            output_df <- t(sapply(results$impacts[present],
+                                  function(aspect) aspect$total))
             colnames(output_df) <- time_steps_labels
+            if (is.numeric(impact_i)) {
+              if (length(impact_i) == 1) {
+                rownames(output_df) <- "impact"
+              } else {
+                rownames(output_df) <- paste("impact", which(present))
+              }
+            }
 
             # Write to CSV file
-            if (region$spatially_implicit()) {
-              filename <- sprintf("impacts%s.csv", ic)
-            } else {
-              filename <- sprintf("total_impacts%s.csv", ic)
-            }
-            utils::write.csv(output_df, filename,
-                             row.names = (length(summaries) > 1))
-          }
-        }
-
-      } else {
-
-        # Combine impact totals when present
-        present <- sapply(results$impacts,
-                          function(aspect) is.list(aspect$total))
-        if (any(present)) {
-
-          # Collect totals at each time step
-          output_df <- t(sapply(results$impacts[present],
-                                function(aspect) aspect$total))
-          colnames(output_df) <- time_steps_labels
-          if (is.numeric(impact_i)) {
-            if (length(impact_i) == 1) {
-              rownames(output_df) <- "impact"
-            } else {
-              rownames(output_df) <- paste("impact", which(present))
-            }
-          }
-
-          # Write to CSV file
-          if (region$spatially_implicit()) {
-            utils::write.csv(output_df, "impacts.csv")
-          } else {
-            utils::write.csv(output_df, "total_impacts.csv")
+            utils::write.csv(output_df, "total_impacts.csv", row.names = TRUE)
           }
         }
       }
@@ -818,20 +896,16 @@ ManageResults.Region <- function(region, population_model,
         action_i <- 1:length(results$actions) # indices
       }
 
-      # Resolve result stages
-      result_stages <- stages
-      if (is.null(stages) || is.numeric(combine_stages)) {
-        result_stages <- 1
-        j_fname <- ""
-      } else {
-        j_fname <- paste0("_stage_", 1:result_stages)
-      }
-
-      # Collated results for multi-patch only
-      if (region$get_type() == "patch" && !region$spatially_implicit()) {
+      # Results for single or multi-patch only
+      if (region$get_type() == "patch") {
 
         # Results for each action
         for (i in action_i) {
+
+          # Direct action?
+          direct_action <- (actions[[i]]$get_label() %in%
+                              c("detected", "control_search_destroy",
+                                "removed"))
 
           # Include action name or numeric index
           if (length(action_i) == 1 && is.numeric(i)) {
@@ -840,63 +914,154 @@ ManageResults.Region <- function(region, population_model,
             ic <- paste0("_", i)
           }
 
-          # Save stages separately when applicable
-          for (j in 1:result_stages) {
+          # Resolve result stages
+          result_stages <- stages
+          if (is.null(stages) || is.numeric(combine_stages) ||
+              !direct_action) {
+            result_stages <- 1
+            j_fname <- ""
+          } else {
+            j_fname <- paste0("_stage_", 1:result_stages)
+          }
 
-            # Action aspects
+          if (include_collated) {
+
+            # Replicate summaries or single replicate
+            if (replicates > 1) {
+              if (direct_action) {
+                summaries <- c("mean", "sd")
+              } else {
+                summaries <- c("mean")
+              }
+            } else {
+              summaries <- 1
+            }
+
+            # Save stages separately when applicable
+            for (j in 1:result_stages) {
+
+              # Action aspects
+              aspects <- names(results$actions[[i]])
+              for (a in aspects[which(aspects != "total")]) {
+
+                # Combine coordinates and collated action values
+                output_df <- list()
+                for (s in summaries) {
+                  if (population_model$get_type() == "stage_structured" &&
+                      direct_action) {
+                    if (replicates > 1) {
+                      output_df[[s]] <- lapply(results$actions[[i]][[a]],
+                                               function(a_tm) a_tm[[s]][,j])
+                    } else {
+                      output_df[[s]] <- lapply(results$actions[[i]][[a]],
+                                               function(a_tm) a_tm[,j])
+                    }
+                  } else {
+                    if (replicates > 1) {
+                      output_df[[s]] <- lapply(results$actions[[i]][[a]],
+                                               function(a_tm) a_tm[[s]])
+                    } else {
+                      output_df[[s]] <- results$actions[[i]][[a]]
+                    }
+                  }
+                  names(output_df[[s]]) <- collated_labels
+                  output_df[[s]] <- cbind(coords, as.data.frame(output_df[[s]]))
+                }
+
+                # Write to CSV files
+                for (s in summaries) {
+                  filename <- sprintf("actions%s_%s%s%s.csv", ic, a, j_fname[j],
+                                      s_fname[[s]])
+                  utils::write.csv(output_df[[s]], filename, row.names = FALSE)
+                }
+              }
+            }
+
+          } else {
+
+            # Save CSVs without coordinates (spatially implicit)
             aspects <- names(results$actions[[i]])
             for (a in aspects[which(aspects != "total")]) {
-
-              # Combine coordinates and collated action values
-              output_df <- list()
-              for (s in summaries) {
-                if (population_model$get_type() == "stage_structured") {
-                  if (replicates > 1) {
-                    output_df[[s]] <- lapply(results$actions[[i]][[a]],
-                                             function(a_tm) a_tm[[s]][,j])
-                  } else {
-                    output_df[[s]] <- lapply(results$actions[[i]][[a]],
-                                             function(a_tm) a_tm[,j])
+              if (population_model$get_type() == "stage_structured" &&
+                  direct_action) {
+                if (replicates > 1) {
+                  for (j in 1:result_stages) {
+                    output_df <- sapply(results$actions[[i]][[a]],
+                                        function(a_tm) as.data.frame(
+                                          lapply(a_tm, function(m) m[,j])))
+                    colnames(output_df) <- time_steps_labels
+                    filename <- sprintf("actions%s_%s%s.csv", ic, a,
+                                        j_fname[j])
+                    utils::write.csv(output_df, filename, row.names = TRUE)
                   }
                 } else {
-                  if (replicates > 1) {
-                    output_df[[s]] <- lapply(results$actions[[i]][[a]],
-                                             function(a_tm) a_tm[[s]])
+                  if (is.numeric(combine_stages)) {
+                    output_df <- as.data.frame(results$actions[[i]][[a]])
+                    if (length(combine_stages) == 1) {
+                      rownames(output_df) <- attr(population_model$get_growth(),
+                                                  "labels")[combine_stages]
+                    } else {
+                      rownames(output_df) <- sprintf(
+                        "stages %s-%s", min(combine_stages), max(combine_stages))
+                    }
                   } else {
-                    output_df[[s]] <- results$actions[[i]][[a]]
+                    output_df <- sapply(results$actions[[i]][[a]],
+                                        function(a_tm) as.data.frame(a_tm))
                   }
+                  colnames(output_df) <- time_steps_labels
+                  filename <- sprintf("actions%s_%s.csv", ic, a)
+                  utils::write.csv(output_df, filename, row.names = TRUE)
                 }
-                names(output_df[[s]]) <- collated_labels
-                output_df[[s]] <- cbind(coords, as.data.frame(output_df[[s]]))
-              }
-
-              # Write to CSV files
-              for (s in summaries) {
-                filename <- sprintf("actions%s_%s%s%s.csv", ic, a, j_fname[j],
-                                    s_fname[[s]])
-                utils::write.csv(output_df[[s]], filename, row.names = FALSE)
+              } else {
+                if (replicates > 1) {
+                  if (direct_action) {
+                    output_df <- sapply(results$actions[[i]][[a]],
+                                        function(a_tm) as.data.frame(a_tm))
+                  } else {
+                    output_df <- as.data.frame(results$actions[[i]][[a]])
+                    rownames(output_df) <- "mean"
+                  }
+                } else {
+                  output_df <- as.data.frame(results$actions[[i]][[a]])
+                  rownames(output_df) <- a
+                }
+                colnames(output_df) <- time_steps_labels
+                filename <- sprintf("actions%s_%s.csv", ic, a)
+                utils::write.csv(output_df, filename, row.names = TRUE)
               }
             }
           }
         }
       }
 
-      # Action totals when present
-      if (replicates > 1 || result_stages > 1) {
-
-        # Totals for each action
+      # Save totals CSV for each action
+      if (include_collated) {
         for (i in action_i) {
+
+          # Action label. Direct action?
+          a_lab <- actions[[i]]$get_label()
+          direct_action <- (a_lab %in% c("detected", "control_search_destroy",
+                                         "removed"))
+
+          # Include action name or numeric index
+          if (length(action_i) == 1 && is.numeric(i)) {
+            ic <- ""
+          } else {
+            ic <- paste0("_", i)
+          }
+
+          # Resolve result stages
+          result_stages <- stages
+          if (is.null(stages) || is.numeric(combine_stages) ||
+              !direct_action) {
+            result_stages <- 1
+            j_fname <- ""
+          } else {
+            j_fname <- paste0("_stage_", 1:result_stages)
+          }
 
           # Action totals when present
           if (is.list(results$actions[[i]]$total)) {
-
-            # Include action name or numeric index plus label
-            if (length(action_i) == 1 && is.numeric(i)) {
-              ic <- ""
-            } else {
-              ic <- paste0("_", i)
-            }
-            label <- actions[[i]]$get_label()
 
             # Collect totals at each time step
             if (replicates > 1 && result_stages > 1) {
@@ -911,17 +1076,12 @@ ManageResults.Region <- function(region, population_model,
                 colnames(output_df) <- time_steps_labels
 
                 # Write to CSV file
-                if (region$spatially_implicit()) {
-                  filename <- sprintf("actions%s_%s%s.csv", ic, label,
-                                      j_fname[j])
-                } else {
-                  filename <- sprintf("total_actions%s_%s%s.csv", ic, label,
-                                      j_fname[j])
-                }
+                filename <- sprintf("total_actions%s_%s%s.csv", ic, a_lab,
+                                    j_fname[j])
                 utils::write.csv(output_df, filename)
               }
 
-            } else {
+            } else if (replicates > 1 || result_stages > 1) {
 
               # Place either summaries or stages in rows
               output_df <- sapply(results$actions[[i]]$total,
@@ -934,51 +1094,16 @@ ManageResults.Region <- function(region, population_model,
               }
 
               # Write to CSV file
-              if (region$spatially_implicit()) {
-                filename <- sprintf("actions%s_%s.csv", ic, label)
-              } else {
-                filename <- sprintf("total_actions%s_%s.csv", ic, label)
-              }
+              filename <- sprintf("total_actions%s_%s.csv", ic, a_lab)
               utils::write.csv(output_df, filename)
-            }
-          }
-        }
 
-      } else {
-
-        # Combine action totals when present
-        present <- sapply(results$actions,
-                          function(aspect) is.list(aspect$total))
-        if (any(present)) {
-
-          # Place actions in rows
-          output_df <- t(sapply(results$actions[present],
-                                function(aspect) aspect$total))
-          colnames(output_df) <- time_steps_labels
-          action_labels <- sapply(actions[present], function(a) a$get_label())
-          if (is.numeric(combine_stages)) {
-            if (length(combine_stages) == 1) {
-              action_labels <- paste(attr(population_model$get_growth(),
-                                          "labels")[combine_stages],
-                                     action_labels)
             } else {
-              action_labels <- paste(
-                sprintf("stages %s-%s", min(combine_stages),
-                        max(combine_stages)), action_labels)
+              output_df <- as.data.frame(results$actions[[i]]$total)
+              rownames(output_df) <- a_lab
+              colnames(output_df) <- time_steps_labels
+              filename <- sprintf("total_actions%s_%s.csv", ic, a_lab)
+              utils::write.csv(output_df, filename, row.names = TRUE)
             }
-          }
-
-          if (is.numeric(action_i)) {
-            rownames(output_df) <- action_labels
-          } else {
-            rownames(output_df) <- paste(rownames(output_df), action_labels)
-          }
-
-          # Write to CSV file
-          if (region$spatially_implicit()) {
-            utils::write.csv(output_df, "actions.csv")
-          } else {
-            utils::write.csv(output_df, "total_actions.csv")
           }
         }
       }
@@ -993,30 +1118,6 @@ ManageResults.Region <- function(region, population_model,
 
     # All plots have time steps on x-axis
     plot_x_label <- paste0("Time steps (", step_units, ")")
-
-    # Resolve the number of (combined) stages used in the results
-    result_stages <- stages
-    if (is.null(stages) || is.numeric(combine_stages)) {
-      result_stages <- 1
-    }
-
-    # Stage label for plot headings and files
-    stage_label <- ""
-    stage_file <- ""
-    if (population_model$get_type() == "stage_structured") {
-      if (is.numeric(stages) && is.null(combine_stages)) {
-        stage_label <- paste0(stage_labels, " ")
-        stage_file <- paste0("_stage_", 1:result_stages)
-      } else if (is.numeric(combine_stages)) {
-        if (length(combine_stages) == 1) {
-          stage_label <- paste0(
-            attr(population_model$get_growth(), "labels")[combine_stages], " ")
-        } else {
-          stage_label <- paste0(sprintf("stages %s-%s", min(combine_stages),
-                                        max(combine_stages)), " ")
-        }
-      }
-    }
 
     # Plot impact totals when present
     if (length(impacts) > 0) {
@@ -1101,7 +1202,37 @@ ManageResults.Region <- function(region, population_model,
             ic <- c(paste0("_", i), paste0(" : ", i))
           }
           # units <- actions[[i]]$get_context()$get_action_measures()
-          label <- actions[[i]]$get_label()
+          a_lab <- actions[[which(action_i == i)]]$get_label()
+          direct_action <- (a_lab %in% c("detected", "control_search_destroy",
+                                         "removed"))
+
+          # Resolve the number of (combined) stages used in the results
+          result_stages <- stages
+          if (is.null(stages) || is.numeric(combine_stages) ||
+              !direct_action) {
+            result_stages <- 1
+          }
+
+          # Stage label for plot headings and files
+          stage_label <- ""
+          stage_file <- ""
+          if (population_model$get_type() == "stage_structured" &&
+              direct_action) {
+            if (is.numeric(stages) && is.null(combine_stages)) {
+              stage_label <- paste0(stage_labels, " ")
+              stage_file <- paste0("_stage_", 1:result_stages)
+            } else if (is.numeric(combine_stages)) {
+              if (length(combine_stages) == 1) {
+                stage_label <- paste0(
+                  attr(population_model$get_growth(),
+                       "labels")[combine_stages], " ")
+              } else {
+                stage_label <- paste0(sprintf(
+                  "stages %s-%s", min(combine_stages), max(combine_stages)),
+                  " ")
+              }
+            }
+          }
 
           # Plot per result stage
           for (s in 1:result_stages) {
@@ -1119,21 +1250,22 @@ ManageResults.Region <- function(region, population_model,
               totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
                              sd = as.numeric(totals["sd",,drop = FALSE]))
               if (region$spatially_implicit()) {
-                filename <- sprintf("actions%s_%s%s.png", ic[1], label,
+                filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
                                     stage_file[s])
                 main_title <- sprintf("Actions%s %s%s (mean +/- 2 SD)", ic[2],
-                                      stage_label[s], label)
+                                      stage_label[s], a_lab)
               } else {
-                filename <- sprintf("total_actions%s_%s%s.png", ic[1], label,
+                filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
                                     stage_file[s])
                 main_title <- sprintf("Total actions%s %s%s (mean +/- 2 SD)",
-                                      ic[2], stage_label[s], label)
+                                      ic[2], stage_label[s], a_lab)
               }
-              grDevices::png(filename = filename, width = width, height = height)
+              grDevices::png(filename = filename, width = width,
+                             height = height)
               graphics::plot(0:time_steps, totals$mean, type = "l",
                              main = main_title,
                              xlab = plot_x_label,
-                             ylab = sprintf("Number %s", label),
+                             ylab = sprintf("Number %s", a_lab),
                              ylim = c(0, 1.1*max(totals$mean + 2*totals$sd)))
               graphics::lines(0:time_steps, totals$mean + 2*totals$sd,
                               lty = "dashed")
@@ -1143,21 +1275,22 @@ ManageResults.Region <- function(region, population_model,
               invisible(grDevices::dev.off())
             } else {
               if (region$spatially_implicit()) {
-                filename <- sprintf("actions%s_%s%s.png", ic[1], label,
+                filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
                                     stage_file[s])
                 main_title <- sprintf("Actions%s %s%s", ic[2], stage_label[s],
-                                      label)
+                                      a_lab)
               } else {
-                filename <- sprintf("total_actions%s_%s%s.png", ic[1], label,
+                filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
                                     stage_file[s])
                 main_title <- sprintf("Total actions%s %s%s", ic[2],
-                                      stage_label[s], label)
+                                      stage_label[s], a_lab)
               }
-              grDevices::png(filename = filename, width = width, height = height)
+              grDevices::png(filename = filename, width = width,
+                             height = height)
               graphics::plot(0:time_steps, totals, type = "l",
                              main = main_title,
                              xlab = plot_x_label,
-                             ylab = sprintf("Number %s", label),
+                             ylab = sprintf("Number %s", a_lab),
                              ylim = c(0, 1.1*max(totals)))
               invisible(grDevices::dev.off())
             }

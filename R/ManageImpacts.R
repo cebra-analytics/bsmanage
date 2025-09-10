@@ -98,7 +98,8 @@ ManageImpacts <- function(impacts, population_model,
       } else if (is.numeric(attr(n, "spread_area"))) {
         total_area <- attr(n, "spread_area")
       } else {
-        stop("Cannot calculate spatially implicit impacts without area occupied.", call. = FALSE)
+        stop(paste("Cannot calculate spatially implicit impacts without area",
+                   "occupied."), call. = FALSE)
       }
     }
 
@@ -108,7 +109,8 @@ ManageImpacts <- function(impacts, population_model,
       n <- rowSums(n[,impact_stages, drop = FALSE])
     }
 
-    # Use total area occupied when spatially implicit when impacting population is present
+    # Use total area occupied when spatially implicit when impacting
+    # population is present
     if (population_model$get_region()$spatially_implicit()) {
       n <- (sum(n) > 0)*total_area
     }
