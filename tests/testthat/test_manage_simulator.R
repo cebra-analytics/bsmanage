@@ -117,16 +117,16 @@ test_that("runs simulator with correct configuration", {
     }))
   expect_silent(results <- simulator$run())
   expect_silent(results_list <- results$get_list())
-  expect_named(results_list, c("collated", "total", "area", "occupancy",
-                               "total_occup", "impacts", "actions"))
-  expect_named(results_list$collated, as.character(seq(0, 4, 2)))
-  expect_equal(unname(sapply(results_list$collated, length)),
+  expect_named(results_list, c("population", "total_pop", "occupancy",
+                               "total_occup", "area", "impacts", "actions"))
+  expect_named(results_list$population, as.character(seq(0, 4, 2)))
+  expect_equal(unname(sapply(results_list$population, length)),
                rep(region$get_locations(), 3))
-  expect_equal(attributes(results_list$collated[["2"]]),
+  expect_equal(attributes(results_list$population[["2"]]),
                list(growth = 1:2, dispersal = 1:2, user = 1:2, tm = 1:2))
-  expect_equal(attributes(results_list$collated[["4"]]),
+  expect_equal(attributes(results_list$population[["4"]]),
                list(growth = 1:4, dispersal = 1:4, user = 1:4, tm = 1:4))
-  expect_named(results_list$total, as.character(0:4))
+  expect_named(results_list$total_pop, as.character(0:4))
   expect_named(results_list$area, as.character(0:4))
   expect_named(results_list$occupancy, as.character(seq(0, 4, 2)))
   expect_named(results_list$total_occup, as.character(0:4))
@@ -152,6 +152,6 @@ test_that("runs simulator with correct configuration", {
   expect_equal(unname(lapply(results_list$actions[[2]]$removed,
                              function(n) n > 0)),
                lapply(1:3, function (n) (initial_n > 0)))
-  expect_equal(results_list$collated[["0"]],
+  expect_equal(results_list$population[["0"]],
                initial_n - results_list$actions[[2]]$removed[["0"]])
 })

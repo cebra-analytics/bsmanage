@@ -196,15 +196,18 @@ ManageResults.Region <- function(region, population_model,
   # Initialize additional incursion management result lists
   results <- list()
   if (length(impacts) > 0) {
-
     results$impacts <- lapply(impacts, function(impacts_i) {
       zeros <- list()
       zeros$impact <- rep(0L, region$get_locations())
-      zeros$total_impact <- 0L
+      if (include_collated) {
+        zeros$total_impact <- 0L
+      }
       if (replicates > 1) { # summaries
         zeros$impact <- list(mean = zeros$impact, sd = zeros$impact)
-        zeros$total_impact <- list(mean = zeros$total_impact,
-                                   sd = zeros$total_impact)
+        if (include_collated) {
+          zeros$total_impact <- list(mean = zeros$total_impact,
+                                     sd = zeros$total_impact)
+        }
       }
       zeros$impact_steps <- list()
       zeros$total_impact_steps <- list()
@@ -219,7 +222,6 @@ ManageResults.Region <- function(region, population_model,
       } else {
         for (tm in as.character(0:time_steps)) {
           zeros$impact_steps[[tm]] <- zeros$impact
-          zeros$total_impact_steps[[tm]] <- zeros$total_impact
         }
       }
       impact_aspects <- list()
@@ -229,7 +231,7 @@ ManageResults.Region <- function(region, population_model,
       if (impacts_i$includes_combined()) {
         impact_aspects$combined <- zeros$impact_steps
       }
-      if (impacts_i$get_calc_total()) {
+      if (include_collated && impacts_i$get_calc_total()) {
         impact_aspects$total <- zeros$total_impact_steps
       }
       impact_aspects
@@ -244,40 +246,45 @@ ManageResults.Region <- function(region, population_model,
         if (is.numeric(combine_stages)) {
           zeros$action <- array(0L, c(region$get_locations(), 1))
           colnames(zeros$action) <- stage_labels
-          zeros$total_action <- zeros$action[1,, drop = FALSE]
+          if (include_collated) {
+            zeros$total_action <- zeros$action[1,, drop = FALSE]
+          }
         } else {
           zeros$action <- population_model$make(initial = 0L)
-          zeros$total_action <- zeros$action[1,, drop = FALSE]
+          if (include_collated) {
+            zeros$total_action <- zeros$action[1,, drop = FALSE]
+          }
         }
       } else {
         zeros$action <- rep(0L, region$get_locations())
-        zeros$total_action <- 0L
+        if (include_collated) {
+          zeros$total_action <- 0L
+        }
       }
       if (replicates > 1) { # summaries
         zeros$action <- list(mean = zeros$action)
         if (direct_action) {
           zeros$action$sd <- zeros$action$mean
         }
-        zeros$total_action <- list(mean = zeros$total_action)
-        if (include_collated || direct_action) {
-          zeros$total_action$sd <- zeros$total_action$mean
+        if (include_collated) {
+          zeros$total_action <- list(mean = zeros$total_action,
+                                     sd = zeros$total_action)
         }
       }
       actions_list <- list()
       actions_list[[actions_i$get_label()]] <- list()
-      actions_list$total <- list()
       if (include_collated) {
         for (tm in as.character(c(0, seq(collation_steps, time_steps,
                                          by = collation_steps)))) {
           actions_list[[actions_i$get_label()]][[tm]] <- zeros$action
         }
+        actions_list$total <- list()
         for (tm in as.character(0:time_steps)) {
           actions_list$total[[tm]] <- zeros$total_action
         }
       } else {
         for (tm in as.character(0:time_steps)) {
           actions_list[[actions_i$get_label()]][[tm]] <- zeros$action
-          actions_list$total[[tm]] <- zeros$total_action
         }
       }
       actions_list
@@ -389,7 +396,7 @@ ManageResults.Region <- function(region, population_model,
         }
 
         # Shape total when population is staged
-        if (is.numeric(stages) && direct_action) {
+        if (include_collated && is.numeric(stages) && direct_action) {
           total_n_a <- array(colSums(n_a), c(1, ncol(n_a)))
           colnames(total_n_a) <- stage_labels
         } else {
@@ -420,13 +427,11 @@ ManageResults.Region <- function(region, population_model,
             previous_mean <- results$actions[[i]]$total[[tmc]]$mean
             results$actions[[i]]$total[[tmc]]$mean <<-
               previous_mean + (total_n_a - previous_mean)/r
-            if (include_collated || direct_action) {
-              previous_sd <- results$actions[[i]]$total[[tmc]]$sd
-              results$actions[[i]]$total[[tmc]]$sd <<-
-                (previous_sd + ((total_n_a - previous_mean)*
-                                  (total_n_a -
-                                     results$actions[[i]]$total[[tmc]]$mean)))
-            }
+            previous_sd <- results$actions[[i]]$total[[tmc]]$sd
+            results$actions[[i]]$total[[tmc]]$sd <<-
+              (previous_sd + ((total_n_a - previous_mean)*
+                                (total_n_a -
+                                   results$actions[[i]]$total[[tmc]]$mean)))
           }
 
         } else {
@@ -788,8 +793,11 @@ ManageResults.Region <- function(region, population_model,
         if (region$get_type() == "patch") {
 
           # Save impact CSV file(s)
-          if (include_collated) {
-            aspects <- names(results$impacts[[i]])
+          aspects <- names(results$impacts[[i]])
+
+          if (include_collated) { # spatial with coordinates
+
+            # Impact aspects excluding totals
             for (a in aspects[which(aspects != "total")]) {
               output_df <- list()
               if (replicates > 1) {
@@ -810,10 +818,12 @@ ManageResults.Region <- function(region, population_model,
                 utils::write.csv(output_df[[s]], filename, row.names = FALSE)
               }
             }
-          } else {
-            aspects <- names(results$impacts[[i]])
+
+          } else { # spatially implicit
+
+            # Collect and save to single row CSV
             if (replicates > 1) {
-              for (a in aspects[which(aspects != "total")]) {
+              for (a in aspects) {
                 output_df <- sapply(results$impacts[[i]][[a]],
                                   function(imp) as.data.frame(imp))
                 colnames(output_df) <- time_steps_labels
@@ -821,9 +831,7 @@ ManageResults.Region <- function(region, population_model,
                 utils::write.csv(output_df, filename, row.names = TRUE)
               }
             } else {
-              output_df <- t(sapply(
-                results$impacts[[i]][which(aspects != "total")],
-                function(a) a))
+              output_df <- t(sapply(results$impacts[[i]], function(a) a))
               colnames(output_df) <- time_steps_labels
               filename <- sprintf("impacts%s.csv", ic)
               utils::write.csv(output_df, filename, row.names = TRUE)
@@ -835,11 +843,7 @@ ManageResults.Region <- function(region, population_model,
       # Impact totals when present
       if (include_collated) {
         if (replicates > 1) {
-
-          # Totals for each impact
           for (i in impact_i) {
-
-            # Impact totals when present
             if (is.list(results$impacts[[i]]$total)) {
 
               # Include impact name or numeric index
@@ -849,12 +853,10 @@ ManageResults.Region <- function(region, population_model,
                 ic <- paste0("_", i)
               }
 
-              # Collect totals at each time step
+              # Collect totals and save to CSV
               output_df <- sapply(results$impacts[[i]]$total,
                                   function(tot) tot)
               colnames(output_df) <- time_steps_labels
-
-              # Write to CSV file
               filename <- sprintf("total_impacts%s.csv", ic)
               utils::write.csv(output_df, filename, row.names = TRUE)
             }
@@ -862,12 +864,10 @@ ManageResults.Region <- function(region, population_model,
 
         } else {
 
-          # Combine impact totals when present
+          # Combine impact totals when present and save to CSV
           present <- sapply(results$impacts,
                             function(aspect) is.list(aspect$total))
           if (any(present)) {
-
-            # Collect totals at each time step
             output_df <- t(sapply(results$impacts[present],
                                   function(aspect) aspect$total))
             colnames(output_df) <- time_steps_labels
@@ -878,8 +878,6 @@ ManageResults.Region <- function(region, population_model,
                 rownames(output_df) <- paste("impact", which(present))
               }
             }
-
-            # Write to CSV file
             utils::write.csv(output_df, "total_impacts.csv", row.names = TRUE)
           }
         }
@@ -980,8 +978,7 @@ ManageResults.Region <- function(region, population_model,
           } else {
 
             # Save CSVs without coordinates (spatially implicit)
-            aspects <- names(results$actions[[i]])
-            for (a in aspects[which(aspects != "total")]) {
+            for (a in names(results$actions[[i]])) {
               if (population_model$get_type() == "stage_structured" &&
                   direct_action) {
                 if (replicates > 1) {
@@ -1119,181 +1116,231 @@ ManageResults.Region <- function(region, population_model,
     # All plots have time steps on x-axis
     plot_x_label <- paste0("Time steps (", step_units, ")")
 
-    # Plot impact totals when present
+    # Plot impacts when present
     if (length(impacts) > 0) {
-      totals_present <- sapply(results$impacts, function(i) is.list(i$total))
-      if (any(totals_present)) {
 
-        # Plots for each impact present
-        if (!is.null(names(results$impacts))) {
-          impact_i <- names(results$impacts)    # named impacts
-        } else {
-          impact_i <- 1:length(results$impacts) # indices
-        }
-        for (i in impact_i[totals_present]) {
+      # Plots for each impact present
+      if (!is.null(names(results$impacts))) {
+        impact_i <- names(results$impacts)    # named impacts
+      } else {
+        impact_i <- 1:length(results$impacts) # indices
+      }
 
-          # Plot impact totals at each time step
+      # Impact spatial totals present or spatially implicit
+      if (include_collated) {
+        is_present <- sapply(results$impacts, function(i) is.list(i$total))
+      } else {
+        is_present <- sapply(results$impacts, function(i) TRUE)
+      }
+      if (any(is_present)) {
+        for (i in impact_i[is_present]) {
+
+          # Plot impacts at each time step
           if (length(impact_i) == 1 && is.numeric(i)) {
             ic <- c("", "")
           } else {
             ic <- c(paste0("_", i), paste0(" : ", i))
           }
           units <- impacts[[i]]$get_context()$get_impact_measures()
-          totals <- sapply(results$impacts[[i]]$total, function(tot) tot)
-          if (replicates > 1) { # plot summary mean +/- 2 SD
-            if (region$spatially_implicit()) {
-              filename <- sprintf("impacts%s.png", ic[1])
-              main_title <- sprintf("Impacts%s (mean +/- 2 SD)", ic[2])
-            } else {
-              filename <- sprintf("total_impacts%s.png", ic[1])
-              main_title <- sprintf("Total impacts%s (mean +/- 2 SD)", ic[2])
-            }
-            totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
-                           sd = as.numeric(totals["sd",,drop = FALSE]))
-            grDevices::png(filename = filename, width = width, height = height)
-            graphics::plot(0:time_steps, totals$mean, type = "l",
-                           main = main_title,
-                           xlab = plot_x_label,
-                           ylab = sprintf("Impact (%s)", units),
-                           ylim = c(0, 1.1*max(totals$mean + 2*totals$sd)))
-            graphics::lines(0:time_steps, totals$mean + 2*totals$sd,
-                            lty = "dashed")
-            graphics::lines(0:time_steps,
-                            pmax(0, totals$mean - 2*totals$sd),
-                            lty = "dashed")
-            invisible(grDevices::dev.off())
+          if (include_collated) {
+            values_list <- list(total = sapply(results$impacts[[i]]$total,
+                                               function(tot) tot))
           } else {
-            if (region$spatially_implicit()) {
-              filename <- sprintf("impacts%s.png", ic[1])
-              main_title <- sprintf("Impacts%s", ic[2])
+            if ("combined" %in% names(results$impacts[[i]])) {
+              values_list <- list(
+                combined = sapply(results$impacts[[i]]$combined,
+                                  function(tot) tot))
             } else {
-              filename <- sprintf("total_impacts%s.png", ic[1])
-              main_title <- sprintf("Total impacts%s", ic[2])
+              values_list <- lapply(results$impacts[[i]],
+                                    function(i_a) sapply(i_a, function(a) a))
             }
-            grDevices::png(filename = filename, width = width, height = height)
-            graphics::plot(0:time_steps, totals, type = "l",
-                           main = main_title,
-                           xlab = plot_x_label,
-                           ylab = sprintf("Impact (%s)", units),
-                           ylim = c(0, 1.1*max(totals)))
-            invisible(grDevices::dev.off())
+          }
+          for (a in 1:length(values_list)) {
+            values <- values_list[[a]]
+            if (length(values_list) > 1) {
+              ac <- c(paste0("_", a), paste0(" : ", names(values_list)[a]))
+            } else {
+              ac <- c("", "")
+            }
+            if (replicates > 1) { # plot summary mean +/- 2 SD
+              values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                             sd = as.numeric(values["sd",,drop = FALSE]))
+              if (include_collated) {
+                filename <- sprintf("total_impacts%s%s.png", ic[1], ac[1])
+                main_title <- sprintf("Total impacts%s%s (mean +/- 2 SD)",
+                                      ic[2], ac[2])
+              } else {
+                filename <- sprintf("impacts%s%s.png", ic[1], ac[1])
+                main_title <- sprintf("Impacts%s%s (mean +/- 2 SD)", ic[2],
+                                      ac[2])
+              }
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values$mean, type = "l",
+                             main = main_title,
+                             xlab = plot_x_label,
+                             ylab = sprintf("Impact (%s)", units),
+                             ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
+              graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                              lty = "dashed")
+              graphics::lines(0:time_steps,
+                              pmax(0, values$mean - 2*values$sd),
+                              lty = "dashed")
+              invisible(grDevices::dev.off())
+            } else {
+              if (include_collated) {
+                filename <- sprintf("total_impacts%s%s.png", ic[1], ac[1])
+                main_title <- sprintf("Total impacts%s%s", ic[2], ac[2])
+              } else {
+                filename <- sprintf("impacts%s%s.png", ic[1], ac[1])
+                main_title <- sprintf("Impacts%s%s", ic[2], ac[2])
+              }
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values, type = "l",
+                             main = main_title,
+                             xlab = plot_x_label,
+                             ylab = sprintf("Impact (%s)", units),
+                             ylim = c(0, 1.1*max(values)))
+              invisible(grDevices::dev.off())
+            }
           }
         }
       }
     }
 
-    # Plot action totals when present
+    # Plot actions when present
     if (length(actions) > 0) {
-      totals_present <- sapply(results$actions, function(i) is.list(i$total))
-      if (any(totals_present)) {
+      if (!is.null(names(results$actions))) {
+        action_i <- names(results$actions)    # named actions
+      } else {
+        action_i <- 1:length(results$actions) # indices
+      }
+      for (i in action_i) {
 
-        # Plots for each action present
-        if (!is.null(names(results$actions))) {
-          action_i <- names(results$actions)    # named actions
+        # Plot action totals/values at each time step
+        if (length(action_i) == 1 && is.numeric(i)) {
+          ic <- c("", "")
         } else {
-          action_i <- 1:length(results$actions) # indices
+          ic <- c(paste0("_", i), paste0(" : ", i))
         }
-        for (i in action_i[totals_present]) {
+        # units <- actions[[i]]$get_context()$get_action_measures()
+        a_lab <- actions[[which(action_i == i)]]$get_label()
+        direct_action <- (a_lab %in% c("detected", "control_search_destroy",
+                                       "removed"))
 
-          # Plot action totals at each time step
-          if (length(action_i) == 1 && is.numeric(i)) {
-            ic <- c("", "")
-          } else {
-            ic <- c(paste0("_", i), paste0(" : ", i))
-          }
-          # units <- actions[[i]]$get_context()$get_action_measures()
-          a_lab <- actions[[which(action_i == i)]]$get_label()
-          direct_action <- (a_lab %in% c("detected", "control_search_destroy",
-                                         "removed"))
+        # Resolve the number of (combined) stages used in the results
+        result_stages <- stages
+        if (is.null(stages) || is.numeric(combine_stages) || !direct_action) {
+          result_stages <- 1
+        }
 
-          # Resolve the number of (combined) stages used in the results
-          result_stages <- stages
-          if (is.null(stages) || is.numeric(combine_stages) ||
-              !direct_action) {
-            result_stages <- 1
-          }
-
-          # Stage label for plot headings and files
-          stage_label <- ""
-          stage_file <- ""
-          if (population_model$get_type() == "stage_structured" &&
-              direct_action) {
-            if (is.numeric(stages) && is.null(combine_stages)) {
-              stage_label <- paste0(stage_labels, " ")
-              stage_file <- paste0("_stage_", 1:result_stages)
-            } else if (is.numeric(combine_stages)) {
-              if (length(combine_stages) == 1) {
-                stage_label <- paste0(
-                  attr(population_model$get_growth(),
-                       "labels")[combine_stages], " ")
-              } else {
-                stage_label <- paste0(sprintf(
-                  "stages %s-%s", min(combine_stages), max(combine_stages)),
-                  " ")
-              }
+        # Stage label for plot headings and files
+        stage_label <- ""
+        stage_file <- ""
+        if (population_model$get_type() == "stage_structured" &&
+            direct_action) {
+          if (is.numeric(stages) && is.null(combine_stages)) {
+            stage_label <- paste0(stage_labels, " ")
+            stage_file <- paste0("_stage_", 1:result_stages)
+          } else if (is.numeric(combine_stages)) {
+            if (length(combine_stages) == 1) {
+              stage_label <- paste0(
+                attr(population_model$get_growth(),
+                     "labels")[combine_stages], " ")
+            } else {
+              stage_label <- paste0(sprintf(
+                "stages %s-%s", min(combine_stages), max(combine_stages)),
+                " ")
             }
           }
+        }
 
-          # Plot per result stage
-          for (s in 1:result_stages) {
+        # Plot per result stage
+        for (s in 1:result_stages) {
 
-            # Plot action totals for result stage
-            if (replicates > 1) {
-              totals <- sapply(results$actions[[i]]$total,
+          # Plot action totals/values for result stage
+          if (include_collated) {
+            a <- "total"
+          } else {
+            a <- a_lab
+          }
+          if (replicates > 1) {
+            if (include_collated || direct_action) {
+              values <- sapply(results$actions[[i]][[a]],
                                function(tot) as.data.frame(
                                  lapply(tot, function(m) m[s])))
             } else {
-              totals <- sapply(results$actions[[i]]$total,
-                               function(tot) tot[s])
+              values <- t(as.matrix(sapply(results$actions[[i]][[a]],
+                                           function(tot) tot$mean[s])))
+              rownames(values) <- "mean"
             }
-            if (replicates > 1) { # plot summary mean +/- 2 SD
-              totals <- list(mean = as.numeric(totals["mean",,drop = FALSE]),
-                             sd = as.numeric(totals["sd",,drop = FALSE]))
-              if (region$spatially_implicit()) {
-                filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
-                                    stage_file[s])
+          } else {
+            values <- sapply(results$actions[[i]][[a]],
+                             function(tot) tot[s])
+          }
+          if (replicates > 1) { # plot summary mean +/- 2 SD
+            if (include_collated || direct_action) {
+              values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                             sd = as.numeric(values["sd",,drop = FALSE]))
+            } else {
+              values <- list(mean = as.numeric(values["mean",,drop = FALSE]))
+            }
+            if (include_collated) {
+              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
+                                  stage_file[s])
+              main_title <- sprintf("Total actions%s %s%s (mean +/- 2 SD)",
+                                    ic[2], stage_label[s], a_lab)
+            } else {
+              filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
+                                  stage_file[s])
+              if (direct_action) {
                 main_title <- sprintf("Actions%s %s%s (mean +/- 2 SD)", ic[2],
                                       stage_label[s], a_lab)
               } else {
-                filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
-                                    stage_file[s])
-                main_title <- sprintf("Total actions%s %s%s (mean +/- 2 SD)",
-                                      ic[2], stage_label[s], a_lab)
-              }
-              grDevices::png(filename = filename, width = width,
-                             height = height)
-              graphics::plot(0:time_steps, totals$mean, type = "l",
-                             main = main_title,
-                             xlab = plot_x_label,
-                             ylab = sprintf("Number %s", a_lab),
-                             ylim = c(0, 1.1*max(totals$mean + 2*totals$sd)))
-              graphics::lines(0:time_steps, totals$mean + 2*totals$sd,
-                              lty = "dashed")
-              graphics::lines(0:time_steps,
-                              pmax(0, totals$mean - 2*totals$sd),
-                              lty = "dashed")
-              invisible(grDevices::dev.off())
-            } else {
-              if (region$spatially_implicit()) {
-                filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
-                                    stage_file[s])
-                main_title <- sprintf("Actions%s %s%s", ic[2], stage_label[s],
-                                      a_lab)
-              } else {
-                filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
-                                    stage_file[s])
-                main_title <- sprintf("Total actions%s %s%s", ic[2],
+                main_title <- sprintf("Actions%s %s%s (mean)", ic[2],
                                       stage_label[s], a_lab)
               }
-              grDevices::png(filename = filename, width = width,
-                             height = height)
-              graphics::plot(0:time_steps, totals, type = "l",
-                             main = main_title,
-                             xlab = plot_x_label,
-                             ylab = sprintf("Number %s", a_lab),
-                             ylim = c(0, 1.1*max(totals)))
-              invisible(grDevices::dev.off())
             }
+            if (include_collated || direct_action) {
+              ylim <- c(0, 1.1*max(values$mean + 2*values$sd))
+            } else {
+              ylim <- c(0, 1.1*max(values$mean))
+            }
+            grDevices::png(filename = filename, width = width, height = height)
+            graphics::plot(0:time_steps, values$mean, type = "l",
+                           main = main_title,
+                           xlab = plot_x_label,
+                           ylab = sprintf("Number %s", a_lab),
+                           ylim = ylim)
+            if (include_collated || direct_action) {
+              graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                              lty = "dashed")
+              graphics::lines(0:time_steps,
+                              pmax(0, values$mean - 2*values$sd),
+                              lty = "dashed")
+            }
+            invisible(grDevices::dev.off())
+          } else {
+            if (include_collated) {
+              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
+                                  stage_file[s])
+              main_title <- sprintf("Total actions%s %s%s", ic[2],
+                                    stage_label[s], a_lab)
+            } else {
+              filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
+                                  stage_file[s])
+              main_title <- sprintf("Actions%s %s%s", ic[2], stage_label[s],
+                                    a_lab)
+            }
+            grDevices::png(filename = filename, width = width,
+                           height = height)
+            graphics::plot(0:time_steps, values, type = "l",
+                           main = main_title,
+                           xlab = plot_x_label,
+                           ylab = sprintf("Number %s", a_lab),
+                           ylim = c(0, 1.1*max(values)))
+            invisible(grDevices::dev.off())
           }
         }
       }
