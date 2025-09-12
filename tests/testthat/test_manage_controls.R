@@ -157,7 +157,8 @@ test_that("applies stochastic controls to invasive population", {
   expect_named(new_n, names(n))
   expect_equal(attr(new_n, "detected"), detected)
   expect_equal(as.numeric(attr(new_n, "control_growth")),
-               (exist_mask | detected_mask)*0.7)
+               ((exist_mask | detected_mask)*0.7 +
+                  !(exist_mask | detected_mask)))
   expect_equal(attr(attr(new_n, "control_growth"), "stages"), 2:3)
   expect_equal(attr(attr(new_n, "control_growth"), "apply_to"), "survival")
 })

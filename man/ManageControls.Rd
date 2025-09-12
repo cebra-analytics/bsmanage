@@ -55,11 +55,12 @@ of growth, spread, or establishment.}
 \item{control_mult}{Control multipliers or rates required for control types
 \code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be a
 single value (0-1), or vector of values for each location specified by
-the \code{region}. Control multipliers are applied to reduce or suppress
-growth, spread, or establishment at existing, known, or scheduled
-treatment locations (when specified via \code{"control_design"}), and at
-locations (and optionally surroundings) where the invasive species has
-been detected (when specified via a population attribute).}
+the \code{region}. Control multipliers are applied to reduce (with values
+< 1) or suppress (with values = 0) growth, spread, or establishment at
+existing, known, or scheduled treatment locations (when specified via
+\code{"control_design"}), and at locations (and optionally surroundings)
+where the invasive species has been detected (when specified via a
+population attribute).}
 
 \item{radius}{Optional radius (m) of the applied control for types
 \code{"growth"}, \code{"spread"}, or \code{"establishment"} only.

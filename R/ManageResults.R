@@ -392,7 +392,7 @@ ManageResults.Region <- function(region, population_model,
         # Binarize growth, spread, & establishment control (indirect actions)
         if (a %in%  c("control_growth", "control_spread",
                       "control_establishment")) {
-          n_a <- +(n_a > 0)
+          n_a <- +(n_a < 1)
         }
 
         # Shape total when population is staged

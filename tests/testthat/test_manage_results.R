@@ -228,7 +228,7 @@ test_that("collates and finalizes action results", {
   # single replicate
   expected_collated <- lapply(actions, function(a) { # HERE
     if (a$get_label() == "control_growth") {
-      n_a <- +(attr(n, a$get_label()) > 0)
+      n_a <- +(attr(n, a$get_label()) < 1)
     } else {
       n_a <- attr(n, a$get_label())
     }
@@ -278,7 +278,7 @@ test_that("collates and finalizes action results", {
   n <- actions$a5$apply(n, 4); n_r2[[3]] <- n
   collated_r <- lapply(n_r, function(n) lapply(actions, function(a) {
     if (a$get_label() == "control_growth") {
-      n_a <- +(attr(n, a$get_label()) > 0)
+      n_a <- +(attr(n, a$get_label()) < 1)
     } else {
       n_a <- attr(n, a$get_label())
     }
@@ -395,7 +395,7 @@ test_that("collates and finalizes action results", {
   n <- actions$a5$apply(n, 4); n_r2[[3]] <- n
   collated_r <- lapply(n_r, function(n) lapply(actions, function(a) {
     if (a$get_label() == "control_growth") {
-      n_a <- +(attr(n, a$get_label()) > 0)
+      n_a <- +(attr(n, a$get_label()) < 1)
     } else {
       n_a <- as.numeric(attr(n, a$get_label()))
     }

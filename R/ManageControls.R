@@ -23,11 +23,12 @@
 #' @param control_mult Control multipliers or rates required for control types
 #'   \code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be a
 #'   single value (0-1), or vector of values for each location specified by
-#'   the \code{region}. Control multipliers are applied to reduce or suppress
-#'   growth, spread, or establishment at existing, known, or scheduled
-#'   treatment locations (when specified via \code{"control_design"}), and at
-#'   locations (and optionally surroundings) where the invasive species has
-#'   been detected (when specified via a population attribute).
+#'   the \code{region}. Control multipliers are applied to reduce (with values
+#'   < 1) or suppress (with values = 0) growth, spread, or establishment at
+#'   existing, known, or scheduled treatment locations (when specified via
+#'   \code{"control_design"}), and at locations (and optionally surroundings)
+#'   where the invasive species has been detected (when specified via a
+#'   population attribute).
 #' @param radius Optional radius (m) of the applied control for types
 #'   \code{"growth"}, \code{"spread"}, or \code{"establishment"} only.
 #'   Control is applied to all surrounding locations within the specified
@@ -200,8 +201,8 @@ ManageControls.Region <- function(region, population_model,
     # Growth, spread, or establishment control
     if (control_type %in% c("growth", "spread", "establishment")) {
 
-      # Initial zero suppressions
-      n_apply <- rep(0, region$get_locations())
+      # Initial no application locations
+      n_apply <- rep(FALSE, region$get_locations())
 
       # Scheduled time step?
       if (is.null(schedule) || tm %in% schedule) {
@@ -215,7 +216,7 @@ ManageControls.Region <- function(region, population_model,
           if (length(idx) > 0) {
 
             # Get control application locations
-            n_apply[idx] <- +(control_design$get_allocation()[idx] > 0)
+            n_apply[idx] <- control_design$get_allocation()[idx] > 0
           }
         }
 
@@ -235,13 +236,13 @@ ManageControls.Region <- function(region, population_model,
 
           # Set/update control locations
           if (length(idx) > 0) {
-            n_apply[idx] <- 1
+            n_apply[idx] <- TRUE
           }
         }
       }
 
       # Add control as attributes to process in growth or spread models
-      attr(n, self$get_label()) <- n_apply*control_mult
+      attr(n, self$get_label()) <- n_apply*control_mult + !n_apply
       if (population_model$get_type() == "stage_structured") {
         if (control_type == "growth") {
           attr(attr(n, self$get_label()), "stages") <- self$get_stages()
