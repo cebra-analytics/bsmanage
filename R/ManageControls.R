@@ -165,7 +165,8 @@ ManageControls.Region <- function(region, population_model,
       if (is.null(schedule) || tm %in% schedule) {
 
         # Occupied locations
-        idx <- which(rowSums(as.matrix(n)[,self$get_stages()]) > 0)
+        idx <- which(rowSums(
+          as.matrix(n)[,self$get_stages(), drop = FALSE]) > 0)
         if (length(idx) > 0) {
 
           # Get control effectiveness (probability)
@@ -212,7 +213,8 @@ ManageControls.Region <- function(region, population_model,
             !is.null(control_design$get_allocation())) {
 
           # Occupied locations
-          idx <- which(rowSums(as.matrix(n)[,self$get_stages()]) > 0)
+          idx <- which(rowSums(
+            as.matrix(n)[,self$get_stages(), drop = FALSE]) > 0)
           if (length(idx) > 0) {
 
             # Get control application locations
@@ -230,8 +232,8 @@ ManageControls.Region <- function(region, population_model,
           if (is.numeric(radius) && length(idx) > 0 &&
               region$get_type() %in% c("grid", "patch")) {
             idx <- region$get_nearby(idx, radius)
-            idx <- idx[which(
-              rowSums(as.matrix(n)[,self$get_stages()])[idx] > 0)]
+            idx <- idx[which(rowSums(
+              as.matrix(n)[,self$get_stages(), drop = FALSE])[idx] > 0)]
           }
 
           # Set/update control locations
