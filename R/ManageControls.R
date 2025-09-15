@@ -232,8 +232,10 @@ ManageControls.Region <- function(region, population_model,
           if (is.numeric(radius) && length(idx) > 0 &&
               region$get_type() %in% c("grid", "patch")) {
             idx <- region$get_nearby(idx, radius)
-            idx <- idx[which(rowSums(
-              as.matrix(n)[,self$get_stages(), drop = FALSE])[idx] > 0)]
+            if (control_type %in% c("growth", "spread")) { # occupied only
+              idx <- idx[which(rowSums(
+                as.matrix(n)[,self$get_stages(), drop = FALSE])[idx] > 0)]
+            }
           }
 
           # Set/update control locations

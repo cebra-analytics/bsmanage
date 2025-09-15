@@ -161,4 +161,20 @@ test_that("applies stochastic controls to invasive population", {
                   !(exist_mask | detected_mask)))
   expect_equal(attr(attr(new_n, "control_growth"), "stages"), 2:3)
   expect_equal(attr(attr(new_n, "control_growth"), "apply_to"), "survival")
+  establish_mask <- +(rowSums(detected) > 0 | NA)
+  establish_mask <- terra::buffer(region$get_rast(establish_mask),
+                                  width = 3000)[region$get_indices()][,1] > 0
+  expect_silent(
+    manage_controls <- ManageControls(region, population_model,
+                                      control_type = "establishment",
+                                      control_design = control_design,
+                                      radius = 3000,
+                                      control_mult = 0.7,
+                                      stages = 2:3,
+                                      apply_to = "survival",
+                                      schedule = 4:6))
+  expect_silent(new_n <- manage_controls$apply(n, 4))
+  expect_equal(attr(new_n, "control_establishment"),
+               ((exist_mask | establish_mask)*0.7 +
+                  !(exist_mask | establish_mask)))
 })
