@@ -150,7 +150,8 @@ ManageRemovals.Region <- function(region, population_model,
       if ("detected" %in% names(attributes(n)) && is.numeric(radius) &&
           length(idx) > 0 && region$get_type() %in% c("grid", "patch")) {
         idx <- region$get_nearby(idx, radius)
-        idx <- idx[which(rowSums(as.matrix(n)[,self$get_stages()])[idx] > 0)]
+        idx <- idx[which(rowSums(
+          as.matrix(n)[,self$get_stages(), drop = FALSE])[idx] > 0)]
       }
 
       # Sample and apply removals
