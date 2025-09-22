@@ -28,11 +28,15 @@ test_that("initializes with impacts, populations and impact stages", {
   expect_error(manage_impacts <- ManageImpacts(impacts, population_model,
                                                calc_total = 1),
                "Calculate total indicator should be logical.")
+  expect_error(manage_impacts <- ManageImpacts(impacts, population_model,
+                                               recovery_delay = "1"),
+               "Recover delay should a number >= 0.")
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
                                                 impact_stages = 2:3))
   expect_is(manage_impacts, "ManageImpacts")
   expect_named(manage_impacts, c("get_context", "get_calc_total",
-                                 "includes_combined", "calculate"))
+                                 "includes_combined", "update_recovery_delay",
+                                 "calculate"))
   expect_is(manage_impacts$get_context(), "Context")
   expect_true(manage_impacts$includes_combined())
   expect_true(manage_impacts$get_calc_total())

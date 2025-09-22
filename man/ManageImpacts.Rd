@@ -9,6 +9,7 @@ ManageImpacts(
   population_model,
   impact_stages = NULL,
   calc_total = NULL,
+  recovery_delay = NULL,
   ...
 )
 }
@@ -31,6 +32,11 @@ valuation type is \code{"monetary"}. Set to \code{TRUE} if it makes sense
 to sum total \code{"non-monetary"} or \code{"ranking"} impact valuations
 across region locations (providing multiple aspects can be combined).}
 
+\item{recovery_delay}{Number of simulation time steps that incursion impacts
+continue to be in effect at previously occupied locations before the
+asset value at the locations recover. Only available for spatially
+explicit grid or network models. Default \code{NULL} assumes no delay.}
+
 \item{...}{Additional parameters.}
 }
 \value{
@@ -39,6 +45,8 @@ getting the impact context and performing impact calculations:
 \describe{
 \item{\code{get_context()}}{Get \code{bsimpact::Context} object.}
 \item{\code{get_calc_total()}}{Get calculate total indicator.}
+\item{\code{update_recovery_delay(n)}}{Update the recovery delay
+attribute attached to the population vector.}
 \item{\code{includes_combined()}}{Logical indicator for when impacts are
 combined.}
 \item{\code{calculate(n, tm)}}{Perform impact calculations resulting
