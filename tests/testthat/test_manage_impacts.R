@@ -108,6 +108,81 @@ test_that("calculates impacts including combined", {
   expect_equal(calc_impacts, expected_impacts)
 })
 
+test_that("updates recovery delay to prolong impacts", {
+  TEST_DIRECTORY <- test_path("test_inputs")
+  template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
+  region <- bsspread::Region(template*0)
+  context <- bsimpact::Context("My species",
+                               impact_scope = c("aspect1", "aspect2"))
+  incursion <- bsimpact::Incursion(template*0, region)
+  aspects <- list(aspect1 = "aspect1", aspect2 = "aspect2")
+  impact_layers <- list(aspect1 = 100*(template > 0.1 & template < 0.4),
+                        aspect2 = 200*(template > 0.3))
+  loss_rates = c(aspect1 = 0.3, aspect2 = 0.4)
+  impacts <- bsimpact::ValueImpacts(context, region, incursion,
+                                    impact_layers, loss_rates = loss_rates)
+  impacts$set_id(3)
+  population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
+  n <- rep(0, region$get_locations())
+  n[5901:6000] <- round(runif(100, 1, 10))
+  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
+                                                recovery_delay = 2))
+  expected_impacts <- lapply(aspects, function(l) {
+    impact_incursion <- +(n > 0)
+    (impact_incursion*impact_layers[[l]][region$get_indices()][,1]*
+        loss_rates[l])
+  })
+  expected_impacts$combined <-
+    expected_impacts$aspect1 + expected_impacts$aspect2
+  expected_recovery_delay <- (n > 0)*2
+  idx <- 1:region$get_locations()
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 0))
+  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_equal(lapply(calc_impacts, function(impact) impact[idx]),
+               lapply(expected_impacts, function(impact) impact[idx]))
+  expect_equal(attr(n, "recovery_delay")[[3]][idx],
+               expected_recovery_delay[idx])
+  n[5901:5910] <- 0
+  expected_recovery_delay[5901:5910] <- 1
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 1))
+  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_equal(lapply(calc_impacts, function(impact) impact[idx]),
+               lapply(expected_impacts, function(impact) impact[idx]))
+  expect_equal(attr(n, "recovery_delay")[[3]][idx],
+               expected_recovery_delay[idx])
+  n[5911:5930] <- 0
+  expected_recovery_delay[5901:5930] <- expected_recovery_delay[5901:5930] - 1
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 2))
+  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_equal(lapply(calc_impacts, function(impact) impact[idx]),
+               lapply(expected_impacts, function(impact) impact[idx]))
+  expect_equal(attr(n, "recovery_delay")[[3]][idx],
+               expected_recovery_delay[idx])
+  expected_impacts <- lapply(expected_impacts, function(impact) {
+    impact[5901:5910] <- 0
+    impact
+  })
+  expected_recovery_delay[5911:5930] <- expected_recovery_delay[5911:5930] - 1
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 3))
+  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_equal(lapply(calc_impacts, function(impact) impact[idx]),
+               lapply(expected_impacts, function(impact) impact[idx]))
+  expect_equal(attr(n, "recovery_delay")[[3]][idx],
+               expected_recovery_delay[idx])
+  n[5921:5930] <- round(runif(10, 1, 10))
+  expected_impacts <- lapply(expected_impacts, function(impact) {
+    impact[5911:5920] <- 0
+    impact
+  })
+  expected_recovery_delay[5921:5930] <- 2
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
+  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_equal(lapply(calc_impacts, function(impact) impact[idx]),
+               lapply(expected_impacts, function(impact) impact[idx]))
+  expect_equal(attr(n, "recovery_delay")[[3]][idx],
+               expected_recovery_delay[idx])
+})
+
 test_that("calculates spatially implicit impacts via area occupied", {
   context <- bsimpact::Context("My species",
                                impact_scope = c("aspect1", "aspect2"))
