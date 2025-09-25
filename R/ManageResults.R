@@ -296,6 +296,7 @@ ManageResults.Region <- function(region, population_model,
 
     # Collate population results (without action attributes)
     n_no_attr <- n
+    attr(n_no_attr, "recovery_delay") <- NULL
     for (a in actions) {
       attr(n_no_attr, a$get_label()) <- NULL
     }

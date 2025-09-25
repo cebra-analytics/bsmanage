@@ -263,6 +263,9 @@ ManageSimulator.Region <- function(region,
         calc_impacts <- lapply(impacts, function(impacts_i) {
           impacts_i$calculate(n, 0)
         })
+        for (impacts_i in impacts) {
+          n <- impacts_i$update_recovery_delay(n)
+        }
       } else {
         calc_impacts <- NULL
       }
@@ -303,6 +306,9 @@ ManageSimulator.Region <- function(region,
           calc_impacts <- lapply(impacts, function(impacts_i) {
             impacts_i$calculate(n, tm)
           })
+          for (impacts_i in impacts) {
+            n <- impacts_i$update_recovery_delay(n)
+          }
         }
 
         # Apply actions
