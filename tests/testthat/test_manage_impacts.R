@@ -209,10 +209,44 @@ test_that("calculates spatially implicit impacts via area occupied", {
   attr(n, "spread_area") <- 50
   expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
   expect_named(calc_impacts, c("aspect1", "aspect2", "combined"))
-  expect_equal(lapply(calc_impacts, as.numeric),
-               list(aspect1 = 100*50*0.3,
-                    aspect2 = 200*50*0.4,
-                    combined = 100*50*0.3 + 200*50*0.4))
+  expect_equal(calc_impacts, list(aspect1 = 100*50*0.3, aspect2 = 200*50*0.4,
+                                  combined = 100*50*0.3 + 200*50*0.4))
+  # with spread delay
+  impacts$set_id(3)
+  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
+                                                impact_stages = 2:3,
+                                                recovery_delay = 2))
+  n <- initializer$initialize()
+  attr(n, "spread_area") <- 50
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 0))
+  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_equal(calc_impacts, list(aspect1 = 100*50*0.3, aspect2 = 200*50*0.4,
+                                  combined = 100*50*0.3 + 200*50*0.4))
+  attr(n, "recovery_delay")[[3]] ; 2
+  attr(attr(n, "recovery_delay"), "incursions") ; 50
+  attr(n, "spread_area") <- 30
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 1))
+  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_equal(calc_impacts, list(aspect1 = 100*50*0.3, aspect2 = 200*50*0.4,
+                                  combined = 100*50*0.3 + 200*50*0.4))
+  attr(n, "recovery_delay")[[3]] ; 2
+  attr(attr(n, "recovery_delay"), "incursions") ; c(30, 50)
+  n[,2:3] <- 0
+  attr(n, "spread_area") <- 20
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 2))
+  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_equal(calc_impacts, list(aspect1 = 100*50*0.3, aspect2 = 200*50*0.4,
+                                  combined = 100*50*0.3 + 200*50*0.4))
+  attr(n, "recovery_delay")[[3]] ; 2
+  attr(attr(n, "recovery_delay"), "incursions") ; c(0, 30, 50)
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 3))
+  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_equal(calc_impacts, list(aspect1 = 100*30*0.3, aspect2 = 200*30*0.4,
+                                  combined = 100*30*0.3 + 200*30*0.4))
+  attr(n, "recovery_delay")[[3]] ; 2
+  attr(attr(n, "recovery_delay"), "incursions") ; c(0, 0, 30, 50)
+  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
+  expect_equal(calc_impacts, list(aspect1 = 0, aspect2 = 0, combined = 0))
 })
 
 

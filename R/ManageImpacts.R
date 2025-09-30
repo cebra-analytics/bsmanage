@@ -101,6 +101,23 @@ ManageImpacts <- function(impacts, population_model,
     return("combined_impacts" %in% names(impacts))
   }
 
+  # Calculate spatially implicit area-based incursion (internal)
+  calculate_area_incursion <- function(n) {
+
+    # Get total area occupied
+    if (is.numeric(attr(n, "diffusion_radius"))) {
+      total_area <- pi*(attr(n, "diffusion_radius"))^2
+    } else if (is.numeric(attr(n, "spread_area"))) {
+      total_area <- attr(n, "spread_area")
+    } else {
+      stop(paste("Cannot calculate spatially implicit impacts without area",
+                 "occupied."), call. = FALSE)
+    }
+
+    # Return total area occupied when population is present, else zero
+    return((sum(n[impact_stages]) > 0)*total_area)
+  }
+
   # Update recovery delay
   self$update_recovery_delay <- function(n) {
     if (is.numeric(recovery_delay)) {
@@ -109,21 +126,25 @@ ManageImpacts <- function(impacts, population_model,
           length(attr(n, "recovery_delay")) >= id &&
           is.numeric(attr(n, "recovery_delay")[[id]])) {
 
-        # Occurrence and recovery delay locations
-        idx <- which(rowSums(as.matrix(n)[,impact_stages, drop = FALSE]) > 0)
-        delay_idx <- which(attr(n, "recovery_delay")[[id]] > 0)
+        # Update for presence incursions
+        if (impacts$get_incursion()$get_type() == "presence") {
 
-        # Decrement delay where population removed or extirpated
-        if (any(!delay_idx %in% idx)) {
-          decr_idx <- delay_idx[which(!delay_idx %in% idx)]
-          attr(n, "recovery_delay")[[id]][decr_idx] <-
-            attr(n, "recovery_delay")[[id]][decr_idx] - 1
-        }
+          # Occurrence and recovery delay locations
+          idx <- which(rowSums(as.matrix(n)[,impact_stages, drop = FALSE]) > 0)
+          delay_idx <- which(attr(n, "recovery_delay")[[id]] > 0)
 
-        # Set recovery for new occurrences
-        if (any(!idx %in% delay_idx)) {
-          new_idx <- idx[which(!idx %in% delay_idx)]
-          attr(n, "recovery_delay")[[id]][new_idx] <- recovery_delay
+          # Decrement delay where population removed or extirpated
+          if (any(!delay_idx %in% idx)) {
+            decr_idx <- delay_idx[which(!delay_idx %in% idx)]
+            attr(n, "recovery_delay")[[id]][decr_idx] <-
+              attr(n, "recovery_delay")[[id]][decr_idx] - 1
+          }
+
+          # Set recovery for new occurrences
+          if (any(!idx %in% delay_idx)) {
+            new_idx <- idx[which(!idx %in% delay_idx)]
+            attr(n, "recovery_delay")[[id]][new_idx] <- recovery_delay
+          }
         }
       } else {
         if (!is.list(attr(n, "recovery_delay"))) {
@@ -133,6 +154,14 @@ ManageImpacts <- function(impacts, population_model,
           (+(rowSums(as.matrix(n)[,impact_stages, drop = FALSE]) > 0)*
              recovery_delay)
       }
+
+      # Attach area-based incursions when spatially explicit
+      if (population_model$get_region()$spatially_implicit() &&
+          impacts$get_incursion()$get_type() == "area") {
+        attr(attr(n, "recovery_delay"), "incursions") <-
+          c(calculate_area_incursion(n),
+            attr(attr(n, "recovery_delay"), "incursions"))
+      }
     }
     return(n)
   }
@@ -140,30 +169,15 @@ ManageImpacts <- function(impacts, population_model,
   # Calculate impacts
   self$calculate <- function(n, tm) {
 
-    # Use area-based impacts for spatially implicit regions
-    if (population_model$get_region()$spatially_implicit()) {
-      if (is.numeric(attr(n, "diffusion_radius"))) {
-        total_area <- pi*(attr(n, "diffusion_radius"))^2
-      } else if (is.numeric(attr(n, "spread_area"))) {
-        total_area <- attr(n, "spread_area")
-      } else {
-        stop(paste("Cannot calculate spatially implicit impacts without area",
-                   "occupied."), call. = FALSE)
-      }
-    }
-
     # Check for recovery delay
     recovery_delay <- attr(n, "recovery_delay")
 
-    # Combine impact stage populations
-    if (population_model$get_type() == "stage_structured") {
+    # Calculate incursion values
+    if (population_model$get_region()$spatially_implicit() &&
+        impacts$get_incursion()$get_type() == "area") {
+      n <- calculate_area_incursion(n)
+    } else if (population_model$get_type() == "stage_structured") {
       n <- rowSums(n[,impact_stages, drop = FALSE])
-    }
-
-    # Use total area occupied when spatially implicit when impacting
-    # population is present
-    if (population_model$get_region()$spatially_implicit()) {
-      n <- (sum(n) > 0)*total_area
     }
 
     # Re-attach recovery delay
