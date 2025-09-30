@@ -15,8 +15,9 @@
 #' @param stages Numeric vector of population stages (indices) to which
 #'   management detection are applied. Default is all stages (when set to
 #'   \code{NULL}).
-#' @param schedule Vector of discrete simulation time steps in which to apply
-#'   management detection. Default is all time steps (when set to \code{NULL}).
+#' @param schedule Vector of discrete simulation time steps (t = 0, 1, 2, ...)
+#'   in which to apply management detection. Default is all time steps (when
+#'   set to \code{NULL}).
 #' @param ... Additional parameters.
 #' @return A \code{ManageDetection} class object (list) containing a function
 #'   for accessing attributes and applying simulated management detection:

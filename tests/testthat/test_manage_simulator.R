@@ -55,7 +55,7 @@ test_that("runs simulator with correct configuration", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
   region <- bsspread::Region(template)
-  template[region$get_indices()][5922,] <- 0.25
+  template[region$get_indices()][5920:5922,] <- c(0.25, 0.5, 1)
   template_vect <- template[region$get_indices()][,1]
   population_model <- bsspread::UnstructPopulation(region, growth = 2)
   population_model_grow <- population_model$grow
@@ -75,21 +75,22 @@ test_that("runs simulator with correct configuration", {
         max(c(attr(n$relocated, "dispersal"), 0) + 1))
     dispersal_disperse(n, tm)
   }
-  incursion <- bsimpact::Incursion(template*0, region, type = "density")
-  impacts <- list(ManageImpacts(
-    bsimpact::ValueImpacts(bsimpact::Context("test",
-                                             impact_scope = "aspect1"),
+  incursion <- bsimpact::Incursion(template*0, region, type = "presence")
+  impacts <- list(
+    bsimpact::ValueImpacts(bsimpact::Context("test", impact_scope = "aspect1"),
                            region, incursion,
                            impact_layers = list(aspect1 = 100*template),
                            loss_rates = c(aspect1 = 0.5)),
-    population_model),
-    ManageImpacts(
-      bsimpact::ValueImpacts(bsimpact::Context("test",
-                                               impact_scope = "aspect2"),
-                             region, incursion,
-                             impact_layers = list(aspect2 = 200*template),
-                             loss_rates = c(aspect2 = 0.7)),
-      population_model))
+    bsimpact::ValueImpacts(bsimpact::Context("test", impact_scope = "aspect2"),
+                           region, incursion,
+                           impact_layers = list(aspect2 = 200*template),
+                           loss_rates = c(aspect2 = 0.7)))
+  for (i in 1:2) {
+    impacts[[i]]$set_id(i)
+  }
+  impacts <- list(
+    ManageImpacts(impacts[[1]], population_model),
+    ManageImpacts(impacts[[2]], population_model, recovery_delay = 2))
   surveillance <-
     bsdesign::SpatialSurvDesign(context = bsdesign::Context("test"),
                                 divisions = bsdesign::Divisions(template),
@@ -135,23 +136,29 @@ test_that("runs simulator with correct configuration", {
                list(list(aspect1 = 3, combined = 3, total = 5),
                     list(aspect2 = 3, combined = 3, total = 5)))
   expect_named(results_list$impacts[[1]]$aspect1, as.character(seq(0, 4, 2)))
+  impact_mask <- unname(results_list$occupancy)
+  impact_mask[[1]] <- +(initial_n > 0) # impacts before removal
   expect_equal(unname(results_list$impacts[[1]]$aspect1),
-               lapply(1:3, function (n) (initial_n > 0)*template_vect*100*0.5))
+               lapply(1:3, function (i)
+                 (initial_n > 0)*template_vect*100*0.5*impact_mask[[i]]))
   expect_named(results_list$impacts[[2]]$aspect2, as.character(seq(0, 4, 2)))
+  impact_mask[[2]] <- impact_mask[[1]] # delayed impacts
   expect_equal(unname(results_list$impacts[[2]]$aspect2),
-               lapply(1:3, function (n) (initial_n > 0)*template_vect*200*0.7))
+               lapply(1:3, function (i)
+                 (initial_n > 0)*template_vect*200*0.7*impact_mask[[i]]))
+
   expect_length(results_list$actions, 2)
   expect_equal(lapply(results_list$actions, function(i) lapply(i, length)),
                list(list(detected = 3, total = 5),
                     list(removed = 3, total = 5)))
   expect_named(results_list$actions[[1]]$detected, as.character(seq(0, 4, 2)))
+  action_mask <- unname(lapply(results_list$occupancy, function(n) n > 0))
+  action_mask[[1]] <- initial_n > 0 # detection before removal
   expect_equal(unname(lapply(results_list$actions[[1]]$detected,
-                             function(n) n > 0)),
-               lapply(1:3, function (n) (initial_n > 0)))
+                             function(n) n > 0)), action_mask)
   expect_named(results_list$actions[[2]]$removed, as.character(seq(0, 4, 2)))
   expect_equal(unname(lapply(results_list$actions[[2]]$removed,
-                             function(n) n > 0)),
-               lapply(1:3, function (n) (initial_n > 0)))
+                             function(n) n > 0)), action_mask)
   expect_equal(results_list$population[["0"]],
                initial_n - results_list$actions[[2]]$removed[["0"]])
 })

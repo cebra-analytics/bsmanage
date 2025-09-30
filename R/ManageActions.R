@@ -14,8 +14,9 @@
 #' @param stages Numeric vector of population stages (indices) to which
 #'   management actions are applied. Default is all stages (when set to
 #'   \code{NULL}).
-#' @param schedule Vector of discrete simulation time steps in which to apply
-#'   management actions. Default is all time steps (when set to \code{NULL}).
+#' @param schedule Vector of discrete simulation time steps (t = 0, 1, 2, ...)
+#'   in which to apply management actions. Default is all time steps (when set
+#'   to \code{NULL}).
 #' @param ... Additional parameters.
 #' @return A \code{ManageActions} class object (list) containing a function for
 #'   applying simulated management actions:

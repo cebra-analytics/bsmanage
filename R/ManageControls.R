@@ -45,8 +45,9 @@
 #'   control is applied to both reproduction and survival. The \code{stages}
 #'   and \code{apply_to} parameters may be utilised together, for example, to
 #'   control the seasonal survival rates of specified life stages.
-#' @param schedule Vector of discrete simulation time steps in which to apply
-#'   management controls. Default is all time steps (when set to \code{NULL}).
+#' @param schedule Vector of discrete simulation time steps (t = 0, 1, 2, ...)
+#'   in which to apply management controls. Default is all time steps (when
+#'   set to \code{NULL}).
 #' @param ... Additional parameters.
 #' @return A \code{ManageControls} class object (list) containing a function
 #'   for accessing attributes and applying simulated management controls:

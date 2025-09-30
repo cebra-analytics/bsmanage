@@ -40,8 +40,9 @@ detection sensitivities.}
 management detection are applied. Default is all stages (when set to
 \code{NULL}).}
 
-\item{schedule}{Vector of discrete simulation time steps in which to apply
-management detection. Default is all time steps (when set to \code{NULL}).}
+\item{schedule}{Vector of discrete simulation time steps (t = 0, 1, 2, ...)
+in which to apply management detection. Default is all time steps (when
+set to \code{NULL}).}
 
 \item{...}{Additional parameters.}
 }
