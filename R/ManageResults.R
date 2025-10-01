@@ -45,8 +45,9 @@
 #'       location, as well as calculated impacts (list).}
 #'     \item{\code{finalize()}}{Finalize the results collation (summary
 #'       calculations).}
-#'     \item{\code{as_list()}}{Return the results as a list (collated, total,
-#'       area).}
+#'     \item{\code{as_list()}}{Return the results as a list (collated
+#'       populations and/or occupancy, totals, area occupied, impacts, and
+#'       actions).}
 #'     \item{\code{get_params()}}{Get the simulation parameters used.}
 #'     \item{\code{save_rasters(...)}}{Save the collated results as raster TIF
 #'       files when the region is grid-based. \code{Terra} raster write options
@@ -55,8 +56,9 @@
 #'       contains non-zero values.}
 #'     \item{\code{save_csv()}}{Save the collated results as comma-separated
 #'       values (CSV) files when the region is patch-based. Also saves the
-#'       population totals and area occupied to CSV files for both grid and
-#'       patch-based region types.}
+#'       population totals, area occupied, as well as impact and action totals
+#'       (where applicable) to CSV files for both grid and patch-based region
+#'       types.}
 #'     \item{\code{save_plots(width = 480, height = 480)}}{Save plots of the
 #'       population (staged) totals, the area occupied, total impacts (where
 #'       applicable), and total actions as PNG files having specified
@@ -234,6 +236,9 @@ ManageResults.Region <- function(region, population_model,
       if (include_collated && impacts_i$get_calc_total()) {
         impact_aspects$total <- zeros$total_impact_steps
       }
+      if (impacts_i$get_context()$get_valuation_type() == "monetary") {
+        impact_aspects$cumulative <- impact_aspects
+      }
       impact_aspects
     })
   }
@@ -311,6 +316,40 @@ ManageResults.Region <- function(region, population_model,
       # Place calculated impacts in existing results structure
       for (i in 1:length(calc_impacts)) {
 
+        # Calculate total impact
+        if ("total" %in% names(results$impacts[[i]])) {
+          total_impact <- 0
+          if ("combined" %in% names(calc_impacts[[i]])) {
+            total_impact <- sum(calc_impacts[[i]]$combined)
+          } else if (length(calc_impacts[[i]]) == 1) {
+            total_impact <- sum(calc_impacts[[i]][[1]])
+          }
+        }
+
+        # Current cumulative impacts
+        if ("cumulative" %in% names(results$impacts[[i]])) {
+          for (a in names(calc_impacts[[i]])) {
+            if (tm == 0) {
+              results$impacts[[i]]$cumulative[[a]]$current <<-
+                unname(calc_impacts[[i]][[a]])
+            } else {
+              results$impacts[[i]]$cumulative[[a]]$current <<-
+                (results$impacts[[i]]$cumulative[[a]]$current +
+                   unname(calc_impacts[[i]][[a]]))
+            }
+            if ("total" %in% names(results$impacts[[i]]) &&
+                "total" %in% names(results$impacts[[i]]$cumulative)) {
+              if (tm == 0) {
+                results$impacts[[i]]$cumulative$total$current <<- total_impact
+              } else {
+                results$impacts[[i]]$cumulative$total$current <<-
+                  (results$impacts[[i]]$cumulative$total$current +
+                     total_impact)
+              }
+            }
+          }
+        }
+
         if (replicates > 1) { # summaries
 
           # Calculates running mean and standard deviation (note: variance*r is
@@ -333,12 +372,6 @@ ManageResults.Region <- function(region, population_model,
           # Total aspects at every time step
           if ("total" %in% names(results$impacts[[i]])) {
             previous_mean <- results$impacts[[i]]$total[[tmc]]$mean
-            total_impact <- 0
-            if ("combined" %in% names(calc_impacts[[i]])) {
-              total_impact <- sum(calc_impacts[[i]]$combined)
-            } else if (length(calc_impacts[[i]]) == 1) {
-              total_impact <- sum(calc_impacts[[i]][[1]])
-            }
             results$impacts[[i]]$total[[tmc]]$mean <<-
               previous_mean + (total_impact - previous_mean)/r
             previous_sd <- results$impacts[[i]]$total[[tmc]]$sd
@@ -346,6 +379,47 @@ ManageResults.Region <- function(region, population_model,
               (previous_sd + ((total_impact - previous_mean)*
                                 (total_impact -
                                    results$impacts[[i]]$total[[tmc]]$mean)))
+          }
+
+          # Cumulative impacts
+          if ("cumulative" %in% names(results$impacts[[i]])) {
+
+            # Collated cumulative aspects
+            if (!include_collated || tm %% collation_steps == 0) {
+              for (a in names(calc_impacts[[i]])) {
+                previous_mean <-
+                  results$impacts[[i]]$cumulative[[a]][[tmc]]$mean
+                results$impacts[[i]]$cumulative[[a]][[tmc]]$mean <<-
+                  (previous_mean +
+                     (results$impacts[[i]]$cumulative[[a]]$current
+                      - previous_mean)/r)
+                previous_sd <- results$impacts[[i]]$cumulative[[a]][[tmc]]$sd
+                results$impacts[[i]]$cumulative[[a]][[tmc]]$sd <<-
+                  (previous_sd +
+                     ((results$impacts[[i]]$cumulative[[a]]$current -
+                         previous_mean)*
+                        (results$impacts[[i]]$cumulative[[a]]$current -
+                           results$impacts[[i]]$cumulative[[a]][[tmc]]$mean)))
+              }
+            }
+
+            # Cumulative totals at every time step
+            if ("total" %in% names(results$impacts[[i]]$cumulative) &&
+                "total" %in% names(results$impacts[[i]])) {
+              previous_mean <-
+                results$impacts[[i]]$cumulative$total[[tmc]]$mean
+              results$impacts[[i]]$cumulative$total[[tmc]]$mean <<-
+                (previous_mean +
+                   (results$impacts[[i]]$cumulative$total$current -
+                      previous_mean)/r)
+              previous_sd <- results$impacts[[i]]$cumulative$total[[tmc]]$sd
+              results$impacts[[i]]$cumulative$total[[tmc]]$sd <<-
+                (previous_sd +
+                   ((results$impacts[[i]]$cumulative$total$current -
+                       previous_mean)*
+                      (results$impacts[[i]]$cumulative$total$current -
+                         results$impacts[[i]]$cumulative$total[[tmc]]$mean)))
+            }
           }
 
         } else {
@@ -360,11 +434,25 @@ ManageResults.Region <- function(region, population_model,
 
           # Total aspects at every time step
           if ("total" %in% names(results$impacts[[i]])) {
-            if ("combined" %in% names(calc_impacts[[i]])) {
-              results$impacts[[i]]$total[[tmc]] <<-
-                sum(calc_impacts[[i]]$combined)
-            } else if (length(calc_impacts[[i]]) == 1) {
-              results$impacts[[i]]$total[[tmc]] <<- sum(calc_impacts[[i]][[1]])
+            results$impacts[[i]]$total[[tmc]] <<- total_impact
+          }
+
+          # Cumulative impacts
+          if ("cumulative" %in% names(results$impacts[[i]])) {
+
+            # Collated cumulative aspects
+            if (!include_collated || tm %% collation_steps == 0) {
+              for (a in names(calc_impacts[[i]])) {
+                results$impacts[[i]]$cumulative[[a]][[tmc]] <<-
+                  results$impacts[[i]]$cumulative[[a]]$current
+              }
+            }
+
+            # Cumulative totals at every time step
+            if ("total" %in% names(results$impacts[[i]]$cumulative) &&
+                "total" %in% names(results$impacts[[i]])) {
+              results$impacts[[i]]$cumulative$total[[tmc]] <<-
+                results$impacts[[i]]$cumulative$total$current
             }
           }
         }
@@ -468,6 +556,19 @@ ManageResults.Region <- function(region, population_model,
             for (tmc in names(results$impacts[[i]][[a]])) {
               results$impacts[[i]][[a]][[tmc]]$sd <<-
                 sqrt(results$impacts[[i]][[a]][[tmc]]$sd/(replicates - 1))
+            }
+          }
+          if ("cumulative" %in% names(results$impacts[[i]])) {
+            for (a in names(results$impacts[[i]]$cumulative)) {
+              for (tmc in names(results$impacts[[i]]$cumulative[[a]])) {
+                results$impacts[[i]]$cumulative[[a]][[tmc]]$sd <<-
+                  sqrt(results$impacts[[i]]$cumulative[[a]][[tmc]]$sd/
+                         (replicates - 1))
+              }
+              results$impacts[[i]]$cumulative[[a]]$current <<- NULL
+            }
+            if ("total" %in% names(results$impacts[[i]]$cumulative)) {
+              results$impacts[[i]]$cumulative$total$current <<- NULL
             }
           }
         }

@@ -83,8 +83,9 @@ current vector or array \code{n} representing the population at each
 location, as well as calculated impacts (list).}
 \item{\code{finalize()}}{Finalize the results collation (summary
 calculations).}
-\item{\code{as_list()}}{Return the results as a list (collated, total,
-area).}
+\item{\code{as_list()}}{Return the results as a list (collated
+populations and/or occupancy, totals, area occupied, impacts, and
+actions).}
 \item{\code{get_params()}}{Get the simulation parameters used.}
 \item{\code{save_rasters(...)}}{Save the collated results as raster TIF
 files when the region is grid-based. \code{Terra} raster write options
@@ -93,8 +94,9 @@ raster layers with attached attributes indicating if each layer
 contains non-zero values.}
 \item{\code{save_csv()}}{Save the collated results as comma-separated
 values (CSV) files when the region is patch-based. Also saves the
-population totals and area occupied to CSV files for both grid and
-patch-based region types.}
+population totals, area occupied, as well as impact and action totals
+(where applicable) to CSV files for both grid and patch-based region
+types.}
 \item{\code{save_plots(width = 480, height = 480)}}{Save plots of the
 population (staged) totals, the area occupied, total impacts (where
 applicable), and total actions as PNG files having specified

@@ -68,8 +68,10 @@ test_that("initializes inherited object with impacts and actions", {
                  "impacts", "actions"))
   expect_equal(lapply(result_list$impacts, function(i) lapply(i, length)),
                list(a1 = list(aspect1 = 6, aspect2 = 6, combined = 6,
-                              total = 11),
+                              total = 11, cumulative = 4),
                     a2 = list(aspect3 = 6, total = 11)))
+  expect_equal(lapply(result_list$impacts$a1$cumulative, length),
+               list(aspect1 = 6, aspect2 = 6, combined = 6, total = 11))
   expect_equal(lapply(result_list$actions, function(i) lapply(i, length)),
                list(a3 = list(detected = 6, total = 11),
                     a4 = list(removed = 6, total = 11)))
@@ -77,11 +79,17 @@ test_that("initializes inherited object with impacts and actions", {
   names(collated) <- as.character(seq(0, 10, 2))
   totals <- rep(1, 11)
   names(totals) <- as.character(0:10)
+  cumulative <- c(aspect1 = 6, aspect2 = 6, combined = 6, total = 11)
   expect_equal(lapply(result_list$impacts,
                       function(i) lapply(i, function(j) sapply(j, length))),
                list(a1 = list(aspect1 = collated, aspect2 = collated,
-                              combined = collated, total = totals),
+                              combined = collated, total = totals,
+                              cumulative = cumulative),
                     a2 = list(aspect3 = collated, total = totals)))
+  expect_equal(lapply(result_list$impacts$a1$cumulative,
+                      function(i) sapply(i, length)),
+               list(aspect1 = collated, aspect2 = collated,
+                    combined = collated, total = totals))
   expect_equal(lapply(result_list$actions,
                       function(i) lapply(i, function(j) sapply(j, length))),
                list(a3 = list(detected = collated, total = totals),
