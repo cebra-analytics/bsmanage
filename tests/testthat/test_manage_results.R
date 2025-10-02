@@ -100,10 +100,11 @@ test_that("collates and finalizes impact results", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
   region <- bsspread::Region(template)
-  template[region$get_indices()][5922,] <- 0.25
+  idx <- 5920:5922 # idx <- 11:13
+  template[region$get_indices()][idx[3],] <- 0.25
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   n <- rep(0, region$get_locations())
-  n[5920:5922] <- 7:9
+  n[idx] <- 7:9
   context <- list(bsimpact::Context("My species",
                                     impact_scope = c("aspect1", "aspect2")),
                   bsimpact::Context("My species", impact_scope = "aspect3",
@@ -116,7 +117,7 @@ test_that("collates and finalizes impact results", {
                         aspect2 = 200*(template > 0.2 & template < 0.4),
                         aspect3 = 300*(template > 0.1 & template < 0.3))
   impact_layer_vals <- lapply(impact_layers,
-                              function(l) l[region$get_indices()][5920:5922,])
+                              function(l) l[region$get_indices()][idx,])
   loss_rates <- c(aspect1 = 0.1, aspect2 = 0.2, aspect3 = 0.3)
   impact_names <- list(a1 = "a1", a2 = "a2")
   impacts <- list(
@@ -131,44 +132,114 @@ test_that("collates and finalizes impact results", {
       population_model, calc_total = TRUE))
   calc_impacts <- lapply(impacts, function(impacts_i) impacts_i$calculate(n))
   expected_collated <- lapply(calc_impacts, function(i) {
-    lapply(i, function(j) j[5920:5922])
+    lapply(i, function(j) j[idx])
   })
   # single replicate
   expect_silent(results <- ManageResults(region,
                                          population_model = population_model,
                                          impacts = impacts, time_steps = 4,
                                          collation_steps = 2, replicates = 1))
-  expect_silent(results$collate(r = 1, tm = 2, n = n, calc_impacts))
+  for (tm in 0:4) {
+    results$collate(r = 1, tm = tm, n = n, calc_impacts)
+  }
+  expect_silent(results$finalize())
   expect_silent(result_list <- results$get_list())
-
-  expect_equal(lapply(result_list$impacts,
-                      function(i) lapply(i[names(i) != "total"],
-                                         function(j) j[["2"]][5920:5922])),
-               expected_collated)
-  expect_equal(lapply(result_list$impacts,
-                      function(i) lapply(i[names(i) == "total"],
-                                         function(j) j[["2"]])),
-               lapply(expected_collated,
-                      function(i) list(total = sum(
-                        unlist(i[names(i) != "combined"])))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[!names(i) %in% c("cumulative","total")],
+                              function(j) j[["0"]][idx])),
+    expected_collated)
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[!names(i) %in% c("cumulative","total")],
+                              function(j) j[["2"]][idx])),
+    expected_collated)
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[!names(i) %in% c("cumulative","total")],
+                              function(j) j[["4"]][idx])),
+    expected_collated)
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"], function(j) j[["0"]])),
+    lapply(expected_collated,
+           function(i) list(total = sum(unlist(i[names(i) != "combined"])))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"], function(j) j[["1"]])),
+    lapply(expected_collated,
+           function(i) list(total = sum(unlist(i[names(i) != "combined"])))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"], function(j) j[["2"]])),
+    lapply(expected_collated,
+           function(i) list(total = sum(unlist(i[names(i) != "combined"])))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"], function(j) j[["3"]])),
+    lapply(expected_collated,
+           function(i) list(total = sum(unlist(i[names(i) != "combined"])))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"], function(j) j[["4"]])),
+    lapply(expected_collated,
+           function(i) list(total = sum(unlist(i[names(i) != "combined"])))))
+  cum_names <- names(result_list$impacts$a1$cumulative)
+  expect_equal(cum_names, c("aspect1", "aspect2", "combined", "total"))
+  expected_cumulative <- c(expected_collated$a1,
+                           total = sum(unlist(expected_collated$a1[1:2])))
+  expect_true(is.list(result_list$impacts$a1$cumulative))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[1:3]],
+           function(i) i[["0"]][idx]),
+    expected_cumulative[cum_names[1:3]])
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[1:3]],
+           function(i) i[["2"]][idx]),
+    lapply(expected_cumulative[cum_names[1:3]], function(i) i*3))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[1:3]],
+           function(i) i[["4"]][idx]),
+    lapply(expected_cumulative[cum_names[1:3]], function(i) i*5))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["0"]]),
+    expected_cumulative[cum_names[4]])
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["1"]]),
+    lapply(expected_cumulative[cum_names[4]], function(i) i*2))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["2"]]),
+    lapply(expected_cumulative[cum_names[4]], function(i) i*3))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["3"]]),
+    lapply(expected_cumulative[cum_names[4]], function(i) i*4))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["4"]]),
+    lapply(expected_cumulative[cum_names[4]], function(i) i*5))
+  expect_null(result_list$impacts$a2$cumulative)
   # multiple replicates
   expect_silent(results <- ManageResults(region,
                                          population_model = population_model,
                                          impacts = impacts, time_steps = 4,
                                          collation_steps = 2, replicates = 3))
   calc_impacts <- list()
-  n[5920:5922] <- 5:7
+  n[idx] <- 5:7
   calc_impacts[[1]] <- lapply(impacts,
                               function(impacts_i) impacts_i$calculate(n))
-  n[5920:5922] <- 7:9
+  n[idx] <- 7:9
   calc_impacts[[2]] <- lapply(impacts,
                               function(impacts_i) impacts_i$calculate(n))
-  n[5920:5922] <- 8:10
+  n[idx] <- 8:10
   calc_impacts[[3]] <- lapply(impacts,
                               function(impacts_i) impacts_i$calculate(n))
-  calc_impacts_vals <- lapply(calc_impacts, function(i) {
-    lapply(i, function(a) lapply(a, function(v) v[5920:5922]))
-  })
+  calc_impacts_vals <-
+    lapply(calc_impacts,
+           function(i) lapply(i, function(a) lapply(a, function(v) v[idx])))
   calc_impacts_r <- calc_impacts_vals[[1]]
   for (i in 2:3) {
     for (j in impact_names) {
@@ -178,21 +249,55 @@ test_that("collates and finalizes impact results", {
       }
     }
   }
-  expect_silent(results$collate(r = 1, tm = 2, n = n, calc_impacts[[1]]))
-  expect_silent(results$collate(r = 2, tm = 2, n = n, calc_impacts[[2]]))
-  expect_silent(results$collate(r = 3, tm = 2, n = n, calc_impacts[[3]]))
+  for (i in 1:3) {
+    for (tm in 0:4) {
+      results$collate(r = i, tm = tm, n = n, calc_impacts[[i]])
+    }
+  }
   expect_silent(results$finalize())
   expect_silent(result_list <- results$get_list())
   expect_equal(
     lapply(result_list$impacts,
-           function(i) lapply(i[names(i) != "total"],
-                              function(j) j[["2"]]$mean[5920:5922])),
+           function(i) lapply(i[!names(i) %in% c("cumulative","total")],
+                              function(j) j[["0"]]$mean[idx])),
     lapply(calc_impacts_r, function(i) lapply(i, function(a) colMeans(a))))
   expect_equal(
     lapply(result_list$impacts,
-           function(i) lapply(i[names(i) != "total"],
-                              function(j) j[["2"]]$sd[5920:5922])),
+           function(i) lapply(i[!names(i) %in% c("cumulative","total")],
+                              function(j) j[["2"]]$mean[idx])),
+    lapply(calc_impacts_r, function(i) lapply(i, function(a) colMeans(a))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[!names(i) %in% c("cumulative","total")],
+                              function(j) j[["4"]]$mean[idx])),
+    lapply(calc_impacts_r, function(i) lapply(i, function(a) colMeans(a))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[!names(i) %in% c("cumulative","total")],
+                              function(j) j[["0"]]$sd[idx])),
     lapply(calc_impacts_r, function(i) lapply(i, function(a) apply(a, 2, sd))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[!names(i) %in% c("cumulative","total")],
+                              function(j) j[["2"]]$sd[idx])),
+    lapply(calc_impacts_r, function(i) lapply(i, function(a) apply(a, 2, sd))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[!names(i) %in% c("cumulative","total")],
+                              function(j) j[["4"]]$sd[idx])),
+    lapply(calc_impacts_r, function(i) lapply(i, function(a) apply(a, 2, sd))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"],
+                              function(j) j[["0"]]$mean)),
+    list(a1 = list(total = mean(rowSums(calc_impacts_r$a1$combined))),
+         a2 = list(total = mean(rowSums(calc_impacts_r$a2$aspect3)))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"],
+                              function(j) j[["1"]]$mean)),
+    list(a1 = list(total = mean(rowSums(calc_impacts_r$a1$combined))),
+         a2 = list(total = mean(rowSums(calc_impacts_r$a2$aspect3)))))
   expect_equal(
     lapply(result_list$impacts,
            function(i) lapply(i[names(i) == "total"],
@@ -202,9 +307,113 @@ test_that("collates and finalizes impact results", {
   expect_equal(
     lapply(result_list$impacts,
            function(i) lapply(i[names(i) == "total"],
+                              function(j) j[["3"]]$mean)),
+    list(a1 = list(total = mean(rowSums(calc_impacts_r$a1$combined))),
+         a2 = list(total = mean(rowSums(calc_impacts_r$a2$aspect3)))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"],
+                              function(j) j[["4"]]$mean)),
+    list(a1 = list(total = mean(rowSums(calc_impacts_r$a1$combined))),
+         a2 = list(total = mean(rowSums(calc_impacts_r$a2$aspect3)))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"],
+                              function(j) j[["0"]]$sd)),
+    list(a1 = list(total = sd(rowSums(calc_impacts_r$a1$combined))),
+         a2 = list(total = sd(rowSums(calc_impacts_r$a2$aspect3)))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"],
+                              function(j) j[["1"]]$sd)),
+    list(a1 = list(total = sd(rowSums(calc_impacts_r$a1$combined))),
+         a2 = list(total = sd(rowSums(calc_impacts_r$a2$aspect3)))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"],
                               function(j) j[["2"]]$sd)),
     list(a1 = list(total = sd(rowSums(calc_impacts_r$a1$combined))),
          a2 = list(total = sd(rowSums(calc_impacts_r$a2$aspect3)))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"],
+                              function(j) j[["3"]]$sd)),
+    list(a1 = list(total = sd(rowSums(calc_impacts_r$a1$combined))),
+         a2 = list(total = sd(rowSums(calc_impacts_r$a2$aspect3)))))
+  expect_equal(
+    lapply(result_list$impacts,
+           function(i) lapply(i[names(i) == "total"],
+                              function(j) j[["4"]]$sd)),
+    list(a1 = list(total = sd(rowSums(calc_impacts_r$a1$combined))),
+         a2 = list(total = sd(rowSums(calc_impacts_r$a2$aspect3)))))
+  cum_names <- names(result_list$impacts$a1$cumulative)
+  expect_equal(cum_names,c("aspect1", "aspect2", "combined", "total"))
+  expect_true(is.list(result_list$impacts$a1$cumulative))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[1:3]],
+           function(i) i[["0"]]$mean[idx]),
+    lapply(calc_impacts_r$a1, function(a) colMeans(a)))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[1:3]],
+           function(i) i[["0"]]$sd[idx]),
+    lapply(calc_impacts_r$a1, function(a) apply(a, 2, sd)))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[1:3]],
+           function(i) i[["2"]]$mean[idx]),
+    lapply(calc_impacts_r$a1, function(a) colMeans(a*3)))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[1:3]],
+           function(i) i[["2"]]$sd[idx]),
+    lapply(calc_impacts_r$a1, function(a) apply(a*3, 2, sd)))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[1:3]],
+           function(i) i[["4"]]$mean[idx]),
+    lapply(calc_impacts_r$a1, function(a) colMeans(a*5)))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[1:3]],
+           function(i) i[["4"]]$sd[idx]),
+    lapply(calc_impacts_r$a1, function(a) apply(a*5, 2, sd)))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["0"]]$mean),
+    list(total = mean(rowSums(calc_impacts_r$a1$combined))))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["0"]]$sd),
+    list(total = sd(rowSums(calc_impacts_r$a1$combined))))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["1"]]$mean),
+    list(total = mean(rowSums(calc_impacts_r$a1$combined*2))))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["1"]]$sd),
+    list(total = sd(rowSums(calc_impacts_r$a1$combined*2))))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["2"]]$mean),
+    list(total = mean(rowSums(calc_impacts_r$a1$combined*3))))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["2"]]$sd),
+    list(total = sd(rowSums(calc_impacts_r$a1$combined*3))))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["3"]]$mean),
+    list(total = mean(rowSums(calc_impacts_r$a1$combined*4))))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["3"]]$sd),
+    list(total = sd(rowSums(calc_impacts_r$a1$combined*4))))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["4"]]$mean),
+    list(total = mean(rowSums(calc_impacts_r$a1$combined*5))))
+  expect_equal(
+    lapply(result_list$impacts$a1$cumulative[cum_names[4]],
+           function(i) i[["4"]]$sd),
+    list(total = sd(rowSums(calc_impacts_r$a1$combined*5))))
+  expect_null(result_list$impacts$a2$cumulative)
 })
 
 test_that("collates and finalizes action results", {

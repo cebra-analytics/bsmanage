@@ -337,15 +337,15 @@ ManageResults.Region <- function(region, population_model,
                 (results$impacts[[i]]$cumulative[[a]]$current +
                    unname(calc_impacts[[i]][[a]]))
             }
-            if ("total" %in% names(results$impacts[[i]]) &&
-                "total" %in% names(results$impacts[[i]]$cumulative)) {
-              if (tm == 0) {
-                results$impacts[[i]]$cumulative$total$current <<- total_impact
-              } else {
-                results$impacts[[i]]$cumulative$total$current <<-
-                  (results$impacts[[i]]$cumulative$total$current +
-                     total_impact)
-              }
+          }
+          if ("total" %in% names(results$impacts[[i]]) &&
+              "total" %in% names(results$impacts[[i]]$cumulative)) {
+            if (tm == 0) {
+              results$impacts[[i]]$cumulative$total$current <<- total_impact
+            } else {
+              results$impacts[[i]]$cumulative$total$current <<-
+                (results$impacts[[i]]$cumulative$total$current +
+                   total_impact)
             }
           }
         }
@@ -545,14 +545,26 @@ ManageResults.Region <- function(region, population_model,
     # Finalize population spread results
     super$finalize()
 
-    if (replicates > 1) { # summaries
+    # Finalize impact results
+    if (length(impacts) > 0) {
 
-      # Finalize impact results
-      if (length(impacts) > 0) {
+      # Clear working memory for current cumulative impacts
+      for (i in 1:length(results$impacts)) {
+        if ("cumulative" %in% names(results$impacts[[i]])) {
+          for (a in names(results$impacts[[i]]$cumulative)) {
+            results$impacts[[i]]$cumulative[[a]]$current <<- NULL
+          }
+          if ("total" %in% names(results$impacts[[i]]$cumulative)) {
+            results$impacts[[i]]$cumulative$total$current <<- NULL
+          }
+        }
+      }
 
-        # Transform impact standard deviations
+      # Transform impact standard deviations
+      if (replicates > 1) { # summaries
         for (i in 1:length(results$impacts)) {
-          for (a in names(results$impacts[[i]])) {
+          i_names <- names(results$impacts[[i]])
+          for (a in i_names[i_names != "cumulative"]) {
             for (tmc in names(results$impacts[[i]][[a]])) {
               results$impacts[[i]][[a]][[tmc]]$sd <<-
                 sqrt(results$impacts[[i]][[a]][[tmc]]$sd/(replicates - 1))
@@ -565,19 +577,17 @@ ManageResults.Region <- function(region, population_model,
                   sqrt(results$impacts[[i]]$cumulative[[a]][[tmc]]$sd/
                          (replicates - 1))
               }
-              results$impacts[[i]]$cumulative[[a]]$current <<- NULL
-            }
-            if ("total" %in% names(results$impacts[[i]]$cumulative)) {
-              results$impacts[[i]]$cumulative$total$current <<- NULL
             }
           }
         }
       }
+    }
 
-      # Finalize action results
-      if (length(actions) > 0) {
+    # Finalize action results
+    if (length(actions) > 0) {
 
-        # Transform action standard deviations
+      # Transform action standard deviations
+      if (replicates > 1) { # summaries
         for (i in 1:length(results$actions)) {
           for (a in names(results$actions[[i]])) {
             if (include_collated && a == "total" ||
@@ -591,6 +601,7 @@ ManageResults.Region <- function(region, population_model,
         }
       }
     }
+
 
     # Add labels to staged populations actions (again)
     if (population_model$get_type() == "stage_structured") {
