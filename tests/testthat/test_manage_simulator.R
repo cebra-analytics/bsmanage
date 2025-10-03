@@ -55,7 +55,8 @@ test_that("runs simulator with correct configuration", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
   region <- bsspread::Region(template)
-  template[region$get_indices()][5920:5922,] <- c(0.25, 0.5, 1)
+  idx <- 5920:5922 # idx <- 11:13
+  template[region$get_indices()][idx,] <- c(0.25, 0.5, 1)
   template_vect <- template[region$get_indices()][,1]
   population_model <- bsspread::UnstructPopulation(region, growth = 2)
   population_model_grow <- population_model$grow
@@ -64,7 +65,7 @@ test_that("runs simulator with correct configuration", {
     population_model_grow(n, tm)
   }
   initial_n <- rep(0, region$get_locations())
-  initial_n[5920:5922] <- (10:12)*5
+  initial_n[idx] <- (10:12)*5
   initializer <- bsspread::Initializer(initial_n, region = region,
                                        population_model = population_model)
   dispersal <- bsspread::Dispersal(region, population_model)
@@ -133,6 +134,12 @@ test_that("runs simulator with correct configuration", {
   expect_named(results_list$total_occup, as.character(0:4))
   expect_length(results_list$impacts, 2)
   expect_equal(lapply(results_list$impacts, function(i) lapply(i, length)),
+               list(list(aspect1 = 3, combined = 3, total = 5,
+                         cumulative = 3),
+                    list(aspect2 = 3, combined = 3, total = 5,
+                         cumulative = 3)))
+  expect_equal(lapply(results_list$impacts,
+                      function(i) lapply(i$cumulative, length)),
                list(list(aspect1 = 3, combined = 3, total = 5),
                     list(aspect2 = 3, combined = 3, total = 5)))
   expect_named(results_list$impacts[[1]]$aspect1, as.character(seq(0, 4, 2)))

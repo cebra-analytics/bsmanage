@@ -672,8 +672,18 @@ ManageResults.Region <- function(region, population_model,
             ic <- paste0("_", i)
           }
 
+          # Impact aspects and their cumulative when present
           aspects <- names(results$impacts[[i]])
-          for (a in aspects[which(aspects != "total")]) {
+          aspects <- aspects[which(!aspects %in% c("total", "cumulative"))]
+          if ("cumulative" %in% names(results$impacts[[i]])) {
+            cum_aspects <- names(results$impacts[[i]]$cumulative)
+            cum_aspects <- cum_aspects[which(cum_aspects != "total")]
+            names(cum_aspects) <- paste0("cum_", cum_aspects)
+            aspects <- c(aspects, names(cum_aspects))
+          } else {
+            cum_aspects <- NULL
+          }
+          for (a in aspects) {
             for (s in summaries) {
 
               # Summary post-fix
@@ -684,34 +694,73 @@ ManageResults.Region <- function(region, population_model,
               }
 
               # Add nested list to output list
-              output_key <- paste0("impacts", ic, "_", a, sc)
+              if (a %in% names(cum_aspects)) {
+                output_key <- paste0("cumulative_impacts", ic, "_",
+                                     cum_aspects[a], sc)
+              } else {
+                output_key <- paste0("impacts", ic, "_", a, sc)
+              }
               output_list[[output_key]] <- list()
 
               # Initialise non-zero indicator
               nonzero_list[[output_key]] <- FALSE
 
-              for (tmc in names(results$impacts[[i]][[a]])) {
+              # Collated time steps
+              if (a %in% names(cum_aspects)) {
+                collated_tmc <-
+                  names(results$impacts[[i]]$cumulative[[cum_aspects[a]]])
+              } else {
+                collated_tmc <- names(results$impacts[[i]][[a]])
+              }
+              for (tmc in collated_tmc) {
 
                 # Copy impacts into a raster & update non-zero indicator
                 if (replicates > 1) {
-                  output_rast <-
-                    region$get_rast(results$impacts[[i]][[a]][[tmc]][[s]])
-                  nonzero_list[[output_key]] <-
-                    (nonzero_list[[output_key]] |
-                       sum(results$impacts[[i]][[a]][[tmc]][[s]]) > 0)
+                  if (a %in% names(cum_aspects)) {
+                    output_rast <-
+                      region$get_rast(results$impacts[[i]]$cumulative[[
+                        cum_aspects[a]]][[tmc]][[s]])
+                    nonzero_list[[output_key]] <-
+                      (nonzero_list[[output_key]] |
+                         sum(results$impacts[[i]]$cumulative[[
+                           cum_aspects[a]]][[tmc]][[s]]) > 0)
+                  } else {
+                    output_rast <-
+                      region$get_rast(results$impacts[[i]][[a]][[tmc]][[s]])
+                    nonzero_list[[output_key]] <-
+                      (nonzero_list[[output_key]] |
+                         sum(results$impacts[[i]][[a]][[tmc]][[s]]) > 0)
+                  }
                 } else {
-                  output_rast <-
-                    region$get_rast(results$impacts[[i]][[a]][[tmc]])
-                  nonzero_list[[output_key]] <-
-                    (nonzero_list[[output_key]] |
-                       sum(results$impacts[[i]][[a]][[tmc]]) > 0)
+                  if (a %in% names(cum_aspects)) {
+                    output_rast <-
+                      region$get_rast(results$impacts[[i]]$cumulative[[
+                        cum_aspects[a]]][[tmc]])
+                    nonzero_list[[output_key]] <-
+                      (nonzero_list[[output_key]] |
+                         sum(results$impacts[[i]]$cumulative[[
+                           cum_aspects[a]]][[tmc]]) > 0)
+                  } else {
+                    output_rast <-
+                      region$get_rast(results$impacts[[i]][[a]][[tmc]])
+                    nonzero_list[[output_key]] <-
+                      (nonzero_list[[output_key]] |
+                         sum(results$impacts[[i]][[a]][[tmc]]) > 0)
+                  }
                 }
 
                 # Write raster to file
-                filename <- sprintf(
-                  paste0("impacts%s_%s_t%0", nchar(as.character(time_steps)),
-                         "d%s.tif"),
-                  ic, a, as.integer(tmc), sc)
+                if (a %in% names(cum_aspects)) {
+                  filename <- sprintf(
+                    paste0("cumulative_impacts%s_%s_t%0",
+                           nchar(as.character(time_steps)), "d%s.tif"),
+                    ic, cum_aspects[a], as.integer(tmc), sc)
+                } else {
+                  filename <- sprintf(
+                    paste0("impacts%s_%s_t%0", nchar(as.character(time_steps)),
+                           "d%s.tif"),
+                    ic, a, as.integer(tmc), sc)
+                }
                 output_list[[output_key]][[tmc]] <-
                   terra::writeRaster(output_rast, filename, ...)
               }
@@ -905,13 +954,21 @@ ManageResults.Region <- function(region, population_model,
         # Results for single or multi-patch only
         if (region$get_type() == "patch") {
 
-          # Save impact CSV file(s)
+          # Impact aspects and their cumulative when present
           aspects <- names(results$impacts[[i]])
+          aspects <- aspects[which(!aspects %in% c("total", "cumulative"))]
+          if ("cumulative" %in% names(results$impacts[[i]])) {
+            cum_aspects <- names(results$impacts[[i]]$cumulative)
+            cum_aspects <- cum_aspects[which(cum_aspects != "total")]
+            names(cum_aspects) <- paste0("cum_", cum_aspects)
+            aspects <- c(aspects, names(cum_aspects))
+          } else {
+            cum_aspects <- NULL
+          }
 
+          # Save impact CSV file(s)
           if (include_collated) { # spatial with coordinates
-
-            # Impact aspects excluding totals
-            for (a in aspects[which(aspects != "total")]) {
+            for (a in aspects) {
               output_df <- list()
               if (replicates > 1) {
                 summaries <- c("mean", "sd")
@@ -920,14 +977,31 @@ ManageResults.Region <- function(region, population_model,
               }
               for (s in summaries) {
                 if (replicates > 1) {
-                  output_df[[s]] <- lapply(results$impacts[[i]][[a]],
-                                           function(a_tm) a_tm[[s]])
+                  if (a %in% names(cum_aspects)) {
+                    output_df[[s]] <-
+                      lapply(results$impacts[[i]]$cumulative[[cum_aspects[a]]],
+                             function(a_tm) a_tm[[s]])
+                  } else {
+                    output_df[[s]] <- lapply(results$impacts[[i]][[a]],
+                                             function(a_tm) a_tm[[s]])
+                  }
                 } else {
-                  output_df[[s]] <- results$impacts[[i]][[a]]
+                  if (a %in% names(cum_aspects)) {
+                    output_df[[s]] <-
+                      results$impacts[[i]]$cumulative[[cum_aspects[a]]]
+                  } else {
+                    output_df[[s]] <- results$impacts[[i]][[a]]
+                  }
                 }
                 names(output_df[[s]]) <- collated_labels
                 output_df[[s]] <- cbind(coords, as.data.frame(output_df[[s]]))
-                filename <- sprintf("impacts%s_%s%s.csv", ic, a, s_fname[[s]])
+                if (a %in% names(cum_aspects)) {
+                  filename <- sprintf("cumulative_impacts%s_%s%s.csv", ic,
+                                      cum_aspects[a], s_fname[[s]])
+                } else {
+                  filename <- sprintf("impacts%s_%s%s.csv", ic, a,
+                                      s_fname[[s]])
+                }
                 utils::write.csv(output_df[[s]], filename, row.names = FALSE)
               }
             }
@@ -937,17 +1011,33 @@ ManageResults.Region <- function(region, population_model,
             # Collect and save to single row CSV
             if (replicates > 1) {
               for (a in aspects) {
-                output_df <- sapply(results$impacts[[i]][[a]],
-                                  function(imp) as.data.frame(imp))
+                if (a %in% names(cum_aspects)) {
+                  output_df <- sapply(
+                    results$impacts[[i]]$cumulative[[cum_aspects[a]]],
+                    function(imp) as.data.frame(imp))
+                  filename <- sprintf("cumulative_impacts%s_%s.csv", ic,
+                                      cum_aspects[a])
+                } else {
+                  output_df <- sapply(results$impacts[[i]][[a]],
+                                      function(imp) as.data.frame(imp))
+                  filename <- sprintf("impacts%s_%s.csv", ic, a)
+                }
                 colnames(output_df) <- time_steps_labels
-                filename <- sprintf("impacts%s_%s.csv", ic, a)
                 utils::write.csv(output_df, filename, row.names = TRUE)
               }
             } else {
-              output_df <- t(sapply(results$impacts[[i]], function(a) a))
+              a_i <- which(names(results$impacts[[i]]) != "cumulative")
+              output_df <- t(sapply(results$impacts[[i]][a_i], function(a) a))
               colnames(output_df) <- time_steps_labels
               filename <- sprintf("impacts%s.csv", ic)
               utils::write.csv(output_df, filename, row.names = TRUE)
+              if ("cumulative" %in% names(results$impacts[[i]])) {
+                output_df <- t(sapply(results$impacts[[i]]$cumulative,
+                                      function(a) a))
+                colnames(output_df) <- time_steps_labels
+                filename <- sprintf("cumulative_impacts%s.csv", ic)
+                utils::write.csv(output_df, filename, row.names = TRUE)
+              }
             }
           }
         }
@@ -957,20 +1047,30 @@ ManageResults.Region <- function(region, population_model,
       if (include_collated) {
         if (replicates > 1) {
           for (i in impact_i) {
+
+            # Include impact name or numeric index
+            if (length(impact_i) == 1 && is.numeric(i)) {
+              ic <- ""
+            } else {
+              ic <- paste0("_", i)
+            }
+
+            # Collect totals and save to CSV
             if (is.list(results$impacts[[i]]$total)) {
-
-              # Include impact name or numeric index
-              if (length(impact_i) == 1 && is.numeric(i)) {
-                ic <- ""
-              } else {
-                ic <- paste0("_", i)
-              }
-
-              # Collect totals and save to CSV
               output_df <- sapply(results$impacts[[i]]$total,
                                   function(tot) tot)
               colnames(output_df) <- time_steps_labels
               filename <- sprintf("total_impacts%s.csv", ic)
+              utils::write.csv(output_df, filename, row.names = TRUE)
+            }
+
+            # Collect cumulative totals and save to CSV when present
+            if ("cumulative" %in% names(results$impacts[[i]]) &&
+                is.list(results$impacts[[i]]$cumulative$total)) {
+              output_df <- sapply(results$impacts[[i]]$cumulative$total,
+                                  function(tot) tot)
+              colnames(output_df) <- time_steps_labels
+              filename <- sprintf("total_cumulative_impacts%s.csv", ic)
               utils::write.csv(output_df, filename, row.names = TRUE)
             }
           }
@@ -992,6 +1092,24 @@ ManageResults.Region <- function(region, population_model,
               }
             }
             utils::write.csv(output_df, "total_impacts.csv", row.names = TRUE)
+          }
+
+          # Combine cumulative impact totals when present and save to CSV
+          present <- sapply(results$impacts,
+                            function(aspect) is.list(aspect$cumulative$total))
+          if (any(present)) {
+            output_df <- t(sapply(results$impacts[present],
+                                  function(aspect) aspect$cumulative$total))
+            colnames(output_df) <- time_steps_labels
+            if (is.numeric(impact_i)) {
+              if (length(impact_i) == 1) {
+                rownames(output_df) <- "impact"
+              } else {
+                rownames(output_df) <- paste("impact", which(present))
+              }
+            }
+            utils::write.csv(output_df, "total_cumulative_impacts.csv",
+                             row.names = TRUE)
           }
         }
       }
@@ -1314,6 +1432,95 @@ ManageResults.Region <- function(region, population_model,
                              main = main_title,
                              xlab = plot_x_label,
                              ylab = sprintf("Impact (%s)", units),
+                             ylim = c(0, 1.1*max(values)))
+              invisible(grDevices::dev.off())
+            }
+          }
+        }
+      }
+
+      # Cumulative impact spatial totals present or spatially implicit
+      if (include_collated) {
+        is_present <- sapply(results$impacts,
+                             function(i) is.list(i$cumulative$total))
+      } else {
+        is_present <- sapply(results$impacts,
+                             function(i) is.list(i$cumulative))
+      }
+      if (any(is_present)) {
+        for (i in impact_i[is_present]) {
+
+          # Plot impacts at each time step
+          if (length(impact_i) == 1 && is.numeric(i)) {
+            ic <- c("", "")
+          } else {
+            ic <- c(paste0("_", i), paste0(" : ", i))
+          }
+          units <- impacts[[i]]$get_context()$get_impact_measures()
+          if (include_collated) {
+            values_list <-
+              list(total = sapply(results$impacts[[i]]$cumulative$total,
+                                  function(tot) tot))
+          } else {
+            if ("combined" %in% names(results$impacts[[i]]$cumulative)) {
+              values_list <- list(
+                combined = sapply(results$impacts[[i]]$cumulative$combined,
+                                  function(tot) tot))
+            } else {
+              values_list <- lapply(results$impacts[[i]]$cumulative,
+                                    function(i_a) sapply(i_a, function(a) a))
+            }
+          }
+          for (a in 1:length(values_list)) {
+            values <- values_list[[a]]
+            if (length(values_list) > 1) {
+              ac <- c(paste0("_", a), paste0(" : ", names(values_list)[a]))
+            } else {
+              ac <- c("", "")
+            }
+            if (replicates > 1) { # plot summary mean +/- 2 SD
+              values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                             sd = as.numeric(values["sd",,drop = FALSE]))
+              if (include_collated) {
+                filename <- sprintf("total_cumulative_impacts%s%s.png",
+                                    ic[1], ac[1])
+                main_title <-
+                  sprintf("Total cumulative impacts%s%s (mean +/- 2 SD)",
+                          ic[2], ac[2])
+              } else {
+                filename <- sprintf("cumulative_impacts%s%s.png", ic[1], ac[1])
+                main_title <- sprintf("Cumulative impacts%s%s (mean +/- 2 SD)",
+                                      ic[2], ac[2])
+              }
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values$mean, type = "l",
+                             main = main_title,
+                             xlab = plot_x_label,
+                             ylab = sprintf("Cumulative impact (%s)", units),
+                             ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
+              graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                              lty = "dashed")
+              graphics::lines(0:time_steps,
+                              pmax(0, values$mean - 2*values$sd),
+                              lty = "dashed")
+              invisible(grDevices::dev.off())
+            } else {
+              if (include_collated) {
+                filename <- sprintf("total_cumulative_impacts%s%s.png",
+                                    ic[1], ac[1])
+                main_title <- sprintf("Total cumulative impacts%s%s",
+                                      ic[2], ac[2])
+              } else {
+                filename <- sprintf("cumulative_impacts%s%s.png", ic[1], ac[1])
+                main_title <- sprintf("Cumulative impacts%s%s", ic[2], ac[2])
+              }
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values, type = "l",
+                             main = main_title,
+                             xlab = plot_x_label,
+                             ylab = sprintf("Cumulative impact (%s)", units),
                              ylim = c(0, 1.1*max(values)))
               invisible(grDevices::dev.off())
             }
