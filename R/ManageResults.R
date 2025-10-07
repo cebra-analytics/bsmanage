@@ -1382,7 +1382,8 @@ ManageResults.Region <- function(region, population_model,
                 combined = sapply(results$impacts[[i]]$combined,
                                   function(tot) tot))
             } else {
-              values_list <- lapply(results$impacts[[i]],
+              a <- which(names(results$impacts[[i]]) != "cumulative")
+              values_list <- lapply(results$impacts[[i]][a],
                                     function(i_a) sapply(i_a, function(a) a))
             }
           }
