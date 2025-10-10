@@ -77,6 +77,13 @@ ManageImpacts <- function(impacts, population_model,
     stop("Calculate total indicator should be logical.", call. = FALSE)
   }
 
+  # Check population capacity is available to calculate density
+  if (impacts$get_incursion()$get_type() == "density" &&
+      is.null(population_model$get_capacity())) {
+    stop("Population capacity is required for density-based impacts.",
+         call. = FALSE)
+  }
+
   # Check recovery delay
   if (!is.null(recovery_delay) &&
       (!is.numeric(recovery_delay) || recovery_delay < 0)) {
@@ -178,6 +185,10 @@ ManageImpacts <- function(impacts, population_model,
       n <- calculate_area_incursion(n)
     } else if (population_model$get_type() == "stage_structured") {
       n <- rowSums(n[,impact_stages, drop = FALSE])
+    }
+    if (impacts$get_incursion()$get_type() == "density") {
+      idx <- which(population_model$get_capacity() > 0)
+      n[idx] <- pmin(n[idx]/population_model$get_capacity()[idx], 1)
     }
 
     # Re-attach recovery delay
