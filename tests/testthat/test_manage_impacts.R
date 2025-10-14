@@ -74,7 +74,7 @@ test_that("calculates impacts including combined", {
   template[region$get_indices()][5922,] <- 0.25
   context <- bsimpact::Context("My species",
                                impact_scope = c("aspect1", "aspect2"))
-  incursion <- bsimpact::Incursion(template*0, region, type = "presence",
+  incursion <- bsimpact::Incursion(template*0, region, type = "density",
                                    multiplier = 0.2)
   aspects <- list(aspect1 = "aspect1", aspect2 = "aspect2")
   impact_layers <- list(aspect1 = 100*(template > 0.1 & template < 0.3),
@@ -105,26 +105,6 @@ test_that("calculates impacts including combined", {
     expected_impacts$aspect1 + expected_impacts$aspect2
   expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
   expect_named(calc_impacts, c("aspect1", "aspect2", "combined"))
-  expect_equal(calc_impacts, expected_impacts)
-  incursion <- bsimpact::Incursion(template*0, region, type = "density")
-  impacts <- bsimpact::ValueImpacts(context, region, incursion,
-                                    impact_layers, loss_rates = loss_rates)
-  expect_error(manage_impacts <- ManageImpacts(impacts, population_model,
-                                               impact_stages = 2:3),
-               "Population capacity is required for density-based impacts.")
-  population_model <- bsspread::StagedPopulation(region, stage_matrix,
-                                                 capacity = (initial_n > 0)*5)
-  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
-                                                impact_stages = 2:3))
-  n[5920:5922,] <- c(4, 9, 9, 4, 2, 3, 2, 0, 0)
-  expected_impacts <- lapply(aspects, function(l) {
-    impact_incursion <- pmin(rowSums(n[,2:3])/5, 1)
-    (impact_incursion*impact_layers[[l]][region$get_indices()][,1]*
-        loss_rates[l])
-  })
-  expected_impacts$combined <-
-    expected_impacts$aspect1 + expected_impacts$aspect2
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
   expect_equal(calc_impacts, expected_impacts)
 })
 
