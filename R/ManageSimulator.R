@@ -333,9 +333,11 @@ ManageSimulator.Region <- function(region,
           } else { # previously just n
             n <- user_function(n)
           }
-          for (i in 1:length(n_attr)) { # restore attributes
-            if (!names(n_attr[i]) %in% names(attributes(n))) {
-              attr(n, names(n_attr[i])) <- n_attr[[i]]
+          if (length(n_attr)) {
+            for (i in 1:length(n_attr)) { # restore attributes
+              if (!names(n_attr[i]) %in% names(attributes(n))) {
+                attr(n, names(n_attr[i])) <- n_attr[[i]]
+              }
             }
           }
         }
