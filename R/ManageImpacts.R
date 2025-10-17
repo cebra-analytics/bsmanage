@@ -143,7 +143,7 @@ ManageImpacts <- function(impacts, population_model,
           is.numeric(attr(n, "recovery_delay")[[id]])) {
 
         # Update for presence incursions
-        if (impacts$get_incursion()$get_type() %in% c("presence", "density")) {
+        if (impacts$get_incursion()$get_type() == "presence") { # decremented
 
           # Occurrence and recovery delay locations
           idx <- which(rowSums(as.matrix(n)[,impact_stages, drop = FALSE]) > 0)
@@ -161,32 +161,56 @@ ManageImpacts <- function(impacts, population_model,
             new_idx <- idx[which(!idx %in% delay_idx)]
             attr(n, "recovery_delay")[[id]][new_idx] <- recovery_delay
           }
+
+        } else if (impacts$get_incursion()$get_type() == "density") {
+
+          # Push current density to front of list for first impact only
+          if (attr(attr(n, "recovery_delay"), "first") == id) {
+            attr(attr(n, "recovery_delay"), "incursions") <-
+              c(list(calculate_density_incursion(n)),
+                attr(attr(n, "recovery_delay"), "incursions"))
+            length(attr(attr(n, "recovery_delay"), "incursions")) <-
+              min(length(attr(attr(n, "recovery_delay"), "incursions")),
+                  attr(attr(n, "recovery_delay"), "max"))
+          }
+
+        } else if (population_model$get_region()$spatially_implicit() &&
+                   impacts$get_incursion()$get_type() == "area") {
+
+          # Add current area to front of list for first impact only
+          if (attr(attr(n, "recovery_delay"), "first") == id) {
+            attr(attr(n, "recovery_delay"), "incursions") <-
+              c(calculate_area_incursion(n),
+                attr(attr(n, "recovery_delay"), "incursions"))
+          }
         }
+
       } else {
+
+        # Initialise recovery delay
         if (!is.list(attr(n, "recovery_delay"))) {
           attr(n, "recovery_delay") <- list()
         }
-        attr(n, "recovery_delay")[[id]] <-
-          (+(rowSums(as.matrix(n)[,impact_stages, drop = FALSE]) > 0)*
-             recovery_delay)
-      }
-
-      # Attach density-based incursions for maximum delay
-      if (impacts$get_incursion()$get_type() == "density") {
-        attr(attr(n, "recovery_delay"), "incursions") <-
-          c(list(calculate_density_incursion(n)),
-            attr(attr(n, "recovery_delay"), "incursions"))
-        length(attr(attr(n, "recovery_delay"), "incursions")) <-
-          min(length(attr(attr(n, "recovery_delay"), "incursions")),
-              max(unlist(attr(n,"recovery_delay"))))
-      }
-
-      # Attach area-based incursions when spatially explicit
-      if (population_model$get_region()$spatially_implicit() &&
-          impacts$get_incursion()$get_type() == "area") {
-        attr(attr(n, "recovery_delay"), "incursions") <-
-          c(calculate_area_incursion(n),
-            attr(attr(n, "recovery_delay"), "incursions"))
+        if (impacts$get_incursion()$get_type() == "presence") { # decremented
+          attr(n, "recovery_delay")[[id]] <-
+            (+(rowSums(as.matrix(n)[,impact_stages, drop = FALSE]) > 0)*
+               recovery_delay)
+        } else { # constant
+          attr(n, "recovery_delay")[[id]] <- recovery_delay
+          attr(attr(n, "recovery_delay"), "max") <-
+            max(attr(attr(n, "recovery_delay"), "max"), recovery_delay)
+          if (is.null(attr(attr(n, "recovery_delay"), "first"))) {
+            attr(attr(n, "recovery_delay"), "first") <- id
+            if (impacts$get_incursion()$get_type() == "density") {
+              attr(attr(n, "recovery_delay"), "incursions") <-
+                list(calculate_density_incursion(n))
+            } else if (population_model$get_region()$spatially_implicit() &&
+                       impacts$get_incursion()$get_type() == "area") {
+              attr(attr(n, "recovery_delay"), "incursions") <-
+                calculate_area_incursion(n)
+            }
+          }
+        }
       }
     }
     return(n)
@@ -199,14 +223,13 @@ ManageImpacts <- function(impacts, population_model,
     recovery_delay <- attr(n, "recovery_delay")
 
     # Calculate incursion values
-    if (population_model$get_region()$spatially_implicit() &&
-        impacts$get_incursion()$get_type() == "area") {
+    if (impacts$get_incursion()$get_type() == "density") {
+      n <- calculate_density_incursion(n)
+    } else if (population_model$get_region()$spatially_implicit() &&
+               impacts$get_incursion()$get_type() == "area") {
       n <- calculate_area_incursion(n)
     } else if (population_model$get_type() == "stage_structured") {
       n <- rowSums(n[,impact_stages, drop = FALSE])
-    }
-    if (impacts$get_incursion()$get_type() == "density") {
-      n <- calculate_density_incursion(n)
     }
 
     # Re-attach recovery delay
