@@ -20,7 +20,7 @@ test_that("initializes with components and parameters", {
                                        population_model = population_model)
   dispersal <- bsspread::Dispersal(region, population_model)
   context <- bsimpact::Context("My species", impact_scope = "aspect1")
-  incursion <- bsimpact::Incursion(template*0, region, type = "density")
+  incursion <- bsimpact::Incursion(template*0, region)
   impacts <- list(ManageImpacts(
     bsimpact::ValueImpacts(context, region, incursion,
                            impact_layers = list(template > 0.5),

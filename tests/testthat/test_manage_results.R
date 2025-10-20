@@ -11,8 +11,7 @@ test_that("initializes inherited object with impacts and actions", {
                                     impact_scope = c("aspect1", "aspect2")),
                   bsimpact::Context("My species", impact_scope = "aspect3",
                                     valuation_type = "non-monetary"))
-  incursion <- bsimpact::Incursion(template*0, region, type = "density",
-                                   multiplier = 0.2)
+  incursion <- bsimpact::Incursion(template*0, region, multiplier = 0.2)
   impact_layers <- list(aspect1 = 100*(template > 0.1 & template < 0.3),
                         aspect2 = 200*(template > 0.2 & template < 0.4),
                         aspect3 = 300*(template > 0.1 & template < 0.3))
@@ -109,8 +108,7 @@ test_that("collates and finalizes impact results", {
                                     impact_scope = c("aspect1", "aspect2")),
                   bsimpact::Context("My species", impact_scope = "aspect3",
                                     valuation_type = "non-monetary"))
-  incursion <- bsimpact::Incursion(template*0, region, type = "density",
-                                   multiplier = 0.1)
+  incursion <- bsimpact::Incursion(template*0, region, multiplier = 0.1)
   aspects <- list(aspect1 = "aspect1", aspect2 = "aspect2",
                   aspect3 = "aspect3")
   impact_layers <- list(aspect1 = 100*(template > 0.1 & template < 0.3),
