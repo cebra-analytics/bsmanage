@@ -128,7 +128,8 @@ test_that("collates and finalizes impact results", {
                              impact_layers[3], loss_rates = loss_rates[3],
                              combine_function = "none"),
       population_model, calc_total = TRUE))
-  calc_impacts <- lapply(impacts, function(impacts_i) impacts_i$calculate(n))
+  calc_impacts <- lapply(
+    impacts, function(impacts_i) attr(impacts_i$calculate(n), "impacts"))
   expected_collated <- lapply(calc_impacts, function(i) {
     lapply(i, function(j) j[idx])
   })
@@ -227,14 +228,14 @@ test_that("collates and finalizes impact results", {
                                          collation_steps = 2, replicates = 3))
   calc_impacts <- list()
   n[idx] <- 5:7
-  calc_impacts[[1]] <- lapply(impacts,
-                              function(impacts_i) impacts_i$calculate(n))
+  calc_impacts[[1]] <- lapply(
+    impacts, function(impacts_i) attr(impacts_i$calculate(n), "impacts"))
   n[idx] <- 7:9
-  calc_impacts[[2]] <- lapply(impacts,
-                              function(impacts_i) impacts_i$calculate(n))
+  calc_impacts[[2]] <- lapply(
+    impacts, function(impacts_i) attr(impacts_i$calculate(n), "impacts"))
   n[idx] <- 8:10
-  calc_impacts[[3]] <- lapply(impacts,
-                              function(impacts_i) impacts_i$calculate(n))
+  calc_impacts[[3]] <- lapply(
+    impacts, function(impacts_i) attr(impacts_i$calculate(n), "impacts"))
   calc_impacts_vals <-
     lapply(calc_impacts,
            function(i) lapply(i, function(a) lapply(a, function(v) v[idx])))
