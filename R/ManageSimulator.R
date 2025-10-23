@@ -261,11 +261,10 @@ ManageSimulator.Region <- function(region,
       # Calculate impacts
       if (length(impacts)) {
         calc_impacts <- lapply(impacts, function(impacts_i) {
-          impacts_i$calculate(n, 0)
+          n <<- impacts_i$calculate(n, 0)
+          attr(n, "impacts")
         })
-        for (impacts_i in impacts) {
-          n <- impacts_i$update_recovery_delay(n)
-        }
+        attr(n, "impacts") <- NULL
       } else {
         calc_impacts <- NULL
       }
@@ -304,11 +303,10 @@ ManageSimulator.Region <- function(region,
         # Calculate impacts
         if (length(impacts)) {
           calc_impacts <- lapply(impacts, function(impacts_i) {
-            impacts_i$calculate(n, tm)
+            n <<- impacts_i$calculate(n, tm)
+            attr(n, "impacts")
           })
-          for (impacts_i in impacts) {
-            n <- impacts_i$update_recovery_delay(n)
-          }
+          attr(n, "impacts") <- NULL
         }
 
         # Apply actions

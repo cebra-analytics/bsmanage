@@ -103,7 +103,9 @@ test_that("calculates impacts including combined", {
   })
   expected_impacts$combined <-
     expected_impacts$aspect1 + expected_impacts$aspect2
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
+  expect_silent(n <- manage_impacts$calculate(n, 4))
+  expect_true("impacts" %in% names(attributes(n)))
+  calc_impacts <- attr(n, "impacts")
   expect_named(calc_impacts, c("aspect1", "aspect2", "combined"))
   expect_equal(calc_impacts, expected_impacts)
   # density-based impacts
@@ -125,7 +127,8 @@ test_that("calculates impacts including combined", {
   })
   expected_impacts$combined <-
     expected_impacts$aspect1 + expected_impacts$aspect2
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
+  expect_silent(n <- manage_impacts$calculate(n, 4))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(calc_impacts, expected_impacts)
 })
 
@@ -157,24 +160,24 @@ test_that("updates recovery delay to prolong presence-based impacts", {
     expected_impacts$aspect1 + expected_impacts$aspect2
   expected_recovery_delay <- (n > 0)*2
   idx <- 1:region$get_locations()
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 0))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 0))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(lapply(calc_impacts, function(impact) impact[idx]),
                lapply(expected_impacts, function(impact) impact[idx]))
   expect_equal(attr(n, "recovery_delay")[[3]][idx],
                expected_recovery_delay[idx])
   n[5901:5910] <- 0
   expected_recovery_delay[5901:5910] <- 1
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 1))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 1))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(lapply(calc_impacts, function(impact) impact[idx]),
                lapply(expected_impacts, function(impact) impact[idx]))
   expect_equal(attr(n, "recovery_delay")[[3]][idx],
                expected_recovery_delay[idx])
   n[5911:5930] <- 0
   expected_recovery_delay[5901:5930] <- expected_recovery_delay[5901:5930] - 1
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 2))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 2))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(lapply(calc_impacts, function(impact) impact[idx]),
                lapply(expected_impacts, function(impact) impact[idx]))
   expect_equal(attr(n, "recovery_delay")[[3]][idx],
@@ -184,8 +187,8 @@ test_that("updates recovery delay to prolong presence-based impacts", {
     impact
   })
   expected_recovery_delay[5911:5930] <- expected_recovery_delay[5911:5930] - 1
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 3))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 3))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(lapply(calc_impacts, function(impact) impact[idx]),
                lapply(expected_impacts, function(impact) impact[idx]))
   expect_equal(attr(n, "recovery_delay")[[3]][idx],
@@ -196,8 +199,8 @@ test_that("updates recovery delay to prolong presence-based impacts", {
     impact
   })
   expected_recovery_delay[5921:5930] <- 2
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 4))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(lapply(calc_impacts, function(impact) impact[idx]),
                lapply(expected_impacts, function(impact) impact[idx]))
   expect_equal(attr(n, "recovery_delay")[[3]][idx],
@@ -239,8 +242,8 @@ test_that("updates recovery delay to prolong density-based impacts", {
   })
   expected_impacts$combined <-
     expected_impacts$aspect1 + expected_impacts$aspect2
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 0))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 0))
+  calc_impacts <- attr(n, "impacts")
   expect_silent(n <- manage_impacts_2$update_recovery_delay(n))
   expect_equal(calc_impacts, expected_impacts)
   expect_equal(attr(n, "recovery_delay")[[1]], 3)
@@ -252,8 +255,8 @@ test_that("updates recovery delay to prolong density-based impacts", {
   idx_1 <- idx[11:20][which(n_density[idx[11:20]] < 1)]
   n[idx_1] <- round(n[idx_1]*0.6)
   mask1 <- +(n > 0); mask1[idx[11:20]] <- mask1[idx[11:20]]*(n/n_orig)[idx[11:20]]
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 1))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 1))
+  calc_impacts <- attr(n, "impacts")
   expect_silent(n <- manage_impacts_2$update_recovery_delay(n))
   expect_equal(calc_impacts, expected_impacts)
   expect_equal(attr(n, "recovery_delay")[[1]], 3)
@@ -262,8 +265,8 @@ test_that("updates recovery delay to prolong density-based impacts", {
                list(mask1*n_density, n_density))
   n[idx[11:30]] <- 0
   mask2 <- +(n > 0)
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 2))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 2))
+  calc_impacts <- attr(n, "impacts")
   expect_silent(n <- manage_impacts_2$update_recovery_delay(n))
   expect_equal(calc_impacts, expected_impacts)
   expect_equal(attr(attr(n, "recovery_delay"), "incursions"),
@@ -274,8 +277,8 @@ test_that("updates recovery delay to prolong density-based impacts", {
     impact[idx[11:20]] <- (impact*mask1)[idx[11:20]]
     impact
   })
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 3))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 3))
+  calc_impacts <- attr(n, "impacts")
   expect_silent(n <- manage_impacts_2$update_recovery_delay(n))
   expect_equal(calc_impacts, expected_impacts)
   expect_equal(attr(attr(n, "recovery_delay"), "incursions"),
@@ -286,8 +289,8 @@ test_that("updates recovery delay to prolong density-based impacts", {
     impact[idx[11:20]] <- 0
     impact
   })
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 0))
+  calc_impacts <- attr(n, "impacts")
   expect_silent(n <- manage_impacts_2$update_recovery_delay(n))
   expect_equal(calc_impacts, expected_impacts)
   expect_equal(attr(attr(n, "recovery_delay"), "incursions"),
@@ -314,11 +317,12 @@ test_that("calculates spatially implicit impacts via area occupied", {
   n <- initializer$initialize()
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
                                                 impact_stages = 2:3))
-  expect_error(calc_impacts <- manage_impacts$calculate(n, 4),
+  expect_error(n <- manage_impacts$calculate(n, 4),
                paste("Cannot calculate spatially implicit impacts without",
                      "area occupied."))
   attr(n, "spread_area") <- 50
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
+  expect_silent(n <- manage_impacts$calculate(n, 4))
+  calc_impacts <- attr(n, "impacts")
   expect_named(calc_impacts, c("aspect1", "aspect2", "combined"))
   expect_equal(calc_impacts, list(aspect1 = 100*50*0.3, aspect2 = 200*50*0.4,
                                   combined = 100*50*0.3 + 200*50*0.4))
@@ -329,34 +333,35 @@ test_that("calculates spatially implicit impacts via area occupied", {
                                                 recovery_delay = 2))
   n <- initializer$initialize()
   attr(n, "spread_area") <- 50
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 0))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 0))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(calc_impacts, list(aspect1 = 100*50*0.3, aspect2 = 200*50*0.4,
                                   combined = 100*50*0.3 + 200*50*0.4))
   attr(n, "recovery_delay")[[3]] ; 2
   attr(attr(n, "recovery_delay"), "incursions") ; 50
   attr(n, "spread_area") <- 30
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 1))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 1))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(calc_impacts, list(aspect1 = 100*50*0.3, aspect2 = 200*50*0.4,
                                   combined = 100*50*0.3 + 200*50*0.4))
   attr(n, "recovery_delay")[[3]] ; 2
   attr(attr(n, "recovery_delay"), "incursions") ; c(30, 50)
   n[,2:3] <- 0
   attr(n, "spread_area") <- 20
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 2))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 2))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(calc_impacts, list(aspect1 = 100*50*0.3, aspect2 = 200*50*0.4,
                                   combined = 100*50*0.3 + 200*50*0.4))
   attr(n, "recovery_delay")[[3]] ; 2
   attr(attr(n, "recovery_delay"), "incursions") ; c(0, 30, 50)
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 3))
-  expect_silent(n <- manage_impacts$update_recovery_delay(n))
+  expect_silent(n <- manage_impacts$calculate(n, 3))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(calc_impacts, list(aspect1 = 100*30*0.3, aspect2 = 200*30*0.4,
                                   combined = 100*30*0.3 + 200*30*0.4))
   attr(n, "recovery_delay")[[3]] ; 2
   attr(attr(n, "recovery_delay"), "incursions") ; c(0, 0, 30, 50)
-  expect_silent(calc_impacts <- manage_impacts$calculate(n, 4))
+  expect_silent(n <- manage_impacts$calculate(n, 4))
+  calc_impacts <- attr(n, "impacts")
   expect_equal(calc_impacts, list(aspect1 = 0, aspect2 = 0, combined = 0))
 })
 

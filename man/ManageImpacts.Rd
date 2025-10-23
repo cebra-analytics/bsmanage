@@ -45,14 +45,14 @@ getting the impact context and performing impact calculations:
 \describe{
 \item{\code{get_context()}}{Get \code{bsimpact::Context} object.}
 \item{\code{get_calc_total()}}{Get calculate total indicator.}
-\item{\code{update_recovery_delay(n)}}{Update the recovery delay
-attribute attached to the population vector.}
 \item{\code{includes_combined()}}{Logical indicator for when impacts are
 combined.}
+\item{\code{update_recovery_delay(n)}}{Update the recovery delay
+attribute attached to the population vector.}
 \item{\code{calculate(n, tm)}}{Perform impact calculations resulting
 from incursion population vector or matrix \code{n} at time step
-\code{tm}, and return a list of impact values, including combined
-impacts when applicable.}
+\code{tm}, and return \code{n} with a list of impact values attached,
+including combined impacts when applicable.}
 }
 }
 \description{

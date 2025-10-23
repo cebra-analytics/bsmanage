@@ -27,14 +27,14 @@
 #'   \describe{
 #'     \item{\code{get_context()}}{Get \code{bsimpact::Context} object.}
 #'     \item{\code{get_calc_total()}}{Get calculate total indicator.}
-#'     \item{\code{update_recovery_delay(n)}}{Update the recovery delay
-#'       attribute attached to the population vector.}
 #'     \item{\code{includes_combined()}}{Logical indicator for when impacts are
 #'       combined.}
+#'     \item{\code{update_recovery_delay(n)}}{Update the recovery delay
+#'       attribute attached to the population vector.}
 #'     \item{\code{calculate(n, tm)}}{Perform impact calculations resulting
 #'       from incursion population vector or matrix \code{n} at time step
-#'       \code{tm}, and return a list of impact values, including combined
-#'       impacts when applicable.}
+#'       \code{tm}, and return \code{n} with a list of impact values attached,
+#'       including combined impacts when applicable.}
 #'   }
 #' @export
 ManageImpacts <- function(impacts, population_model,
@@ -219,24 +219,23 @@ ManageImpacts <- function(impacts, population_model,
   # Calculate impacts
   self$calculate <- function(n, tm) {
 
-    # Check for recovery delay
-    recovery_delay <- attr(n, "recovery_delay")
-
     # Calculate incursion values
     if (impacts$get_incursion()$get_type() == "density") {
-      n <- calculate_density_incursion(n)
+      x <- calculate_density_incursion(n)
     } else if (population_model$get_region()$spatially_implicit() &&
                impacts$get_incursion()$get_type() == "area") {
-      n <- calculate_area_incursion(n)
+      x <- calculate_area_incursion(n)
     } else if (population_model$get_type() == "stage_structured") {
-      n <- rowSums(n[,impact_stages, drop = FALSE])
+      x <- rowSums(n[,impact_stages, drop = FALSE])
+    } else {
+      x <- as.numeric(n)
     }
 
-    # Re-attach recovery delay
-    attr(n, "recovery_delay") <- recovery_delay
+    # Attach recovery delay
+    attr(x, "recovery_delay") <- attr(n, "recovery_delay")
 
     # Set incursion values within impact object
-    impacts$get_incursion()$set_values(n)
+    impacts$get_incursion()$set_values(x)
 
     # Get incursion impacts
     impact_list <- impacts$incursion_impacts(raw = TRUE, time_int = tm)
@@ -246,7 +245,13 @@ ManageImpacts <- function(impacts, population_model,
       impact_list$combined <- impacts$combined_impacts(raw = TRUE)
     }
 
-    return(impact_list)
+    # Attach calculated impacts to population
+    attr(n, "impacts") <- impact_list
+
+    # Update recovery delay
+    n <- self$update_recovery_delay(n)
+
+    return(n)
   }
 
   return(self)
