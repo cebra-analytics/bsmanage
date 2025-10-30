@@ -143,10 +143,17 @@ ManageImpacts <- function(impacts, population_model,
           is.numeric(attr(n, "recovery_delay")[[id]])) {
 
         # Update for presence incursions
-        if (impacts$get_incursion()$get_type() == "presence") { # decremented
+        if (impacts$get_incursion()$get_type() == "presence" ||
+            (impacts$get_is_dynamic() &&
+             impacts$get_incursion()$get_type() == "density")) { # decremented
 
           # Occurrence and recovery delay locations
-          idx <- which(rowSums(as.matrix(n)[,impact_stages, drop = FALSE]) > 0)
+          if (impacts$get_incursion()$get_type() == "density") {
+            x <- calculate_density_incursion(n)
+          } else { # presence
+            x <- rowSums(as.matrix(n)[,impact_stages, drop = FALSE])
+          }
+          idx <- which(x > 0)
           delay_idx <- which(attr(n, "recovery_delay")[[id]] > 0)
 
           # Decrement delay where population removed or extirpated
@@ -183,6 +190,21 @@ ManageImpacts <- function(impacts, population_model,
               c(calculate_area_incursion(n),
                 attr(attr(n, "recovery_delay"), "incursions"))
           }
+
+          # Add dynamic multipliers to front of each existing list
+          if (impacts$get_is_dynamic() && is.list(attr(n, "dynamic_mult")) &&
+              length(attr(n, "dynamic_mult")) >= id &&
+              is.list(attr(n, "dynamic_mult")[[id]]) &&
+              is.list(attr(attr(n, "recovery_delay")[[id]], "dynamic_mult")) &&
+              (length(attr(attr(n, "recovery_delay")[[id]],
+                          "dynamic_mult")) ==
+               length(attr(n, "dynamic_mult")[[id]]))) {
+            for (i in 1:length(attr(n, "dynamic_mult")[[id]])){
+              attr(attr(n, "recovery_delay")[[id]], "dynamic_mult")[[i]] <-
+                c(attr(n, "dynamic_mult")[[id]][[i]],
+                  attr(attr(n, "recovery_delay")[[id]], "dynamic_mult")[[i]])
+            }
+          }
         }
 
       } else {
@@ -191,10 +213,15 @@ ManageImpacts <- function(impacts, population_model,
         if (!is.list(attr(n, "recovery_delay"))) {
           attr(n, "recovery_delay") <- list()
         }
-        if (impacts$get_incursion()$get_type() == "presence") { # decremented
-          attr(n, "recovery_delay")[[id]] <-
-            (+(rowSums(as.matrix(n)[,impact_stages, drop = FALSE]) > 0)*
-               recovery_delay)
+        if (impacts$get_incursion()$get_type() == "presence" ||
+            (impacts$get_is_dynamic() &&
+             impacts$get_incursion()$get_type() == "density")) { # decremented
+          if (impacts$get_incursion()$get_type() == "density") {
+            x <- calculate_density_incursion(n)
+          } else { # presence
+            x <- rowSums(as.matrix(n)[,impact_stages, drop = FALSE])
+          }
+          attr(n, "recovery_delay")[[id]] <- (x > 0)*recovery_delay
         } else { # constant
           attr(n, "recovery_delay")[[id]] <- recovery_delay
           attr(attr(n, "recovery_delay"), "max") <-
@@ -209,6 +236,14 @@ ManageImpacts <- function(impacts, population_model,
               attr(attr(n, "recovery_delay"), "incursions") <-
                 calculate_area_incursion(n)
             }
+          }
+          if (population_model$get_region()$spatially_implicit() &&
+              impacts$get_incursion()$get_type() == "area" &&
+              impacts$get_is_dynamic() && is.list(attr(n, "dynamic_mult")) &&
+              length(attr(n, "dynamic_mult")) >= id &&
+              is.list(attr(n, "dynamic_mult")[[id]])) {
+            attr(attr(n, "recovery_delay")[[id]], "dynamic_mult") <-
+              attr(n, "dynamic_mult")[[id]]
           }
         }
       }
@@ -231,8 +266,9 @@ ManageImpacts <- function(impacts, population_model,
       x <- as.numeric(n)
     }
 
-    # Attach recovery delay
+    # Attach recovery delay and dynamic multipliers
     attr(x, "recovery_delay") <- attr(n, "recovery_delay")
+    attr(x, "dynamic_mult") <- attr(n, "dynamic_mult")
 
     # Set incursion values within impact object
     impacts$get_incursion()$set_values(x)
@@ -243,6 +279,21 @@ ManageImpacts <- function(impacts, population_model,
     # Append combined impacts when present
     if ("combined_impacts" %in% names(impacts)) {
       impact_list$combined <- impacts$combined_impacts(raw = TRUE)
+    }
+
+    # Move attached dynamic multipliers
+    if (impacts$get_is_dynamic() &&
+        is.list(attr(impact_list, "dynamic_mult"))) {
+      if (!is.list(attr(n, "dynamic_mult"))) {
+        attr(n, "dynamic_mult") <- list()
+      }
+      id <- impacts$get_id()
+      attr(n, "dynamic_mult")[[id]] <- attr(impact_list, "dynamic_mult")
+      if (population_model$get_region()$spatially_implicit() &&
+          impacts$get_incursion()$get_type() == "area") {
+        attr(attr(n, "dynamic_mult"), "incursion") <- as.numeric(x)
+      }
+      attr(impact_list, "dynamic_mult") <- NULL
     }
 
     # Attach calculated impacts to population
