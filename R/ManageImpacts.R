@@ -244,6 +244,8 @@ ManageImpacts <- function(impacts, population_model,
               is.list(attr(n, "dynamic_mult")[[id]])) {
             attr(attr(n, "recovery_delay")[[id]], "dynamic_mult") <-
               attr(n, "dynamic_mult")[[id]]
+            attr(attr(attr(n, "recovery_delay")[[id]], "dynamic_mult"),
+                 "incursion") <- NULL
           }
         }
       }
@@ -289,10 +291,6 @@ ManageImpacts <- function(impacts, population_model,
       }
       id <- impacts$get_id()
       attr(n, "dynamic_mult")[[id]] <- attr(impact_list, "dynamic_mult")
-      if (population_model$get_region()$spatially_implicit() &&
-          impacts$get_incursion()$get_type() == "area") {
-        attr(attr(n, "dynamic_mult"), "incursion") <- as.numeric(x)
-      }
       attr(impact_list, "dynamic_mult") <- NULL
     }
 
