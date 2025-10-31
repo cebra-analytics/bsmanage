@@ -17,6 +17,18 @@
 #'   valuation type is \code{"monetary"}. Set to \code{TRUE} if it makes sense
 #'   to sum total \code{"non-monetary"} or \code{"ranking"} impact valuations
 #'   across region locations (providing multiple aspects can be combined).
+#' @param dynamic_links Dynamic impacts (when \code{impacts} is a
+#'   \code{bsimpact::ValueImpacts} object with \code{is_dynamic = TRUE}) may
+#'   optionally be linked to apply (proportional) dynamic losses to threat
+#'   suitability, carrying capacity, and/or dispersal attraction when
+#'   applicable, such as when a threat utilises a resource or asset (e.g. as a
+#'   food source). Configure dynamic links via a vector of one or more strings
+#'   from \code{"suitability"}, \code{"capacity"}, and/or \code{"attractors"}.
+#'   Default \code{NULL} assumes no dynamic links or impacts are not dynamic.
+#' Vector Number of simulation time steps that incursion impacts
+#'   continue to be in effect at previously occupied locations before the
+#'   asset value at the locations recover. Only available for spatially
+#'   explicit grid or network models. Default \code{NULL} assumes no delay.
 #' @param recovery_delay Number of simulation time steps that incursion impacts
 #'   continue to be in effect at previously occupied locations before the
 #'   asset value at the locations recover. Only available for spatially
@@ -40,6 +52,7 @@
 ManageImpacts <- function(impacts, population_model,
                           impact_stages = NULL,
                           calc_total = NULL,
+                          dynamic_links = NULL,
                           recovery_delay = NULL, ...) {
 
   # Check the impacts object
@@ -82,6 +95,21 @@ ManageImpacts <- function(impacts, population_model,
       is.null(population_model$get_capacity())) {
     stop("Population capacity is required for density-based impacts.",
          call. = FALSE)
+  }
+
+  # Check dynamic links
+  if (!is.null(dynamic_links)) {
+    if (!is.function(impacts$get_is_dynamic) || !impacts$get_is_dynamic()) {
+      stop(paste("Dynamic links are only applicable for dynamic impacts (i.e.",
+                 "a bsimpact::ValueImpacts object with is_dynamic = TRUE)."),
+           call. = FALSE)
+    }
+    if (!is.vector(dynamic_links) ||
+        !all(dynamic_links %in% c("suitability", "capacity", "attractors"))) {
+      stop(paste("Dynamic links should be a vector of one or more of",
+                 "'suitability', 'capacity', and/or 'attractors'."),
+           call. = FALSE)
+    }
   }
 
   # Check recovery delay
@@ -246,6 +274,8 @@ ManageImpacts <- function(impacts, population_model,
               attr(n, "dynamic_mult")[[id]]
             attr(attr(attr(n, "recovery_delay")[[id]], "dynamic_mult"),
                  "incursion") <- NULL
+            attr(attr(attr(n, "recovery_delay")[[id]], "dynamic_mult"),
+                 "links") <- NULL
           }
         }
       }
@@ -291,6 +321,9 @@ ManageImpacts <- function(impacts, population_model,
       }
       id <- impacts$get_id()
       attr(n, "dynamic_mult")[[id]] <- attr(impact_list, "dynamic_mult")
+      if (!is.null(dynamic_links)) {
+        attr(attr(n, "dynamic_mult")[[id]], "links") <- dynamic_links
+      }
       attr(impact_list, "dynamic_mult") <- NULL
     }
 

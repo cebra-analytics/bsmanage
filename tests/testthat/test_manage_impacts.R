@@ -28,11 +28,27 @@ test_that("initializes with impacts, populations and impact stages", {
   expect_error(manage_impacts <- ManageImpacts(impacts, population_model,
                                                calc_total = 1),
                "Calculate total indicator should be logical.")
+  expect_error(ManageImpacts(impacts, population_model,
+                             dynamic_links = "suitability"),
+               paste("Dynamic links are only applicable for dynamic impacts",
+                     "(i.e. a bsimpact::ValueImpacts object with is_dynamic",
+                     "= TRUE)."), fixed = TRUE)
+  impacts <- bsimpact::ValueImpacts(context, region, incursion,
+                                    impact_layers,
+                                    loss_rates = c(aspect1 = 0.3,
+                                                   aspect2 = 0.4),
+                                    is_dynamic = TRUE)
+  expect_error(ManageImpacts(impacts, population_model,
+                             dynamic_links = "dummy"),
+               paste("Dynamic links should be a vector of one or more of",
+                     "'suitability', 'capacity', and/or 'attractors'."))
   expect_error(manage_impacts <- ManageImpacts(impacts, population_model,
                                                recovery_delay = "1"),
                "Recover delay should a number >= 0.")
   expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
-                                                impact_stages = 2:3))
+                                                impact_stages = 2:3,
+                                                dynamic_links = "suitability",
+                                                recovery_delay = 2))
   expect_is(manage_impacts, "ManageImpacts")
   expect_named(manage_impacts, c("get_context", "get_calc_total",
                                  "includes_combined", "update_recovery_delay",
@@ -382,7 +398,9 @@ test_that("applies dynamic presence-based impacts", {
                                     loss_rates = loss_rates, is_dynamic = TRUE)
   impacts$set_id(2)
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
-  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model))
+  expect_silent(manage_impacts <-
+                  ManageImpacts(impacts, population_model,
+                                dynamic_links = c("suitability", "capacity")))
   n <- rep(0, region$get_locations())
   n[idx[1:90]] <- round(runif(90, 1, 10))
   n[idx[1:10]] <- 0
@@ -395,6 +413,7 @@ test_that("applies dynamic presence-based impacts", {
     expected_impacts$aspect1 + expected_impacts$aspect2
   expected_dynamic_mult <- lapply(aspects,
                                   function(a) (1 - loss_rates[a]*(n > 0)))
+  attr(expected_dynamic_mult, "links") <- c("suitability", "capacity")
   expect_silent(n <- manage_impacts$calculate(n, 0))
   expect_equal(attr(n, "impacts"), expected_impacts)
   expect_equal(attr(n, "dynamic_mult")[[2]], expected_dynamic_mult)
@@ -405,6 +424,7 @@ test_that("applies dynamic presence-based impacts", {
     dynamic_mult[which(n == 0)] <- 1
     dynamic_mult
   })
+  attr(expected_dynamic_mult, "links") <- c("suitability", "capacity")
   expected_impacts <-
     lapply(aspects, function(a) {
       (impact_layers[[a]][region$get_indices()][,1]*
@@ -556,15 +576,18 @@ test_that("applies dynamic implicit area-based impacts with recovery", {
                                                  capacity = 50,
                                                  capacity_area = 1,
                                                  capacity_stages = 2:3)
-  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
-                                                impact_stages = 2:3,
-                                                recovery_delay = 2))
+  expect_silent(manage_impacts <-
+                  ManageImpacts(impacts, population_model,
+                                impact_stages = 2:3,
+                                dynamic_links = c("suitability", "capacity"),
+                                recovery_delay = 2))
   initializer <- bsspread::Initializer(100, region = region,
                                        population_model = population_model)
   n <- initializer$initialize()
   attr(n, "spread_area") <- 50
   expected_dynamic_mult <- list(aspect1 = 1 - 0.3, aspect2 = 1 - 0.4)
   attr(expected_dynamic_mult, "incursion") <- 50
+  attr(expected_dynamic_mult, "links") <- c("suitability", "capacity")
   expected_impacts <- list(aspect1 = 100*50*0.3, aspect2 = 200*50*0.4)
   expected_impacts$combined <-
     expected_impacts$aspect1 + expected_impacts$aspect2
@@ -577,6 +600,9 @@ test_that("applies dynamic implicit area-based impacts with recovery", {
   expect_equal(attr(attr(n, "recovery_delay"), "incursions"), 50)
   expect_equal(attr(attr(n, "recovery_delay")[[2]], "dynamic_mult"),
                list(aspect1 = 0.7, aspect2 = 0.6))
+  expect_silent(manage_impacts <- ManageImpacts(impacts, population_model,
+                                                impact_stages = 2:3,
+                                                recovery_delay = 2))
   attr(n, "impacts") <- NULL
   attr(n, "spread_area") <- 30
   expected_dynamic_mult <- lapply(expected_dynamic_mult, function(a) a^2)
