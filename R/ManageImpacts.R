@@ -137,11 +137,12 @@ ManageImpacts <- function(impacts, population_model,
   }
 
   # Calculate density-based incursion (internal)
-  calculate_density_incursion <- function(n) {
+  calculate_density_incursion <- function(n, tm = NULL) {
     n <- rowSums(as.matrix(n)[,impact_stages, drop = FALSE])
     n_density <- n*0
     idx <- which(population_model$get_capacity() > 0)
-    n_density[idx] <- pmin(n[idx]/population_model$get_capacity()[idx], 1)
+    n_density[idx] <-
+      pmin(n[idx]/population_model$get_capacity(tm = tm)[idx], 1)
     return(n_density)
   }
 
@@ -288,7 +289,7 @@ ManageImpacts <- function(impacts, population_model,
 
     # Calculate incursion values
     if (impacts$get_incursion()$get_type() == "density") {
-      x <- calculate_density_incursion(n)
+      x <- calculate_density_incursion(n, tm = tm)
     } else if (population_model$get_region()$spatially_implicit() &&
                impacts$get_incursion()$get_type() == "area") {
       x <- calculate_area_incursion(n)

@@ -299,9 +299,10 @@ ManageResults.Region <- function(region, population_model,
   # Extended collate results
   self$collate <- function(r, tm, n, calc_impacts) {
 
-    # Collate population results (without action attributes)
+    # Collate population results (without additional attributes)
     n_no_attr <- n
     attr(n_no_attr, "recovery_delay") <- NULL
+    attr(n_no_attr, "dynamic_mult") <- NULL
     for (a in actions) {
       attr(n_no_attr, a$get_label()) <- NULL
     }
