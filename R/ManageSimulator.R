@@ -265,6 +265,10 @@ ManageSimulator.Region <- function(region,
           attr(n, "impacts")
         })
         attr(n, "impacts") <- NULL
+
+        # Apply any dynamically linked impacts to capacity
+        population_model$set_capacity_mult(n)
+
       } else {
         calc_impacts <- NULL
       }
@@ -307,6 +311,10 @@ ManageSimulator.Region <- function(region,
             attr(n, "impacts")
           })
           attr(n, "impacts") <- NULL
+
+          # Apply any dynamically linked impacts to capacity
+          population_model$set_capacity_mult(n)
+
         }
 
         # Apply actions
