@@ -124,14 +124,14 @@
 #'       collection of raster TIF and/or comma-separated value (CSV) files,
 #'       appropriate for the \code{divisions} type, including the management
 #'       resource \code{allocation}, the probability of management success (or
-#'       effectiveness) values (\code{manage_pr}), and the modified
-#'       establishment likelihood (\code{mod_establish_pr}) when previous
-#'       control is specified, as well as a \code{summary} (CSV) of the total
-#'       allocation, costs (when applicable), the weighted average probability
-#'       of success (\code{average_pr}), and (when available) the overall
-#'       system-wide probability of success (or effectiveness) of the
-#'       management design (\code{overall_pr}). \code{Terra} raster write
-#'       options may be passed to the function for saving grid-based designs.}
+#'       effectiveness) values (\code{manage_pr}), \code{control_cost}
+#'       (combined control allocation and fixed costs), and a \code{summary}
+#'       (CSV) of the total allocation, costs (when applicable), the weighted
+#'       average probability of success (\code{average_pr}), and (when
+#'       available) the overall system-wide probability of success (or
+#'       effectiveness) of the management design (\code{overall_pr}).
+#'       \code{Terra} raster write options may be passed to the function for
+#'       saving grid-based designs.}
 #'   }
 #' @references
 #'   Cannon, R. M. (2009). Inspecting and monitoring on a restricted budget -
@@ -344,6 +344,10 @@ ControlDesign.ManageContext <- function(context,
       return(establish_pr)
     }
   }
+
+  # Output control cost?
+  output_cost <- list(alloc_cost = is.numeric(alloc_cost),
+                      fixed_cost = is.numeric(fixed_cost))
 
   # Resolve alloc_cost, fixed_cost, min_alloc, and exist_manage_pr
   if (length(alloc_cost) == 1) {
@@ -676,6 +680,12 @@ ControlDesign.ManageContext <- function(context,
   self$save_design <- function(...) {
 
     # Save allocation and management probability/effectiveness
+    if (any(unlist(output_cost))) {
+      cost <- (self$get_allocation() > 0)*fixed_cost
+      if (output_cost$alloc_cost) {
+        cost <- cost + self$get_allocation()*alloc_cost
+      }
+    }
     if (divisions$get_type() == "grid") {
       terra::writeRaster(divisions$get_rast(self$get_allocation()),
                          "allocation.tif", ...)
@@ -685,32 +695,40 @@ ControlDesign.ManageContext <- function(context,
         terra::writeRaster(divisions$get_rast(self$get_mod_establish_pr()),
                            "mod_establish_pr.tif", ...)
       }
+      if (any(unlist(output_cost))) {
+        terra::writeRaster(divisions$get_rast(cost), "control_cost.tif", ...)
+      }
     } else if (divisions$get_type() == "patch") {
       if (!is.null(previous_control)) {
-        write.csv(cbind(divisions$get_coords(extra_cols = TRUE),
-                        mod_establish_pr = self$get_mod_establish_pr(),
-                        allocation = self$get_allocation(),
-                        manage_pr = self$get_manage_pr()),
-                  file = "design.csv", row.names = FALSE)
+        design_df <- cbind(divisions$get_coords(extra_cols = TRUE),
+                           mod_establish_pr = self$get_mod_establish_pr(),
+                           allocation = self$get_allocation(),
+                           manage_pr = self$get_manage_pr())
+        write.csv(design_df, file = "design.csv", row.names = FALSE)
       } else {
-        write.csv(cbind(divisions$get_coords(extra_cols = TRUE),
-                        allocation = self$get_allocation(),
-                        manage_pr = self$get_manage_pr()),
-                  file = "design.csv", row.names = FALSE)
+        design_df <- cbind(divisions$get_coords(extra_cols = TRUE),
+                           allocation = self$get_allocation(),
+                           manage_pr = self$get_manage_pr())
       }
+      if (any(unlist(output_cost))) {
+        design_df$control_cost <- round(cost, 2)
+      }
+      write.csv(design_df, file = "design.csv", row.names = FALSE)
     } else if (divisions$get_type() == "other") {
       if (!is.null(previous_control)) {
-        write.csv(cbind(divisions$get_data(),
-                        mod_establish_pr = self$get_mod_establish_pr(),
-                        allocation = self$get_allocation(),
-                        manage_pr = self$get_manage_pr()),
-                  file = "design.csv", row.names = FALSE)
+        design_df <- cbind(divisions$get_data(),
+                           mod_establish_pr = self$get_mod_establish_pr(),
+                           allocation = self$get_allocation(),
+                           manage_pr = self$get_manage_pr())
       } else {
-        write.csv(cbind(divisions$get_data(),
-                        allocation = self$get_allocation(),
-                        manage_pr = self$get_manage_pr()),
-                  file = "design.csv", row.names = FALSE)
+        design_df <- cbind(divisions$get_data(),
+                           allocation = self$get_allocation(),
+                           manage_pr = self$get_manage_pr())
       }
+      if (any(unlist(output_cost))) {
+        design_df$control_cost <- round(cost, 2)
+      }
+      write.csv(design_df, file = "design.csv", row.names = FALSE)
     }
 
     # Save summary
