@@ -25,10 +25,6 @@
 #'   food source). Configure dynamic links via a vector of one or more strings
 #'   from \code{"suitability"}, \code{"capacity"}, and/or \code{"attractors"}.
 #'   Default \code{NULL} assumes no dynamic links or impacts are not dynamic.
-#' Vector Number of simulation time steps that incursion impacts
-#'   continue to be in effect at previously occupied locations before the
-#'   asset value at the locations recover. Only available for spatially
-#'   explicit grid or network models. Default \code{NULL} assumes no delay.
 #' @param recovery_delay Number of simulation time steps that incursion impacts
 #'   continue to be in effect at previously occupied locations before the
 #'   asset value at the locations recover. Only available for spatially

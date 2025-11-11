@@ -40,11 +40,7 @@ suitability, carrying capacity, and/or dispersal attraction when
 applicable, such as when a threat utilises a resource or asset (e.g. as a
 food source). Configure dynamic links via a vector of one or more strings
 from \code{"suitability"}, \code{"capacity"}, and/or \code{"attractors"}.
-Default \code{NULL} assumes no dynamic links or impacts are not dynamic.
-Vector Number of simulation time steps that incursion impacts
-continue to be in effect at previously occupied locations before the
-asset value at the locations recover. Only available for spatially
-explicit grid or network models. Default \code{NULL} assumes no delay.}
+Default \code{NULL} assumes no dynamic links or impacts are not dynamic.}
 
 \item{recovery_delay}{Number of simulation time steps that incursion impacts
 continue to be in effect at previously occupied locations before the
