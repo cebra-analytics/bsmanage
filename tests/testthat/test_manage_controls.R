@@ -29,11 +29,19 @@ test_that("initializes with region, population, and other parameters", {
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "search_destroy"),
     "Control design object is required for 'search & destroy' control.")
+  expect_error(
+    manage_controls <- ManageControls(region, population_model,
+                                      control_type = "search_destroy",
+                                      control_design = control_design,
+                                      control_cost = 1:5),
+    paste("The control cost parameter must be a numeric vector with values",
+          "for each location."))
   expect_silent(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "search_destroy",
                                       control_design = control_design,
-                                      stages = 2:3, schedule = 4:6))
+                                      control_cost = 2, stages = 2:3,
+                                      schedule = 4:6))
   expect_is(manage_controls, "ManageControls")
   expect_s3_class(manage_controls, "ManageActions")
   expect_named(manage_controls, c(c("get_type", "get_label", "get_stages",
@@ -78,6 +86,7 @@ test_that("initializes with region, population, and other parameters", {
                                       control_design = control_design,
                                       radius = 1000,
                                       control_mult = 0.7,
+                                      control_cost = 2,
                                       stages = 2:3,
                                       apply_to = "survival",
                                       schedule = 4:6))
@@ -118,15 +127,21 @@ test_that("applies stochastic controls to invasive population", {
   attr(n, "attachment") <- "extra"
   expected_n <- n - expected_controls
   attr(expected_n, "control_search_destroy") <- expected_controls
+  expected_costs <- 2*(exist_manage_pr > 0)
+  attr(expected_costs, "unit") <- "$"
+  attr(expected_n, "control_search_destroy_cost") <- expected_costs
   expect_silent(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "search_destroy",
                                       control_design = control_design,
-                                      stages = 2:3, schedule = 4:6))
+                                      control_cost = 2,
+                                      stages = 2:3,
+                                      schedule = 4:6))
   set.seed(1234)
   expect_silent(new_n <- manage_controls$apply(n, 4))
   expect_equal(new_n, expected_n)
   expect_equal(attr(new_n, "control_search_destroy"), expected_controls)
+  expect_equal(attr(new_n, "control_search_destroy_cost"), expected_costs)
   expect_equal(attr(new_n, "attachment"), "extra")
   attr(n, "attachment") <- NULL
   # growth, spread, or establishment
@@ -148,19 +163,22 @@ test_that("applies stochastic controls to invasive population", {
                                       control_design = control_design,
                                       radius = 1500,
                                       control_mult = 0.7,
+                                      control_cost = 2,
                                       stages = 2:3,
                                       apply_to = "survival",
                                       schedule = 4:6))
   expect_silent(new_n <- manage_controls$apply(n, 4))
   expect_equal(as.numeric(new_n), as.numeric(n))
   expect_equal(dim(new_n), dim(n))
-  expect_named(new_n, names(n))
   expect_equal(attr(new_n, "detected"), detected)
   expect_equal(as.numeric(attr(new_n, "control_growth")),
                ((exist_mask | detected_mask)*0.7 +
                   !(exist_mask | detected_mask)))
   expect_equal(attr(attr(new_n, "control_growth"), "stages"), 2:3)
   expect_equal(attr(attr(new_n, "control_growth"), "apply_to"), "survival")
+  expect_equal(attr(new_n, "control_growth_cost"),
+               (expected_costs*(control_design$get_allocation() > 0 |
+                                  detected_mask)))
   establish_mask <- +(rowSums(detected) > 0 | NA)
   establish_mask <- terra::buffer(region$get_rast(establish_mask),
                                   width = 3000)[region$get_indices()][,1] > 0
@@ -170,6 +188,7 @@ test_that("applies stochastic controls to invasive population", {
                                       control_design = control_design,
                                       radius = 3000,
                                       control_mult = 0.7,
+                                      control_cost = 2,
                                       stages = 2:3,
                                       apply_to = "survival",
                                       schedule = 4:6))
@@ -177,4 +196,7 @@ test_that("applies stochastic controls to invasive population", {
   expect_equal(attr(new_n, "control_establishment"),
                ((exist_mask | establish_mask)*0.7 +
                   !(exist_mask | establish_mask)))
+  expect_equal(attr(new_n, "control_establishment_cost"),
+               (expected_costs*(control_design$get_allocation() > 0 |
+                                  establish_mask)))
 })

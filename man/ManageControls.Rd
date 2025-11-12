@@ -11,6 +11,7 @@ ManageControls(
   control_type = c("search_destroy", "growth", "spread", "establishment"),
   control_design = NULL,
   control_mult = NULL,
+  control_cost = NULL,
   radius = NULL,
   stages = NULL,
   apply_to = NULL,
@@ -24,6 +25,7 @@ ManageControls(
   control_type = c("search_destroy", "growth", "spread", "establishment"),
   control_design = NULL,
   control_mult = NULL,
+  control_cost = NULL,
   radius = NULL,
   stages = NULL,
   apply_to = NULL,
@@ -61,6 +63,14 @@ existing, known, or scheduled treatment locations (when specified via
 \code{"control_design"}), and at locations (and optionally surroundings)
 where the invasive species has been detected (when specified via a
 population attribute).}
+
+\item{control_cost}{Numeric vector of distributed control costs (combined
+resource and fixed costs) or a single cost value for each location where
+control is applied. Costs are accumulated for each application of the
+control at each (scheduled) simulation time step. The cost unit may be
+added as an attribute (\code{attr(control_cost, "unit")}), or set within
+the \code{ControlDesign} object associated with the \code{control_design}
+when given. Default is \code{NULL} when costs are unavailable.}
 
 \item{radius}{Optional radius (m) of the applied control for types
 \code{"growth"}, \code{"spread"}, or \code{"establishment"} only.

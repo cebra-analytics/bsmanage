@@ -26,6 +26,12 @@
 #'   applied to detected individuals (e.g. via traps). Default is \code{FALSE},
 #'   indicating that removal is applied to all individuals at locations where
 #'   the invasive species has been detected (e.g. via treatment).
+#' @param removal_cost Numeric vector of distributed removal costs (combined
+#'   resource and fixed costs) or a single cost value for each location where
+#'   removal is applied. Costs are accumulated for each application of the
+#'   removal at each (scheduled) simulation time step. The cost unit may be
+#'   added as an attribute (\code{attr(removal_cost, "unit")}). Default is
+#'   \code{NULL} when costs are unavailable.
 #' @param radius Optional radius (m) of the removal. Stochastic removal is
 #'   applied to all locations within the specified radius of each location
 #'   where the invasive species has been detected. Default is \code{NULL},
@@ -60,6 +66,7 @@ ManageRemovals <- function(region, population_model,
                            removal_pr = 1,
                            remove_always = FALSE,
                            detected_only = FALSE,
+                           removal_cost = NULL,
                            radius = NULL,
                            stages = NULL, schedule = NULL, ...) {
   UseMethod("ManageRemovals")
@@ -71,6 +78,7 @@ ManageRemovals.Region <- function(region, population_model,
                                   removal_pr = 1,
                                   remove_always = FALSE,
                                   detected_only = FALSE,
+                                  removal_cost = NULL,
                                   radius = NULL,
                                   stages = NULL, schedule = NULL, ...) {
 
@@ -101,6 +109,20 @@ ManageRemovals.Region <- function(region, population_model,
   # Notify if radius is provided when detected only
   if (is.numeric(radius) && detected_only) {
     message("Radius is not used when only detected individuals are removed.")
+  }
+
+  # Check and process removal cost
+  if (!is.null(removal_cost)) {
+    if (!is.numeric(removal_cost) ||
+        !length(removal_cost) %in% c(1, region$get_locations())) {
+      stop(paste("The removal cost parameter must be a numeric vector with",
+                 "values for each location."), call. = FALSE)
+    }
+    cost_unit <- attr(removal_cost, "unit")
+    if (length(removal_cost) == 1) {
+      removal_cost <- removal_cost*(removal_pr > 0)
+    }
+    attr(removal_cost, "unit") <- cost_unit
   }
 
   # Get results label
@@ -174,6 +196,14 @@ ManageRemovals.Region <- function(region, population_model,
           }
         }
       }
+
+      # Set removal cost locations
+      if (!is.null(removal_cost)) {
+        cost_apply <- rep(FALSE, region$get_locations())
+        if (length(idx) > 0) {
+          cost_apply[idx] <- TRUE
+        }
+      }
     }
 
     # Attach or update removed as an attribute
@@ -188,6 +218,15 @@ ManageRemovals.Region <- function(region, population_model,
         attr(n, "removed") <- removed
       } else {
         attr(n, "removed") <- removed + attr(n, "removed")
+      }
+    }
+
+    # Attach removal costs as an attribute
+    if (!is.null(removal_cost)) {
+      if (is.null(schedule) || tm %in% schedule) {
+        attr(n, "removal_cost") <- removal_cost*cost_apply
+      } else {
+        attr(n, "removal_cost") <- removal_cost*0
       }
     }
 

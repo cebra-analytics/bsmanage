@@ -29,6 +29,13 @@
 #'   \code{"control_design"}), and at locations (and optionally surroundings)
 #'   where the invasive species has been detected (when specified via a
 #'   population attribute).
+#' @param control_cost Numeric vector of distributed control costs (combined
+#'   resource and fixed costs) or a single cost value for each location where
+#'   control is applied. Costs are accumulated for each application of the
+#'   control at each (scheduled) simulation time step. The cost unit may be
+#'   added as an attribute (\code{attr(control_cost, "unit")}), or set within
+#'   the \code{ControlDesign} object associated with the \code{control_design}
+#'   when given. Default is \code{NULL} when costs are unavailable.
 #' @param radius Optional radius (m) of the applied control for types
 #'   \code{"growth"}, \code{"spread"}, or \code{"establishment"} only.
 #'   Control is applied to all surrounding locations within the specified
@@ -74,6 +81,7 @@ ManageControls <- function(region, population_model,
                                             "establishment"),
                            control_design = NULL,
                            control_mult = NULL,
+                           control_cost = NULL,
                            radius = NULL,
                            stages = NULL,
                            apply_to = NULL,
@@ -90,6 +98,7 @@ ManageControls.Region <- function(region, population_model,
                                                    "establishment"),
                                   control_design = NULL,
                                   control_mult = NULL,
+                                  control_cost = NULL,
                                   radius = NULL,
                                   stages = NULL,
                                   apply_to = NULL,
@@ -142,6 +151,28 @@ ManageControls.Region <- function(region, population_model,
     }
   } else {
    apply_to <- "both"
+  }
+
+  # Check and process control cost
+  if (!is.null(control_cost)) {
+    if (!is.numeric(control_cost) ||
+        !length(control_cost) %in% c(1, region$get_locations())) {
+      stop(paste("The control cost parameter must be a numeric vector with",
+                 "values for each location."), call. = FALSE)
+    }
+    cost_unit <- attr(control_cost, "unit")
+    if (!is.null(control_design) && (is.null(cost_unit) || cost_unit == "")) {
+      cost_unit <- control_design$get_cost_unit()
+    }
+    if (length(control_cost) == 1) {
+      if (control_type == "search_destroy") {
+        control_cost <- control_cost*(control_design$get_manage_pr() > 0)
+      } else if (control_type %in% c("growth", "spread", "establishment")) {
+        control_cost <-
+          control_cost*(control_mult*rep(1, region$get_locations()) > 0)
+      }
+    }
+    attr(control_cost, "unit") <- cost_unit
   }
 
   # Get results label
@@ -198,6 +229,15 @@ ManageControls.Region <- function(region, population_model,
       } else {
         attr(n, self$get_label()) <- controlled
       }
+
+      # Attach control costs as an attribute via label
+      if (!is.null(control_cost)) {
+        if (is.null(schedule) || tm %in% schedule) {
+          attr(n, paste0(self$get_label(), "_cost")) <- control_cost
+        } else {
+          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
+        }
+      }
     }
 
     # Growth, spread, or establishment control
@@ -205,6 +245,11 @@ ManageControls.Region <- function(region, population_model,
 
       # Initial no application locations
       n_apply <- rep(FALSE, region$get_locations())
+
+      # Initial no control cost locations
+      if (!is.null(control_cost)) {
+        cost_apply <- rep(FALSE, region$get_locations())
+      }
 
       # Scheduled time step?
       if (is.null(schedule) || tm %in% schedule) {
@@ -220,6 +265,11 @@ ManageControls.Region <- function(region, population_model,
 
             # Get control application locations
             n_apply[idx] <- control_design$get_allocation()[idx] > 0
+          }
+
+          # Control cost locations
+          if (!is.null(control_cost)) {
+            cost_apply <- control_design$get_allocation() > 0
           }
         }
 
@@ -243,6 +293,11 @@ ManageControls.Region <- function(region, population_model,
           if (length(idx) > 0) {
             n_apply[idx] <- TRUE
           }
+
+          # Set/update control cost locations
+          if (!is.null(control_cost) && length(idx) > 0) {
+            cost_apply[idx] <- TRUE
+          }
         }
       }
 
@@ -252,6 +307,15 @@ ManageControls.Region <- function(region, population_model,
         if (control_type == "growth") {
           attr(attr(n, self$get_label()), "stages") <- self$get_stages()
           attr(attr(n, self$get_label()), "apply_to") <- apply_to
+        }
+      }
+
+      # Attach control costs as an attribute via label
+      if (!is.null(control_cost)) {
+        if (is.null(schedule) || tm %in% schedule) {
+          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*cost_apply
+        } else {
+          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
         }
       }
     }

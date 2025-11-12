@@ -11,6 +11,7 @@ ManageRemovals(
   removal_pr = 1,
   remove_always = FALSE,
   detected_only = FALSE,
+  removal_cost = NULL,
   radius = NULL,
   stages = NULL,
   schedule = NULL,
@@ -23,6 +24,7 @@ ManageRemovals(
   removal_pr = 1,
   remove_always = FALSE,
   detected_only = FALSE,
+  removal_cost = NULL,
   radius = NULL,
   stages = NULL,
   schedule = NULL,
@@ -57,6 +59,13 @@ via the general public or property owners).}
 applied to detected individuals (e.g. via traps). Default is \code{FALSE},
 indicating that removal is applied to all individuals at locations where
 the invasive species has been detected (e.g. via treatment).}
+
+\item{removal_cost}{Numeric vector of distributed removal costs (combined
+resource and fixed costs) or a single cost value for each location where
+removal is applied. Costs are accumulated for each application of the
+removal at each (scheduled) simulation time step. The cost unit may be
+added as an attribute (\code{attr(removal_cost, "unit")}). Default is
+\code{NULL} when costs are unavailable.}
 
 \item{radius}{Optional radius (m) of the removal. Stochastic removal is
 applied to all locations within the specified radius of each location

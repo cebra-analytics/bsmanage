@@ -9,6 +9,7 @@ ManageDetection(
   region,
   population_model,
   surveillance,
+  surv_cost = NULL,
   stages = NULL,
   schedule = NULL,
   ...
@@ -18,6 +19,7 @@ ManageDetection(
   region,
   population_model,
   surveillance,
+  surv_cost = NULL,
   stages = NULL,
   schedule = NULL,
   ...
@@ -35,6 +37,15 @@ simulations.}
 \item{surveillance}{A \code{bsdesign::SurveillanceDesign} or inherited class
 object representing the distribution of surveillance resources and their
 detection sensitivities.}
+
+\item{surv_cost}{Numeric vector of distributed surveillance costs (combined
+resource and fixed costs) or a single cost value for each location where
+surveillance is applied. Costs are accumulated for each application of the
+surveillance at each (scheduled) simulation time step. The cost unit may
+be added as an attribute (\code{attr(surv_cost, "unit")}), or set within
+the \code{bsdesign::Context} object associated with the
+\code{surveillance} (\code{bsdesign::SurveillanceDesign}) object. Default
+is \code{NULL} when costs are unavailable.}
 
 \item{stages}{Numeric vector of population stages (indices) to which
 management detection are applied. Default is all stages (when set to

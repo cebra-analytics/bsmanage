@@ -28,8 +28,14 @@ test_that("initializes with region, population, and surveillance", {
     region2, bsspread::StagedPopulation(region2, stage_matrix), surveillance,
     stages = 2:3),
     "Surveillance object must be compatible with the region object.")
+  expect_error(manage_detection <- ManageDetection(
+    region, population_model, surveillance, surv_cost = 1:5, stages = 2:3,
+    schedule = 4:6),
+    paste("The surveillance cost parameter must be a numeric vector with",
+          "values for each location."))
   expect_silent(manage_detection <- ManageDetection(
-    region, population_model, surveillance, stages = 2:3, schedule = 4:6))
+    region, population_model, surveillance, surv_cost = 1, stages = 2:3,
+    schedule = 4:6))
   expect_is(manage_detection, "ManageDetection")
   expect_s3_class(manage_detection, "ManageActions")
   expect_named(manage_detection, c(c("get_type", "get_label", "get_stages",
@@ -44,7 +50,6 @@ test_that("initializes with region, population, and surveillance", {
 
 test_that("applies stochastic detection to invasive population", {
   TEST_DIRECTORY <- test_path("test_inputs")
-
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
   region <- bsspread::Region(template)
   template[region$get_indices()][5920:5922,] <- c(0.5, 0.75, 1)
@@ -72,10 +77,17 @@ test_that("applies stochastic detection to invasive population", {
                                              c(0.5, 0.75, 1))), c(3, 3))
   colnames(expected_detected) <- colnames(n)
   expect_silent(manage_detection <- ManageDetection(
-    region, population_model, surveillance, stages = 2:3, schedule = 4:6))
+    region, population_model, surveillance, surv_cost = 2, stages = 2:3,
+    schedule = 4:6))
   set.seed(1234)
   expect_silent(new_n <- manage_detection$apply(n, 4))
   expect_equal(attr(new_n, "detected")[5920:5922,], expected_detected)
+  expect_equal(as.numeric(attr(new_n, "surv_cost")),
+               2*(surveillance$get_sensitivity() > 0))
+  expect_equal(attr(attr(new_n, "surv_cost"), "unit"), "$")
   expect_silent(new_n <- manage_detection$apply(n, 2))
   expect_equal(attr(new_n, "detected")[5920:5922,], expected_detected*0)
+  expect_equal(as.numeric(attr(new_n, "surv_cost")),
+               rep(0, region$get_locations()))
+  expect_equal(attr(attr(new_n, "surv_cost"), "unit"), "$")
 })

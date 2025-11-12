@@ -12,6 +12,14 @@
 #' @param surveillance A \code{bsdesign::SurveillanceDesign} or inherited class
 #'   object representing the distribution of surveillance resources and their
 #'   detection sensitivities.
+#' @param surv_cost Numeric vector of distributed surveillance costs (combined
+#'   resource and fixed costs) or a single cost value for each location where
+#'   surveillance is applied. Costs are accumulated for each application of the
+#'   surveillance at each (scheduled) simulation time step. The cost unit may
+#'   be added as an attribute (\code{attr(surv_cost, "unit")}), or set within
+#'   the \code{bsdesign::Context} object associated with the
+#'   \code{surveillance} (\code{bsdesign::SurveillanceDesign}) object. Default
+#'   is \code{NULL} when costs are unavailable.
 #' @param stages Numeric vector of population stages (indices) to which
 #'   management detection are applied. Default is all stages (when set to
 #'   \code{NULL}).
@@ -40,15 +48,23 @@
 #'       newly applied detection/surveillance.}
 #'   }
 #' @export
-ManageDetection <- function(region, population_model, surveillance,
-                            stages = NULL, schedule = NULL, ...) {
+ManageDetection <- function(region,
+                            population_model,
+                            surveillance,
+                            surv_cost = NULL,
+                            stages = NULL,
+                            schedule = NULL, ...) {
   UseMethod("ManageDetection")
 }
 
 #' @name ManageDetection
 #' @export
-ManageDetection.Region <- function(region, population_model, surveillance,
-                                   stages = NULL, schedule = NULL, ...) {
+ManageDetection.Region <- function(region,
+                                   population_model,
+                                   surveillance,
+                                   surv_cost = NULL,
+                                   stages = NULL,
+                                   schedule = NULL, ...) {
 
   # Build via base class
   self <- ManageActions(region = region,
@@ -67,6 +83,23 @@ ManageDetection.Region <- function(region, population_model, surveillance,
              region$get_locations()) {
     stop("Surveillance object must be compatible with the region object.",
          call. = FALSE)
+  }
+
+  # Check and process surveillance cost
+  if (!is.null(surv_cost)) {
+    if (!is.numeric(surv_cost) ||
+        !length(surv_cost) %in% c(1, region$get_locations())) {
+      stop(paste("The surveillance cost parameter must be a numeric vector",
+                 "with values for each location."), call. = FALSE)
+    }
+    cost_unit <- attr(surv_cost, "unit")
+    if (is.null(cost_unit) || cost_unit == "") {
+      cost_unit <- surveillance$get_context()$get_cost_unit()
+    }
+    if (length(surv_cost) == 1) {
+      surv_cost <- surv_cost*(surveillance$get_sensitivity() > 0)
+    }
+    attr(surv_cost, "unit") <- cost_unit
   }
 
   # Get results label
@@ -117,6 +150,15 @@ ManageDetection.Region <- function(region, population_model, surveillance,
       attr(n, "detected") <- as.logical(detected)
     } else {
       attr(n, "detected") <- detected
+    }
+
+    # Attach surveillance costs as an attribute
+    if (!is.null(surv_cost)) {
+      if (is.null(schedule) || tm %in% schedule) {
+        attr(n, "surv_cost") <- surv_cost
+      } else {
+        attr(n, "surv_cost") <- surv_cost*0
+      }
     }
 
     return(n)
