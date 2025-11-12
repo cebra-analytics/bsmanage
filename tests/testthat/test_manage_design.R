@@ -143,9 +143,9 @@ test_that("initializes with context, divisions, and valid parameters", {
                                               optimal = "none"))
   expect_is(manage_design, "ManageDesign")
   expect_named(manage_design, c("get_context", "get_divisions", "get_dim_type",
-                                "get_allocation", "get_manage_pr",
-                                "get_average_pr", "get_overall_pr",
-                                "save_design"))
+                                "get_cost_unit", "get_allocation",
+                                "get_manage_pr", "get_average_pr",
+                                "get_overall_pr", "save_design"))
   expect_is(manage_design$get_context(), "ManageContext")
   expect_is(manage_design$get_divisions(), "Divisions")
   expect_equal(manage_design$get_dim_type(), "spatial")
@@ -157,8 +157,9 @@ test_that("initializes with context, divisions, and valid parameters", {
                                               establish_pr = 2,
                                               optimal = "none"))
   expect_named(manage_design, c("get_context", "get_divisions", "get_dim_type",
-                                "get_allocation", "get_manage_pr",
-                                "get_average_pr", "save_design"))
+                                "get_cost_unit", "get_allocation",
+                                "get_manage_pr", "get_average_pr",
+                                "save_design"))
   expect_silent(manage_design <- ManageDesign(context = ManageContext("test"),
                                               divisions = divisions,
                                               dim_type = "user_defined",

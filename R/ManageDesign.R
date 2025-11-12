@@ -78,6 +78,7 @@
 #'     \item{\code{get_context()}}{Get context object.}
 #'     \item{\code{get_divisions()}}{Get divisions object.}
 #'     \item{\code{get_dim_type()}}{Get dimension type.}
+#'     \item{\code{get_cost_unit()}}{Get cost unit.}
 #'     \item{\code{get_allocation()}}{Get allocated resources via specified
 #'       strategy, utilizing savings, benefits, budget constraints, and/or
 #'       desired overall management success probability level.}
@@ -361,6 +362,11 @@ ManageDesign.ManageContext <- function(context,
   # Get dimension type
   self$get_dim_type <- function() {
     return(dim_type)
+  }
+
+  # Get cost unit
+  self$get_cost_unit <- function() {
+    return(cost_unit)
   }
 
   # Get the allocated surveillance resource quantities of the design

@@ -50,10 +50,10 @@ test_that("initializes with context, divisions, and valid parameters", {
                                                 optimal = "none"))
   expect_is(control_design, "ControlDesign")
   expect_s3_class(control_design, "ManageDesign")
-  expect_named(
-    control_design,
-    c("get_context", "get_divisions", "get_dim_type", "get_allocation",
-      "get_manage_pr", "get_average_pr", "get_overall_pr", "save_design"))
+  expect_named(control_design,
+               c("get_context", "get_divisions", "get_dim_type",
+                 "get_cost_unit", "get_allocation", "get_manage_pr",
+                 "get_average_pr", "get_overall_pr", "save_design"))
   expect_is(control_design$get_context(), "ManageContext")
   expect_is(control_design$get_divisions(), "Divisions")
   expect_equal(control_design$get_dim_type(), "spatial")
@@ -341,11 +341,11 @@ test_that("resource allocation utilises previous control efforts", {
     benefit = test_ref$cost_undetected - test_ref$cost_detected,
     budget = NULL,
     previous_control = previous_control))
-  expect_named(
-    control_design,
-    c("get_context", "get_divisions", "get_dim_type", "get_allocation",
-      "get_manage_pr", "get_average_pr", "get_overall_pr", "save_design",
-      "get_mod_establish_pr"))
+  expect_named(control_design,
+               c("get_context", "get_divisions", "get_dim_type",
+                 "get_cost_unit", "get_allocation", "get_manage_pr",
+                 "get_average_pr", "get_overall_pr", "save_design",
+                 "get_mod_establish_pr"))
   expect_equal(control_design$get_mod_establish_pr(), mod_establish_pr)
   expect_silent(mod_alloc <- control_design$get_allocation())
   expect_equal(mod_alloc, expected_alloc)

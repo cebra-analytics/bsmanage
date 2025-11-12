@@ -105,6 +105,7 @@
 #'     \item{\code{get_context()}}{Get context object.}
 #'     \item{\code{get_divisions()}}{Get divisions object.}
 #'     \item{\code{get_dim_type()}}{Get dimension type.}
+#'     \item{\code{get_cost_unit()}}{Get cost unit.}
 #'     \item{\code{get_mod_establish_pr()}}{Get the modified establishment
 #'       likelihood (only when previous control is specified).}
 #'     \item{\code{get_allocation()}}{Get allocated resources via specified
