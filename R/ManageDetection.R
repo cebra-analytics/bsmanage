@@ -40,6 +40,8 @@
 #'       detection are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 #'       which management detection are applied.}
+#'     \item{\code{include_cost()}}{Logical indication of a cost parameter
+#'       having a value (named as per population attachment).}
 #'     \item{\code{apply(n, tm)}}{Apply management detection to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, providing the time
@@ -110,6 +112,13 @@ ManageDetection.Region <- function(region,
   # Get the surveillance object
   self$get_surveillance <- function() {
     return(surveillance)
+  }
+
+  # Does cost parameter (named) having a value?
+  self$include_cost <- function() {
+    include_cost <- is.numeric(surv_cost)
+    names(include_cost) <- "surv_cost"
+    return(include_cost)
   }
 
   # Detection/surveillance apply method

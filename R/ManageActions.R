@@ -28,6 +28,8 @@
 #'       actions are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 #'       which management actions are applied.}
+#'     \item{\code{include_cost()}}{Logical indication of a cost parameter
+#'       having a value (named as per population attachment).}
 #'     \item{\code{apply(n, tm)}}{Apply management actions to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, providing the time
@@ -107,6 +109,11 @@ ManageActions.Region <- function(region, population_model,
   # Get schedule
   self$get_schedule <- function() {
     return(schedule)
+  }
+
+  # Does cost parameter (named) having a value?
+  self$include_cost <- function() { # overridden in inherited classes
+    return(FALSE)
   }
 
   # Generic apply method (overridden in inherited classes)

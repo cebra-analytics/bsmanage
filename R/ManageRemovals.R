@@ -54,6 +54,8 @@
 #'       removals are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 #'       which management removals are applied.}
+#'     \item{\code{include_cost()}}{Logical indication of a cost parameter
+#'       having a value (named as per population attachment).}
 #'     \item{\code{apply(n, tm)}}{Apply management removals to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, providing the time
@@ -128,6 +130,13 @@ ManageRemovals.Region <- function(region, population_model,
   # Get results label
   self$get_label <- function() {
     return("removed")
+  }
+
+  # Does cost parameter (named) having a value?
+  self$include_cost <- function() {
+    include_cost <- is.numeric(removal_cost)
+    names(include_cost) <- "removal_cost"
+    return(include_cost)
   }
 
   # Removal apply method

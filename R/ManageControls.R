@@ -66,6 +66,8 @@
 #'       controls are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 #'       which management controls are applied.}
+#'     \item{\code{include_cost()}}{Logical indication of a cost parameter
+#'       having a value (named as per population attachment).}
 #'     \item{\code{apply(n, tm)}}{Apply management controls to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, providing the time
@@ -178,6 +180,13 @@ ManageControls.Region <- function(region, population_model,
   # Get results label
   self$get_label <- function() {
     return(paste0("control_", control_type))
+  }
+
+  # Does cost parameter (named) having a value?
+  self$include_cost <- function() {
+    include_cost <- is.numeric(control_cost)
+    names(include_cost) <- paste0(self$get_label(), "_cost")
+    return(include_cost)
   }
 
   # Control apply method
