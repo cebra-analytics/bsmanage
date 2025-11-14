@@ -93,6 +93,69 @@ test_that("initializes inherited object with impacts and actions", {
                       function(i) lapply(i, function(j) sapply(j, length))),
                list(a3 = list(detected = collated, total = totals),
                     a4 = list(removed = collated, total = totals)))
+  # with action costs
+  actions <- list(
+    a3 = ManageDetection(region, population_model, surveillance,
+                         surv_cost = 3),
+    a4 = ManageControls(region, population_model, control_type = "growth",
+                        control_mult = 0.4, control_cost = 4),
+    a5 = ManageControls(region, population_model, control_type = "spread",
+                        control_mult = 0.5, control_cost = 5),
+    a6 = ManageRemovals(region, population_model, removal_cost = 6))
+  expect_silent(
+    results <- ManageResults(region, population_model = population_model,
+                             impacts = impacts, actions = actions,
+                             time_steps = 10, collation_steps = 2,
+                             replicates = 1))
+  expect_silent(result_list <- results$get_list())
+  expect_named(result_list, c("population", "total_pop", "occupancy",
+                              "total_occup", "area", "impacts", "actions"))
+  expect_equal(lapply(result_list$actions, function(i) lapply(i, length)),
+               lapply(actions, function(a) {
+                 l = list(6, total = 11, cost = 3)
+                 names(l)[1] <- a$get_label()
+                 l
+               }))
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i$cost, length)),
+               lapply(actions, function(a) {
+                 l = list(6, total = 11, cumulative = 2)
+                 names(l)[1] <- a$get_label()
+                 l
+               }))
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i$cost$cumulative, length)),
+               lapply(actions, function(a) {
+                 l = list(6, total = 11)
+                 names(l)[1] <- a$get_label()
+                 l
+               }))
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i[-which(names(i) == "cost")],
+                                         function(j) sapply(j, length))),
+               lapply(actions, function(a) {
+                 l = list(collated, total = totals)
+                 names(l)[1] <- a$get_label()
+                 l
+               }))
+  expect_equal(lapply(result_list$actions,
+                      function(i) {
+                        lapply(i$cost[-which(names(i$cost) == "cumulative")],
+                               function(j) sapply(j, length))
+                      }),
+               lapply(actions, function(a) {
+                 l = list(collated, total = totals)
+                 names(l)[1] <- a$get_label()
+                 l
+               }))
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i$cost$cumulative,
+                                         function(j) sapply(j, length))),
+               lapply(actions, function(a) {
+                 l = list(collated, total = totals)
+                 names(l)[1] <- a$get_label()
+                 l
+               }))
 })
 
 test_that("collates and finalizes impact results", {
@@ -423,7 +486,8 @@ test_that("collates and finalizes action results", {
   template_vect <- template[region$get_indices()][,1]
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   n <- rep(0, region$get_locations())
-  n[5920:5922] <- (10:12)*5
+  idx <- 5920:5922
+  n[idx] <- (10:12)*5
   surveillance <-
     bsdesign::SpatialSurvDesign(context = bsdesign::Context("test"),
                                 divisions = bsdesign::Divisions(template),
@@ -474,19 +538,19 @@ test_that("collates and finalizes action results", {
                       function(i) lapply(i, function(j) j*0)))
   # multiple replicates
   n_r <- list(); n_r2 <- list()
-  n[5920:5922] <- (9:11)*5
+  n[idx] <- (9:11)*5
   n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2)
   n <- actions$a5$apply(n, 2); n_r[[1]] <- n
   attributes(n) <- NULL
   n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4)
   n <- actions$a5$apply(n, 4); n_r2[[1]] <- n
-  n[5920:5922] <- (10:12)*5
+  n[idx] <- (10:12)*5
   n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2)
   n <- actions$a5$apply(n, 2); n_r[[2]] <- n
   attributes(n) <- NULL
   n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4)
   n <- actions$a5$apply(n, 4); n_r2[[2]] <- n
-  n[5920:5922] <- (11:13)*5
+  n[idx] <- (11:13)*5
   n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2)
   n <- actions$a5$apply(n, 2); n_r[[3]] <- n
   attributes(n) <- NULL
@@ -552,7 +616,7 @@ test_that("collates and finalizes action results", {
   population_model <- bsspread::StagedPopulation(region, stage_matrix)
   initial_n <- rep(0, region$get_locations())
   n <- rep(0, region$get_locations())
-  n[5920:5922] <- (10:12)*5
+  n[idx] <- (10:12)*5
   n <- population_model$make(initial = n)
   actions <- list(
     a3 = ManageDetection(region, population_model, surveillance, stages = 2:3,
@@ -586,7 +650,7 @@ test_that("collates and finalizes action results", {
   # staged multiple replicates
   n_r <- list(); n_r2 <- list()
   n <- rep(0, region$get_locations())
-  n[5920:5922] <- (9:11)*5
+  n[idx] <- (9:11)*5
   n <- population_model$make(initial = n)
   n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2)
   n <- actions$a5$apply(n, 2); n_r[[1]] <- n
@@ -594,7 +658,7 @@ test_that("collates and finalizes action results", {
   n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4)
   n <- actions$a5$apply(n, 4); n_r2[[1]] <- n
   n <- rep(0, region$get_locations())
-  n[5920:5922] <- (10:12)*5
+  n[idx] <- (10:12)*5
   n <- population_model$make(initial = n)
   n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2)
   n <- actions$a5$apply(n, 2); n_r[[2]] <- n
@@ -602,7 +666,7 @@ test_that("collates and finalizes action results", {
   n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4)
   n <- actions$a5$apply(n, 4); n_r2[[2]] <- n
   n <- rep(0, region$get_locations())
-  n[5920:5922] <- (11:13)*5
+  n[idx] <- (11:13)*5
   n <- population_model$make(initial = n)
   n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2)
   n <- actions$a5$apply(n, 2); n_r[[3]] <- n
