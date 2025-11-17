@@ -298,6 +298,26 @@ ManageResults.Region <- function(region, population_model,
       }
       actions_list
     })
+    if (all(sapply(actions, function(a) a$include_cost()))) {
+      if (include_collated) {
+        results$actions$total_cost <- results$actions[[1]]$cost$total
+        results$actions$total_cumulative_cost <-
+          results$actions[[1]]$cost$cumulative$total
+      } else {
+        results$actions$total_cost <- results$actions[[1]]$cost[[1]]
+        results$actions$total_cumulative_cost <-
+          results$actions[[1]]$cost$cumulative[[1]]
+      }
+    }
+  }
+
+  # Total combined monetary impacts and action costs
+  if (length(impacts) > 0 &&
+      all(sapply(impacts, function(i) {
+        i$get_context()$get_valuation_type() == "monetary" })) &&
+      length(actions) > 0 && is.list(results$actions$total_cost)) {
+    results$total_cost <- results$actions$total_cost
+    results$total_cumulative_cost <- results$actions$total_cumulative_cost
   }
 
   # Extended collate results
@@ -471,6 +491,9 @@ ManageResults.Region <- function(region, population_model,
     if (length(actions) > 0) {
 
       # Place applied actions in existing results structure
+      if (is.list(results$actions$total_cumulative_cost) && tm == 0) {
+        results$actions$total_cumulative_cost$current <<- 0
+      }
       for (i in 1:length(actions)) {
 
         # Get attribute from n
@@ -510,6 +533,10 @@ ManageResults.Region <- function(region, population_model,
           } else {
             results$actions[[i]]$cost$cumulative[[a]]$current <<-
               results$actions[[i]]$cost$cumulative[[a]]$current + a_cost
+          }
+          if (is.list(results$actions$total_cumulative_cost) && tm == 0) {
+            results$actions$total_cumulative_cost$current <<-
+              results$actions$total_cumulative_cost$current + sum(a_cost)
           }
         }
 

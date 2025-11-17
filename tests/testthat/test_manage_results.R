@@ -93,7 +93,7 @@ test_that("initializes inherited object with impacts and actions", {
                       function(i) lapply(i, function(j) sapply(j, length))),
                list(a3 = list(detected = collated, total = totals),
                     a4 = list(removed = collated, total = totals)))
-  # with action costs
+  # with action costs and monetary-only impacts
   actions <- list(
     a3 = ManageDetection(region, population_model, surveillance,
                          surv_cost = 3),
@@ -104,33 +104,43 @@ test_that("initializes inherited object with impacts and actions", {
     a6 = ManageRemovals(region, population_model, removal_cost = 6))
   expect_silent(
     results <- ManageResults(region, population_model = population_model,
-                             impacts = impacts, actions = actions,
+                             impacts = impacts[1], actions = actions,
                              time_steps = 10, collation_steps = 2,
                              replicates = 1))
   expect_silent(result_list <- results$get_list())
   expect_named(result_list, c("population", "total_pop", "occupancy",
-                              "total_occup", "area", "impacts", "actions"))
-  expect_equal(lapply(result_list$actions, function(i) lapply(i, length)),
+                              "total_occup", "area", "impacts", "actions",
+                              "total_cost", "total_cumulative_cost"))
+  expect_equal(sapply(result_list$total_cost, length), totals)
+  expect_equal(sapply(result_list$total_cumulative_cost, length), totals)
+  expect_named(result_list$actions,
+               c("a3", "a4", "a5", "a6", "total_cost",
+                 "total_cumulative_cost"))
+  expect_equal(sapply(result_list$actions$total_cost, length), totals)
+  expect_equal(sapply(result_list$actions$total_cumulative_cost, length),
+               totals)
+  expect_equal(lapply(result_list$actions[1:4],
+                      function(i) lapply(i, length)),
                lapply(actions, function(a) {
                  l = list(6, total = 11, cost = 3)
                  names(l)[1] <- a$get_label()
                  l
                }))
-  expect_equal(lapply(result_list$actions,
+  expect_equal(lapply(result_list$actions[1:4],
                       function(i) lapply(i$cost, length)),
                lapply(actions, function(a) {
                  l = list(6, total = 11, cumulative = 2)
                  names(l)[1] <- a$get_label()
                  l
                }))
-  expect_equal(lapply(result_list$actions,
+  expect_equal(lapply(result_list$actions[1:4],
                       function(i) lapply(i$cost$cumulative, length)),
                lapply(actions, function(a) {
                  l = list(6, total = 11)
                  names(l)[1] <- a$get_label()
                  l
                }))
-  expect_equal(lapply(result_list$actions,
+  expect_equal(lapply(result_list$actions[1:4],
                       function(i) lapply(i[-which(names(i) == "cost")],
                                          function(j) sapply(j, length))),
                lapply(actions, function(a) {
@@ -138,7 +148,7 @@ test_that("initializes inherited object with impacts and actions", {
                  names(l)[1] <- a$get_label()
                  l
                }))
-  expect_equal(lapply(result_list$actions,
+  expect_equal(lapply(result_list$actions[1:4],
                       function(i) {
                         lapply(i$cost[-which(names(i$cost) == "cumulative")],
                                function(j) sapply(j, length))
@@ -148,7 +158,7 @@ test_that("initializes inherited object with impacts and actions", {
                  names(l)[1] <- a$get_label()
                  l
                }))
-  expect_equal(lapply(result_list$actions,
+  expect_equal(lapply(result_list$actions[1:4],
                       function(i) lapply(i$cost$cumulative,
                                          function(j) sapply(j, length))),
                lapply(actions, function(a) {
