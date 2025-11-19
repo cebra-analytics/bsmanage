@@ -266,6 +266,12 @@ ManageResults.Region <- function(region, population_model,
           zeros$total_action <- 0L
         }
       }
+      if (actions_i$include_cost()) {
+        zeros$action_cost <- rep(0L, region$get_locations())
+        if (include_collated) {
+          zeros$total_action_cost <- 0L
+        }
+      }
       if (replicates > 1) { # summaries
         zeros$action <- list(mean = zeros$action)
         if (direct_action) {
@@ -275,30 +281,58 @@ ManageResults.Region <- function(region, population_model,
           zeros$total_action <- list(mean = zeros$total_action,
                                      sd = zeros$total_action)
         }
+        if (actions_i$include_cost()) {
+          zeros$action_cost <- list(mean = zeros$action_cost,
+                                    sd = zeros$action_cost)
+          if (include_collated) {
+            zeros$total_action_cost <- list(mean = zeros$total_action_cost,
+                                       sd = zeros$total_action_cost)
+          }
+        }
       }
       actions_list <- list()
       actions_list[[actions_i$get_label()]] <- list()
+      if (actions_i$include_cost()) {
+        actions_list$cost <- list()
+        actions_list$cost[[actions_i$get_label()]] <- list()
+      }
       if (include_collated) {
         for (tm in as.character(c(0, seq(collation_steps, time_steps,
                                          by = collation_steps)))) {
           actions_list[[actions_i$get_label()]][[tm]] <- zeros$action
+          if (actions_i$include_cost()) {
+            actions_list$cost[[actions_i$get_label()]][[tm]] <-
+              zeros$action_cost
+          }
         }
         actions_list$total <- list()
+        if (actions_i$include_cost()) {
+          actions_list$cost$total <- list()
+        }
         for (tm in as.character(0:time_steps)) {
           actions_list$total[[tm]] <- zeros$total_action
+          if (actions_i$include_cost()) {
+            actions_list$cost$total[[tm]] <- zeros$total_action_cost
+          }
         }
       } else {
         for (tm in as.character(0:time_steps)) {
           actions_list[[actions_i$get_label()]][[tm]] <- zeros$action
+          if (actions_i$include_cost()) {
+            actions_list$cost[[actions_i$get_label()]][[tm]] <-
+              zeros$action_cost
+          }
         }
       }
       if (actions_i$include_cost()) {
-        actions_list$cost <- actions_list
         actions_list$cost$cumulative <- actions_list$cost
       }
       actions_list
     })
-    if (all(sapply(actions, function(a) a$include_cost()))) {
+
+    # Total cost for multiple actions
+    if (length(actions) > 1 &&
+        all(sapply(actions, function(a) a$include_cost()))) {
       if (include_collated) {
         results$actions$total_cost <- results$actions[[1]]$cost$total
         results$actions$total_cumulative_cost <-
@@ -341,11 +375,18 @@ ManageResults.Region <- function(region, population_model,
     # Collate impacts
     if (length(impacts) > 0) {
 
+      # Total combined monetary impacts and action costs
+      if (is.list(results$total_cost)) {
+        total_cost <- 0
+        total_cumulative_cost <- 0
+      }
+
       # Place calculated impacts in existing results structure
       for (i in 1:length(calc_impacts)) {
 
         # Calculate total impact
-        if ("total" %in% names(results$impacts[[i]])) {
+        if ("total" %in% names(results$impacts[[i]]) ||
+            is.list(results$total_cost)) {
           total_impact <- 0
           if ("combined" %in% names(calc_impacts[[i]])) {
             total_impact <- sum(calc_impacts[[i]]$combined)
@@ -366,8 +407,7 @@ ManageResults.Region <- function(region, population_model,
                    unname(calc_impacts[[i]][[a]]))
             }
           }
-          if ("total" %in% names(results$impacts[[i]]) &&
-              "total" %in% names(results$impacts[[i]]$cumulative)) {
+          if ("total" %in% names(results$impacts[[i]]$cumulative)) {
             if (tm == 0) {
               results$impacts[[i]]$cumulative$total$current <<- total_impact
             } else {
@@ -375,6 +415,24 @@ ManageResults.Region <- function(region, population_model,
                 (results$impacts[[i]]$cumulative$total$current +
                    total_impact)
             }
+          }
+        }
+
+        # Add to total combined monetary impacts and action costs when present
+        if (is.list(results$total_cost)) {
+          total_cost <- total_cost + total_impact
+          if ("total" %in% names(results$impacts[[i]]$cumulative)) {
+            total_cumulative_cost <-
+              (total_cumulative_cost +
+                 results$impacts[[i]]$cumulative$total$current)
+          } else if ("combined" %in% names(results$impacts[[i]])) {
+            total_cumulative_cost <-
+              (total_cumulative_cost +
+                 results$impacts[[i]]$cumulative$combined$current)
+          } else if (length(results$impacts[[i]]) == 1) {
+            total_cumulative_cost <-
+              (total_cumulative_cost +
+                 results$impacts[[i]]$cumulative[[1]]$current)
           }
         }
 
@@ -491,8 +549,9 @@ ManageResults.Region <- function(region, population_model,
     if (length(actions) > 0) {
 
       # Place applied actions in existing results structure
-      if (is.list(results$actions$total_cumulative_cost) && tm == 0) {
-        results$actions$total_cumulative_cost$current <<- 0
+      if (is.list(results$actions$total_cost) || is.list(results$total_cost)) {
+        total_actions_cost <- 0
+        total_actions_cumulative_cost <- 0
       }
       for (i in 1:length(actions)) {
 
@@ -534,9 +593,22 @@ ManageResults.Region <- function(region, population_model,
             results$actions[[i]]$cost$cumulative[[a]]$current <<-
               results$actions[[i]]$cost$cumulative[[a]]$current + a_cost
           }
-          if (is.list(results$actions$total_cumulative_cost) && tm == 0) {
-            results$actions$total_cumulative_cost$current <<-
-              results$actions$total_cumulative_cost$current + sum(a_cost)
+
+          # Add to total action costs when present or total costs present
+          if (is.list(results$actions$total_cost) ||
+              is.list(results$total_cost)) {
+            total_actions_cost <- total_actions_cost + sum(a_cost)
+            total_actions_cumulative_cost <-
+              (total_actions_cumulative_cost +
+                 sum(results$actions[[i]]$cost$cumulative[[a]]$current))
+
+            # Add to total combined monetary impacts and action costs
+            if (is.list(results$total_cost)) {
+              total_cost <- total_cost + sum(a_cost)
+              total_cumulative_cost <-
+                (total_cumulative_cost +
+                   sum(results$actions[[i]]$cost$cumulative[[a]]$current))
+            }
           }
         }
 
@@ -661,6 +733,31 @@ ManageResults.Region <- function(region, population_model,
           }
         }
       }
+
+      # Collate total action costs when present
+      if (is.list(results$actions$total_cost)) {
+        if (replicates > 1) { # summaries
+          # TODO ####
+          # Calculates running mean and standard deviation (note: variance*r is
+          # stored as SD and transformed at the final replicate and time step)
+        } else {
+          results$actions$total_cost[[tmc]] <<- total_actions_cost
+          results$actions$total_cumulative_cost[[tmc]] <<-
+            total_actions_cumulative_cost
+        }
+      }
+    }
+
+    # Collate total combined monetary impacts and action costs when present
+    if (is.list(results$total_cost)) {
+      if (replicates > 1) { # summaries
+        # TODO ####
+        # Calculates running mean and standard deviation (note: variance*r is
+        # stored as SD and transformed at the final replicate and time step)
+      } else {
+        results$total_cost[[tmc]] <<- total_cost
+        results$total_cumulative_cost[[tmc]] <<- total_cumulative_cost
+      }
     }
   }
 
@@ -711,6 +808,16 @@ ManageResults.Region <- function(region, population_model,
     # Finalize action results
     if (length(actions) > 0) {
 
+      # Clear working memory for current cumulative costs
+      for (i in 1:length(results$actions)) {
+        if ("cost" %in% names(results$actions[[i]]) &&
+            "cumulative" %in% names(results$actions[[i]]$cost)) {
+          for (a in names(results$actions[[i]]$cost$cumulative)) {
+            results$actions[[i]]$cost$cumulative[[a]]$current <<- NULL
+          }
+        }
+      }
+
       # Transform action standard deviations
       if (replicates > 1) { # summaries
         for (i in 1:length(results$actions)) {
@@ -725,6 +832,7 @@ ManageResults.Region <- function(region, population_model,
             }
           }
           if ("cost" %in% names(results$actions[[i]])) {
+            a <- actions[[i]]$get_label()
             for (tmc in names(results$actions[[i]]$cost[[a]])) {
               results$actions[[i]]$cost[[a]][[tmc]]$sd <<-
                 sqrt(results$actions[[i]]$cost[[a]][[tmc]]$sd/(replicates - 1))

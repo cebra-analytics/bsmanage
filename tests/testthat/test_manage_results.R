@@ -618,6 +618,23 @@ test_that("collates and finalizes action results", {
                       function(i) lapply(i, function(j) j[["4"]]$sd)))
   expect_equal(lapply(result_list$actions[[3]], function(j) j[["4"]]$sd),
                list(control_growth = NULL, total = 0))
+})
+
+test_that("collates and finalizes staged action results", {
+  TEST_DIRECTORY <- test_path("test_inputs")
+  template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
+  idx <- 5916:5922
+  region <- bsspread::Region(template)
+  template[region$get_indices()][idx,] <- c(rep(0.5, 4), 0.5, 0.75, 1)
+  idx <- idx[5:7]
+  template_vect <- template[region$get_indices()][,1]
+  surveillance <-
+    bsdesign::SpatialSurvDesign(context = bsdesign::Context("test"),
+                                divisions = bsdesign::Divisions(template),
+                                establish_pr = template_vect*0,
+                                lambda = 1,
+                                optimal = "none",
+                                exist_sens = template_vect)
   # staged single replicate
   stage_matrix <- matrix(c(0.0, 2.0, 5.0,
                            0.3, 0.0, 0.0,
