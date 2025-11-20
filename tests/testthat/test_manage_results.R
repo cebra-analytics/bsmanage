@@ -495,16 +495,36 @@ test_that("collates and finalizes impact results", {
   expect_null(result_list$impacts$a2$cumulative)
 })
 
-test_that("collates and finalizes action results", {
+test_that("collates and finalizes action results with costs", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
+  idx <- 5916:5922
   region <- bsspread::Region(template)
-  template[region$get_indices()][5916:5922,] <- c(rep(0.5, 4), 0.5, 0.75, 1)
+  template[region$get_indices()][idx,] <- c(rep(0.5, 4), 0.5, 0.75, 1)
   template_vect <- template[region$get_indices()][,1]
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   n <- rep(0, region$get_locations())
-  idx <- 5920:5922
-  n[idx] <- (10:12)*5
+  idx <- idx[5:7]
+  n_list <- list(n, n, n)
+  n_list[[1]][idx] <- (10:12)*5
+  n_list[[2]][idx] <- c(9, 0, 11)*5
+  n_list[[3]][idx] <- c(0, 12, 13)*5
+  context <- list(bsimpact::Context("My species",
+                                    impact_scope = c("aspect1", "aspect2")))
+  incursion <- bsimpact::Incursion(template*0, region, multiplier = 0.1)
+  aspects <- list(aspect1 = "aspect1", aspect2 = "aspect2")
+  impact_layers <- list(aspect1 = 100*(template < 0.9),
+                        aspect2 = 200*(template > 0.6))
+  impact_layer_vals <- lapply(impact_layers,
+                              function(l) l[region$get_indices()][idx,])
+  loss_rates <- c(aspect1 = 0.1, aspect2 = 0.2)
+  impact_names <- list(a1 = "a1", a2 = "a2")
+  impacts <- list(
+    a1 = ManageImpacts(
+      bsimpact::ValueImpacts(context[[1]], region, incursion,
+                             impact_layers[1:2],
+                             loss_rates = loss_rates[1:2]),
+      population_model))
   surveillance <-
     bsdesign::SpatialSurvDesign(context = bsdesign::Context("test"),
                                 divisions = bsdesign::Divisions(template),
@@ -512,119 +532,337 @@ test_that("collates and finalizes action results", {
                                 lambda = 1,
                                 optimal = "none",
                                 exist_sens = template_vect)
+  removal_cost <- 4; attr(removal_cost, "unit") <- "$"
+  control_cost <- 5; attr(control_cost, "unit") <- "$"
   actions <- list(
     a3 = ManageDetection(region, population_model, surveillance,
-                         schedule = 2:3),
+                         schedule = 2:3, surv_cost = 3),
     a4 = ManageRemovals(region, population_model, removal_pr = template_vect,
-                        schedule = 2:3),
+                        schedule = 2:3, removal_cost = removal_cost),
     a5 = ManageControls(region, population_model, control_type = "growth",
-                        control_mult = 0.7, schedule = 2:3))
-  n <- actions$a3$apply(n, 2)
-  n <- actions$a4$apply(n, 2)
-  n <- actions$a5$apply(n, 2)
+                        control_mult = 0.7, schedule = 2:3,
+                        control_cost = control_cost))
   # single replicate
-  expected_collated <- lapply(actions, function(a) { # HERE
-    if (a$get_label() == "control_growth") {
-      n_a <- +(attr(n, a$get_label()) < 1)
-    } else {
-      n_a <- attr(n, a$get_label())
-    }
-    collated <- list(n_a, total = sum(n_a))
-    names(collated)[1] <- a$get_label()
-    collated
-  })
-  expect_silent(results <- ManageResults(region,
-                                         population_model = population_model,
-                                         actions = actions, time_steps = 4,
-                                         collation_steps = 2, replicates = 1))
-  expect_silent(results$collate(r = 1, tm = 2, n = n))
-  attributes(n) <- NULL
-  n <- actions$a3$apply(n, 4)
-  n <- actions$a4$apply(n, 4)
-  n <- actions$a5$apply(n, 4)
-  expect_silent(results$collate(r = 1, tm = 4, n = n))
-  expect_silent(result_list <- results$get_list())
-  expect_equal(lapply(result_list$population, function(i) attributes(i)),
-               lapply(result_list$population, function(i) NULL)) # no attr
-  expect_equal(lapply(result_list$actions,
-                      function(i) lapply(i, function(j) j[["2"]])),
-               expected_collated)
-  expect_equal(lapply(result_list$actions,
-                      function(i) lapply(i, function(j) j[["4"]])),
-               lapply(expected_collated,
-                      function(i) lapply(i, function(j) j*0)))
-  # multiple replicates
-  n_r <- list(); n_r2 <- list()
-  n[idx] <- (9:11)*5
-  n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2)
-  n <- actions$a5$apply(n, 2); n_r[[1]] <- n
-  attributes(n) <- NULL
-  n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4)
-  n <- actions$a5$apply(n, 4); n_r2[[1]] <- n
-  n[idx] <- (10:12)*5
-  n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2)
-  n <- actions$a5$apply(n, 2); n_r[[2]] <- n
-  attributes(n) <- NULL
-  n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4)
-  n <- actions$a5$apply(n, 4); n_r2[[2]] <- n
-  n[idx] <- (11:13)*5
-  n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2)
-  n <- actions$a5$apply(n, 2); n_r[[3]] <- n
-  attributes(n) <- NULL
-  n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4)
-  n <- actions$a5$apply(n, 4); n_r2[[3]] <- n
-  collated_r <- lapply(n_r, function(n) lapply(actions, function(a) {
-    if (a$get_label() == "control_growth") {
-      n_a <- +(attr(n, a$get_label()) < 1)
-    } else {
-      n_a <- attr(n, a$get_label())
-    }
-    collated <- list(n_a, total = sum(n_a))
-    names(collated)[1] <- a$get_label()
-    collated
-  }))
-  collated_arrays <- collated_r[[1]]
-  for (i in 2:3) {
-    for (j in names(actions)) {
-      for (a in names(collated_r[[i]][[j]])) {
-        collated_arrays[[j]][[a]] <- rbind(collated_arrays[[j]][[a]],
-                                           collated_r[[i]][[j]][[a]])
+  expect_silent(
+    results <- ManageResults(region, population_model = population_model,
+                             impacts = impacts, actions = actions,
+                             time_steps = 4, collation_steps = 2,
+                             replicates = 1))
+  expect_silent(action_results_0 <- results$get_list()$actions)
+  action_results_0$combined_cost_plus_impacts <- action_results_0$combined_cost
+  action_results_0$combined_cum_cost_plus_impacts <-
+    action_results_0$combined_cost
+  action_results_0$total_cost_plus_impacts <- action_results_0$total_cost
+  action_results_0$total_cum_cost_plus_impacts <- action_results_0$total_cost
+  expect_list <- list(action_results_0, action_results_0, action_results_0)
+  set.seed(1234)
+  for (r in 1:3) { # collect expected for single and multiple replicates
+    n <- n_list[[r]]
+    for (tm in 0:4) {
+      tmc <- as.character(tm)
+      tmc_prev <- as.character(max(tm - 1, 0))
+      calc_impacts <- lapply(impacts, function(impacts_i)
+        attr(impacts_i$calculate(n), "impacts"))
+      for (a in c("a3", "a4", "a5")) {
+        attr(n, actions[[a]]$get_label()) <- NULL # clear
+      }
+      for (a in c("a3", "a4", "a5")) {
+        n <- actions[[a]]$apply(n, tm)
+      }
+      if (tm %in% c(0, 2, 4)) {
+        expect_list[[r]]$a3$detected[[tmc]] <- attr(n, "detected")
+        expect_list[[r]]$a4$removed[[tmc]] <- attr(n, "removed")
+        expect_list[[r]]$a5$control_growth[[tmc]] <-
+          +(attr(n, "control_growth") < 1)
+        expect_list[[r]]$a4$cost$removed[[tmc]] <-
+          as.numeric(attr(n, "removal_cost"))
+        expect_list[[r]]$a3$cost$detected[[tmc]] <-
+          as.numeric(attr(n, "surv_cost"))
+        expect_list[[r]]$a5$cost$control_growth[[tmc]] <-
+          as.numeric(attr(n, "control_growth_cost"))
+      }
+      expect_list[[r]]$a3$total[[tmc]] <- sum(attr(n, "detected"))
+      expect_list[[r]]$a4$total[[tmc]] <- sum(attr(n, "removed"))
+      expect_list[[r]]$a5$total[[tmc]] <- sum(attr(n, "control_growth") < 1)
+      expect_list[[r]]$a3$cost$total[[tmc]] <- sum(attr(n, "surv_cost"))
+      expect_list[[r]]$a4$cost$total[[tmc]] <- sum(attr(n, "removal_cost"))
+      expect_list[[r]]$a5$cost$total[[tmc]] <-
+        sum(attr(n, "control_growth_cost"))
+      expect_list[[r]]$a3$cost$cumulative$total[[tmc]] <-
+        (expect_list[[r]]$a3$cost$cumulative$total[[tmc_prev]] +
+           sum(attr(n, "surv_cost")))
+      expect_list[[r]]$a4$cost$cumulative$total[[tmc]] <-
+        (expect_list[[r]]$a4$cost$cumulative$total[[tmc_prev]] +
+           sum(attr(n, "removal_cost")))
+      expect_list[[r]]$a5$cost$cumulative$total[[tmc]] <-
+        (expect_list[[r]]$a5$cost$cumulative$total[[tmc_prev]] +
+           sum(attr(n, "control_growth_cost")))
+      combined_cost <-
+        as.numeric(attr(n, "surv_cost") + attr(n, "removal_cost") +
+                     attr(n, "control_growth_cost"))
+      combined_cost_plus_impacts <- combined_cost + calc_impacts$a1$combined
+      if (tm %in% c(0, 2, 4)) {
+        expect_list[[r]]$combined_cost[[tmc]] <- combined_cost
+        expect_list[[r]]$combined_cost_plus_impacts[[tmc]] <-
+          combined_cost_plus_impacts
+      }
+      expect_list[[r]]$total_cost[[tmc]] <- sum(combined_cost)
+      expect_list[[r]]$total_cumulative_cost[[tmc]] <-
+        (expect_list[[r]]$total_cumulative_cost[[tmc_prev]] +
+           sum(combined_cost))
+      expect_list[[r]]$total_cost_plus_impacts[[tmc]] <-
+        sum(combined_cost_plus_impacts)
+      expect_list[[r]]$total_cum_cost_plus_impacts[[tmc]] <-
+        (expect_list[[r]]$total_cum_cost_plus_impacts[[tmc_prev]] +
+           sum(combined_cost_plus_impacts))
+      if (tm %in% c(0, 2, 4)) {
+        tmc_prev <- as.character(tm)
+      } else {
+        tmc <- as.character(tm + 1)
+      }
+      expect_list[[r]]$a3$cost$cumulative$detected[[tmc]] <-
+        (expect_list[[r]]$a3$cost$cumulative$detected[[tmc_prev]] +
+           as.numeric(attr(n, "surv_cost")))
+      expect_list[[r]]$a4$cost$cumulative$removed[[tmc]] <-
+        (expect_list[[r]]$a4$cost$cumulative$removed[[tmc_prev]] +
+           as.numeric(attr(n, "removal_cost")))
+      expect_list[[r]]$a5$cost$cumulative$control_growth[[tmc]] <-
+        (expect_list[[r]]$a5$cost$cumulative$control_growth[[tmc_prev]] +
+           as.numeric(attr(n, "control_growth_cost")))
+      expect_list[[r]]$combined_cumulative_cost[[tmc]] <-
+        expect_list[[r]]$combined_cumulative_cost[[tmc_prev]] + combined_cost
+      expect_list[[r]]$combined_cum_cost_plus_impacts[[tmc]] <-
+        (expect_list[[r]]$combined_cum_cost_plus_impacts[[tmc_prev]] +
+           combined_cost_plus_impacts)
+      if (r == 1) {
+        results$collate(r = 1, tm = tm, n = n, calc_impacts)
       }
     }
   }
-  expect_silent(results <- ManageResults(region,
-                                         population_model = population_model,
-                                         actions = actions, time_steps = 4,
-                                         collation_steps = 2, replicates = 3))
-  expect_silent(zero_results <- results$get_list()$actions)
-  expect_silent(results$collate(r = 1, tm = 2, n = n_r[[1]]))
-  expect_silent(results$collate(r = 1, tm = 4, n = n_r2[[1]]))
-  expect_silent(results$collate(r = 2, tm = 2, n = n_r[[2]]))
-  expect_silent(results$collate(r = 2, tm = 4, n = n_r2[[2]]))
-  expect_silent(results$collate(r = 3, tm = 2, n = n_r[[3]]))
-  expect_silent(results$collate(r = 3, tm = 4, n = n_r2[[3]]))
   expect_silent(results$finalize())
   expect_silent(result_list <- results$get_list())
-  expect_equal(lapply(result_list$actions,
-                      function(i) lapply(i, function(j) j[["2"]]$mean)),
-               lapply(collated_arrays,
-                      function(i) lapply(i, function(a) colMeans(a))))
-  expect_equal(lapply(result_list$actions[1:2],
-                      function(i) lapply(i, function(j) j[["2"]]$sd)),
-               lapply(collated_arrays[1:2], function(i)
-                 lapply(i, function(a) apply(a, 2, sd))))
-  expect_equal(lapply(result_list$actions[[3]], function(j) j[["2"]]$sd),
-               list(control_growth = NULL, total = 0))
-  expect_equal(lapply(result_list$actions,
-                      function(i) lapply(i, function(j) j[["4"]]$mean)),
-               lapply(zero_results,
-                      function(i) lapply(i, function(j) j[["4"]]$mean)))
-  expect_equal(lapply(result_list$actions[1:2],
-                      function(i) lapply(i, function(j) j[["4"]]$sd)),
-               lapply(zero_results[1:2],
-                      function(i) lapply(i, function(j) j[["4"]]$sd)))
-  expect_equal(lapply(result_list$actions[[3]], function(j) j[["4"]]$sd),
-               list(control_growth = NULL, total = 0))
+  expect_equal(lapply(result_list$population, function(i) attributes(i)),
+               lapply(result_list$population, function(i) NULL))
+  expect_equal(result_list$actions$a3[c("detected", "total")],
+               expect_list[[1]]$a3[c("detected", "total")])
+  expect_equal(result_list$actions$a3$cost[c("detected", "total")],
+               expect_list[[1]]$a3$cost[c("detected", "total")])
+  expect_equal(result_list$actions$a3$cost$cumulative[c("detected", "total")],
+               expect_list[[1]]$a3$cost$cumulative[c("detected", "total")])
+  expect_equal(result_list$actions$a4[c("removed", "total")],
+               expect_list[[1]]$a4[c("removed", "total")])
+  expect_equal(result_list$actions$a4$cost[c("removed", "total")],
+               expect_list[[1]]$a4$cost[c("removed", "total")])
+  expect_equal(result_list$actions$a4$cost$cumulative[c("removed", "total")],
+               expect_list[[1]]$a4$cost$cumulative[c("removed", "total")])
+  expect_equal(result_list$actions$a5[c("control_growth", "total")],
+               expect_list[[1]]$a5[c("control_growth", "total")])
+  expect_equal(result_list$actions$a5$cost[c("control_growth", "total")],
+               expect_list[[1]]$a5$cost[c("control_growth", "total")])
+  expect_equal(result_list$actions$a5$cost$cumulative[c("control_growth",
+                                                        "total")],
+               expect_list[[1]]$a5$cost$cumulative[c("control_growth",
+                                                     "total")])
+  expect_equal(result_list$actions$combined_cost,
+               expect_list[[1]]$combined_cost)
+  expect_equal(result_list$actions$combined_cumulative_cost,
+               expect_list[[1]]$combined_cumulative_cost)
+  expect_equal(result_list$actions$total_cost, expect_list[[1]]$total_cost)
+  expect_equal(result_list$actions$total_cumulative_cost,
+               expect_list[[1]]$total_cumulative_cost)
+  expect_equal(result_list$combined_cost,
+               expect_list[[1]]$combined_cost_plus_impacts)
+  expect_equal(result_list$combined_cumulative_cost,
+               expect_list[[1]]$combined_cum_cost_plus_impacts)
+  expect_equal(result_list$total_cost,
+               expect_list[[1]]$total_cost_plus_impacts)
+  expect_equal(result_list$total_cumulative_cost,
+               expect_list[[1]]$total_cum_cost_plus_impacts)
+  # multiple replicates
+  expect_silent(
+    results <- ManageResults(region, population_model = population_model,
+                             impacts = impacts, actions = actions,
+                             time_steps = 4, collation_steps = 2,
+                             replicates = 3))
+  expect_silent(result_list_0 <- results$get_list())
+  set.seed(1234)
+  for (r in 1:3) {
+    n <- n_list[[r]]
+    for (tm in 0:4) {
+      calc_impacts <- lapply(impacts, function(impacts_i)
+        attr(impacts_i$calculate(n), "impacts"))
+      for (j in c("a3", "a4", "a5")) {
+        attr(n, actions[[j]]$get_label()) <- NULL # clear
+      }
+      for (j in c("a3", "a4", "a5")) {
+        n <- actions[[j]]$apply(n, tm)
+      }
+      results$collate(r = r, tm = tm, n = n, calc_impacts)
+    }
+  }
+  expect_silent(results$finalize())
+  expect_silent(result_list <- results$get_list())
+  expect_collated <- result_list_0$actions[[1]][[1]]
+  expect_collated_no_sd <- lapply(expect_collated, function(ec) ec["mean"])
+  expect_totals <- result_list_0$actions[[1]]$total
+  generate_summary <- function(rep_list, summary_list) {
+    for (i in 1:length(summary_list)) {
+      nrow <- length(summary_list[[i]][[1]])
+      rep_values <- matrix(sapply(rep_list, function(l) l[[i]]), nrow = nrow)
+      summary_list[[i]]$mean <- rowMeans(rep_values)
+      if (any(sapply(summary_list, function(sl) "sd" %in% names(sl)))) {
+        summary_list[[i]]$sd <- apply(rep_values, 1, sd)
+      }
+    }
+    return(summary_list)
+  }
+  expect_equal(
+    lapply(result_list$population,
+           function(i) lapply(i, function(j) attributes(j))),
+    lapply(expect_collated, function(i) lapply(i, function(j) NULL)))
+  expect_equal(
+    result_list$actions$a3$detected,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a3$detected),
+                     expect_collated))
+  expect_equal(
+    result_list$actions$a3$total,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a3$total),
+                     expect_totals))
+  expect_equal(
+    result_list$actions$a3$cost$detected,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a3$cost$detected),
+                     expect_collated))
+  expect_equal(
+    result_list$actions$a3$cost$total,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a3$cost$total),
+                     expect_totals))
+  expect_equal(
+    result_list$actions$a3$cost$cumulative$detected,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$a3$cost$cumulative$detected),
+      expect_collated))
+  expect_equal(
+    result_list$actions$a3$cost$cumulative$total,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$a3$cost$cumulative$total),
+      expect_totals))
+  expect_equal(
+    result_list$actions$a4$removed,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a4$removed),
+                     expect_collated))
+  expect_equal(
+    result_list$actions$a4$total,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a4$total),
+                     expect_totals))
+  expect_equal(
+    result_list$actions$a4$cost$removed,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a4$cost$removed),
+                     expect_collated))
+  expect_equal(
+    result_list$actions$a4$cost$total,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a4$cost$total),
+                     expect_totals))
+  expect_equal(
+    result_list$actions$a4$cost$cumulative$removed,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$a4$cost$cumulative$removed),
+      expect_collated))
+  expect_equal(
+    result_list$actions$a4$cost$cumulative$total,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$a4$cost$cumulative$total),
+      expect_totals))
+  expect_equal(
+    result_list$actions$a5$control_growth,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a5$control_growth),
+                     expect_collated_no_sd))
+  expect_equal(
+    result_list$actions$a5$total,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a5$total),
+                     expect_totals))
+  expect_equal(
+    result_list$actions$a5$cost$control_growth,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$a5$cost$control_growth),
+      expect_collated))
+  expect_equal(
+    result_list$actions$a5$cost$total,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$a5$cost$total),
+                     expect_totals))
+  expect_equal(
+    result_list$actions$a5$cost$cumulative$control_growth,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$a5$cost$cumulative$control_growth),
+      expect_collated))
+  expect_equal(
+    result_list$actions$a5$cost$cumulative$total,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$a5$cost$cumulative$total),
+      expect_totals))
+  expect_equal(
+    result_list$actions$combined_cost,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$combined_cost),
+                     expect_collated))
+  expect_equal(
+    result_list$actions$combined_cumulative_cost,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$combined_cumulative_cost),
+      expect_collated))
+  expect_equal(
+    result_list$actions$total_cost,
+    generate_summary(lapply(as.list(1:3),
+                            function(i) expect_list[[i]]$total_cost),
+                     expect_totals))
+  expect_equal(
+    result_list$actions$total_cumulative_cost,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$total_cumulative_cost),
+      expect_totals))
+  expect_equal(
+    result_list$combined_cost,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$combined_cost_plus_impacts),
+      expect_collated))
+  expect_equal(
+    result_list$combined_cumulative_cost,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$combined_cum_cost_plus_impacts),
+      expect_collated))
+  expect_equal(
+    result_list$total_cost,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$total_cost_plus_impacts),
+      expect_totals))
+  expect_equal(
+    result_list$total_cumulative_cost,
+    generate_summary(
+      lapply(as.list(1:3),
+             function(i) expect_list[[i]]$total_cum_cost_plus_impacts),
+      expect_totals))
 })
 
 test_that("collates and finalizes staged action results", {
