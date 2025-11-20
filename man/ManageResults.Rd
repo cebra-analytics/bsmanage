@@ -108,9 +108,9 @@ Builds a class for encapsulating, calculating, and collating incursion
 management simulation results, including the population at each location at
 each collation time step, the total population size and area occupied at
 each time step, as well as spatio-temporal impacts and management action
-quantities applied (e.g. removals). When simulations are replicated, summary
-results (means and standard deviations) are produced. Extends the
-\code{bsspread::Results} package module.
+quantities applied (e.g. removals), plus costs when configured. When
+simulations are replicated, summary results (means and standard deviations)
+are produced. Extends the \code{bsspread::Results} package module.
 }
 \references{
 Baker, C. M., Bower, S., Tartaglia, E., Bode, M., Bower, H., & Pressey,

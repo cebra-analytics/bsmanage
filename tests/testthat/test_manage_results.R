@@ -110,12 +110,19 @@ test_that("initializes inherited object with impacts and actions", {
   expect_silent(result_list <- results$get_list())
   expect_named(result_list, c("population", "total_pop", "occupancy",
                               "total_occup", "area", "impacts", "actions",
+                              "combined_cost", "combined_cumulative_cost",
                               "total_cost", "total_cumulative_cost"))
+  expect_equal(sapply(result_list$combined_cost, length), collated)
+  expect_equal(sapply(result_list$combined_cumulative_cost, length), collated)
   expect_equal(sapply(result_list$total_cost, length), totals)
   expect_equal(sapply(result_list$total_cumulative_cost, length), totals)
   expect_named(result_list$actions,
-               c("a3", "a4", "a5", "a6", "total_cost",
-                 "total_cumulative_cost"))
+               c("a3", "a4", "a5", "a6",
+                 "combined_cost", "combined_cumulative_cost",
+                 "total_cost", "total_cumulative_cost"))
+  expect_equal(sapply(result_list$actions$combined_cost, length), collated)
+  expect_equal(sapply(result_list$actions$combined_cumulative_cost, length),
+               collated)
   expect_equal(sapply(result_list$actions$total_cost, length), totals)
   expect_equal(sapply(result_list$actions$total_cumulative_cost, length),
                totals)
