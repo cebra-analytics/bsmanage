@@ -44,13 +44,20 @@ test_that("initializes with region, population, and other parameters", {
   expect_s3_class(manage_removals, "ManageActions")
   expect_named(manage_removals,
                c(c("get_type", "get_label", "get_stages", "get_schedule",
-                   "include_cost", "apply")))
+                   "include_cost", "get_cost_unit", "apply")))
   expect_equal(manage_removals$get_type(), "removal")
   expect_equal(manage_removals$get_label(), "removed")
   expect_equal(manage_removals$get_stages(), 2:3)
   expect_equal(manage_removals$get_schedule(), 4:6)
   expect_true(manage_removals$include_cost())
   expect_named(manage_removals$include_cost(), "removal_cost")
+  expect_null(manage_removals$get_cost_unit())
+  removal_cost <- 2
+  attr(removal_cost, "unit") <- "beans"
+  manage_removals <- ManageRemovals(region, population_model,
+                                    removal_pr = template_vect,
+                                    removal_cost = removal_cost) # silent
+  expect_equal(manage_removals$get_cost_unit(), "beans")
 })
 
 test_that("applies stochastic removals to invasive population", {

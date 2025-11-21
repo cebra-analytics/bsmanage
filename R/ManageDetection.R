@@ -14,12 +14,14 @@
 #'   detection sensitivities.
 #' @param surv_cost Numeric vector of distributed surveillance costs (combined
 #'   resource and fixed costs) or a single cost value for each location where
-#'   surveillance is applied. Costs are accumulated for each application of the
-#'   surveillance at each (scheduled) simulation time step. The cost unit may
-#'   be added as an attribute (\code{attr(surv_cost, "unit")}), or set within
-#'   the \code{bsdesign::Context} object associated with the
-#'   \code{surveillance} (\code{bsdesign::SurveillanceDesign}) object. Default
-#'   is \code{NULL} when costs are unavailable.
+#'   surveillance is applied. For spatially-implicit area-based regions, costs
+#'   should be specified as cost per metres squared. Costs are accumulated for
+#'   each application of the surveillance at each (scheduled) simulation time
+#'   step. The cost unit may be added as an attribute
+#'   (\code{attr(surv_cost, "unit")}), or set within the
+#'   \code{bsdesign::Context} object associated with the \code{surveillance}
+#'   (\code{bsdesign::SurveillanceDesign}) object. Default is \code{NULL} when
+#'   costs are unavailable.
 #' @param stages Numeric vector of population stages (indices) to which
 #'   management detection are applied. Default is all stages (when set to
 #'   \code{NULL}).
@@ -42,6 +44,7 @@
 #'       which management detection are applied.}
 #'     \item{\code{include_cost()}}{Logical indication of a cost parameter
 #'       having a value (named as per population attachment).}
+#'     \item{\code{get_cost_unit()}}{Get the unit of surveillance cost.}
 #'     \item{\code{apply(n, tm)}}{Apply management detection to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, providing the time
@@ -119,6 +122,11 @@ ManageDetection.Region <- function(region,
     include_cost <- is.numeric(surv_cost)
     names(include_cost) <- "surv_cost"
     return(include_cost)
+  }
+
+  # Get the unit of surveillance cost
+  self$get_cost_unit <- function() {
+    return(attr(surv_cost, "unit"))
   }
 
   # Detection/surveillance apply method

@@ -40,7 +40,8 @@ test_that("initializes with region, population, and surveillance", {
   expect_s3_class(manage_detection, "ManageActions")
   expect_named(manage_detection,
                c(c("get_type", "get_label", "get_stages", "get_schedule",
-                   "include_cost", "apply", "get_surveillance")))
+                   "include_cost", "get_cost_unit", "apply",
+                   "get_surveillance")))
   expect_equal(manage_detection$get_type(), "detection")
   expect_equal(manage_detection$get_label(), "detected")
   expect_is(manage_detection$get_surveillance(), "SpatialSurvDesign")
@@ -48,6 +49,7 @@ test_that("initializes with region, population, and surveillance", {
   expect_equal(manage_detection$get_schedule(), 4:6)
   expect_true(manage_detection$include_cost())
   expect_named(manage_detection$include_cost(), "surv_cost")
+  expect_equal(manage_detection$get_cost_unit(), "$")
 })
 
 test_that("applies stochastic detection to invasive population", {

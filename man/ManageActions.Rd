@@ -60,6 +60,7 @@ actions are applied.}
 which management actions are applied.}
 \item{\code{include_cost()}}{Logical indication of a cost parameter
 having a value (named as per population attachment).}
+\item{\code{get_cost_unit()}}{Get the unit of action cost.}
 \item{\code{apply(n, tm)}}{Apply management actions to a simulated
 population vector or matrix \code{n}, potentially with attached
 attributes relating to previously applied actions, providing the time

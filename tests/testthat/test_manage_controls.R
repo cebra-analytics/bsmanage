@@ -46,13 +46,14 @@ test_that("initializes with region, population, and other parameters", {
   expect_s3_class(manage_controls, "ManageActions")
   expect_named(manage_controls,
                c(c("get_type", "get_label", "get_stages", "get_schedule",
-                   "include_cost", "apply")))
+                   "include_cost", "get_cost_unit", "apply")))
   expect_equal(manage_controls$get_type(), "control")
   expect_equal(manage_controls$get_label(), "control_search_destroy")
   expect_equal(manage_controls$get_stages(), 2:3)
   expect_equal(manage_controls$get_schedule(), 4:6)
   expect_true(manage_controls$include_cost())
   expect_named(manage_controls$include_cost(), "control_search_destroy_cost")
+  expect_equal(manage_controls$get_cost_unit(), "$")
   expect_error(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "growth"),
@@ -96,6 +97,7 @@ test_that("initializes with region, population, and other parameters", {
   expect_equal(manage_controls$get_label(), "control_growth")
   expect_true(manage_controls$include_cost())
   expect_named(manage_controls$include_cost(), "control_growth_cost")
+  expect_equal(manage_controls$get_cost_unit(), "$")
 })
 
 test_that("applies stochastic controls to invasive population", {

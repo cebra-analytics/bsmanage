@@ -93,15 +93,20 @@ test_that("initializes inherited object with impacts and actions", {
                       function(i) lapply(i, function(j) sapply(j, length))),
                list(a3 = list(detected = collated, total = totals),
                     a4 = list(removed = collated, total = totals)))
+  expect_equal(lapply(result_list$impacts, function(i) attr(i, "unit")),
+               list(a1 = "$", a2 = "$"))
   # with action costs and monetary-only impacts
+  control_cost1 <- 4; attr(control_cost1, "unit") <- "$"
+  control_cost2 <- 5; attr(control_cost2, "unit") <- "$"
+  removal_cost <- 6; attr(removal_cost, "unit") <- "$"
   actions <- list(
     a3 = ManageDetection(region, population_model, surveillance,
                          surv_cost = 3),
     a4 = ManageControls(region, population_model, control_type = "growth",
-                        control_mult = 0.4, control_cost = 4),
+                        control_mult = 0.4, control_cost = control_cost1),
     a5 = ManageControls(region, population_model, control_type = "spread",
-                        control_mult = 0.5, control_cost = 5),
-    a6 = ManageRemovals(region, population_model, removal_cost = 6))
+                        control_mult = 0.5, control_cost = control_cost2),
+    a6 = ManageRemovals(region, population_model, removal_cost = removal_cost))
   expect_silent(
     results <- ManageResults(region, population_model = population_model,
                              impacts = impacts[1], actions = actions,
@@ -110,22 +115,21 @@ test_that("initializes inherited object with impacts and actions", {
   expect_silent(result_list <- results$get_list())
   expect_named(result_list, c("population", "total_pop", "occupancy",
                               "total_occup", "area", "impacts", "actions",
-                              "combined_cost", "combined_cumulative_cost",
-                              "total_cost", "total_cumulative_cost"))
-  expect_equal(sapply(result_list$combined_cost, length), collated)
-  expect_equal(sapply(result_list$combined_cumulative_cost, length), collated)
-  expect_equal(sapply(result_list$total_cost, length), totals)
-  expect_equal(sapply(result_list$total_cumulative_cost, length), totals)
+                              "cost"))
+  expect_equal(sapply(result_list$cost$combined, length), collated)
+  expect_equal(sapply(result_list$cost$cumulative$combined, length), collated)
+  expect_equal(sapply(result_list$cost$total, length), totals)
+  expect_equal(sapply(result_list$cost$cumulative$total, length), totals)
+  expect_equal(attr(result_list$cost, "unit"), "$")
   expect_named(result_list$actions,
-               c("a3", "a4", "a5", "a6",
-                 "combined_cost", "combined_cumulative_cost",
-                 "total_cost", "total_cumulative_cost"))
-  expect_equal(sapply(result_list$actions$combined_cost, length), collated)
-  expect_equal(sapply(result_list$actions$combined_cumulative_cost, length),
+               c("a3", "a4", "a5", "a6", "cost"))
+  expect_equal(sapply(result_list$actions$cost$combined, length), collated)
+  expect_equal(sapply(result_list$actions$cost$cumulative$combined, length),
                collated)
-  expect_equal(sapply(result_list$actions$total_cost, length), totals)
-  expect_equal(sapply(result_list$actions$total_cumulative_cost, length),
+  expect_equal(sapply(result_list$actions$cost$total, length), totals)
+  expect_equal(sapply(result_list$actions$cost$cumulative$total, length),
                totals)
+  expect_equal(attr(result_list$actions$cost, "unit"), "$")
   expect_equal(lapply(result_list$actions[1:4],
                       function(i) lapply(i, length)),
                lapply(actions, function(a) {
@@ -301,6 +305,8 @@ test_that("collates and finalizes impact results", {
            function(i) i[["4"]]),
     lapply(expected_cumulative[cum_names[4]], function(i) i*5))
   expect_null(result_list$impacts$a2$cumulative)
+  expect_equal(lapply(result_list$impacts, function(i) attr(i, "unit")),
+               list(a1 = "$", a2 = "$"))
   # multiple replicates
   expect_silent(results <- ManageResults(region,
                                          population_model = population_model,
@@ -493,6 +499,8 @@ test_that("collates and finalizes impact results", {
            function(i) i[["4"]]$sd),
     list(total = sd(rowSums(calc_impacts_r$a1$combined*5))))
   expect_null(result_list$impacts$a2$cumulative)
+  expect_equal(lapply(result_list$impacts, function(i) attr(i, "unit")),
+               list(a1 = "$", a2 = "$"))
 })
 
 test_that("collates and finalizes action results with costs", {
@@ -549,11 +557,11 @@ test_that("collates and finalizes action results with costs", {
                              time_steps = 4, collation_steps = 2,
                              replicates = 1))
   expect_silent(action_results_0 <- results$get_list()$actions)
-  action_results_0$combined_cost_plus_impacts <- action_results_0$combined_cost
+  action_results_0$combined_cost_plus_impacts <- action_results_0$cost$combined
   action_results_0$combined_cum_cost_plus_impacts <-
-    action_results_0$combined_cost
-  action_results_0$total_cost_plus_impacts <- action_results_0$total_cost
-  action_results_0$total_cum_cost_plus_impacts <- action_results_0$total_cost
+    action_results_0$cost$combined
+  action_results_0$total_cost_plus_impacts <- action_results_0$cost$total
+  action_results_0$total_cum_cost_plus_impacts <- action_results_0$cost$total
   expect_list <- list(action_results_0, action_results_0, action_results_0)
   set.seed(1234)
   for (r in 1:3) { # collect expected for single and multiple replicates
@@ -602,13 +610,13 @@ test_that("collates and finalizes action results with costs", {
                      attr(n, "control_growth_cost"))
       combined_cost_plus_impacts <- combined_cost + calc_impacts$a1$combined
       if (tm %in% c(0, 2, 4)) {
-        expect_list[[r]]$combined_cost[[tmc]] <- combined_cost
+        expect_list[[r]]$cost$combined[[tmc]] <- combined_cost
         expect_list[[r]]$combined_cost_plus_impacts[[tmc]] <-
           combined_cost_plus_impacts
       }
-      expect_list[[r]]$total_cost[[tmc]] <- sum(combined_cost)
-      expect_list[[r]]$total_cumulative_cost[[tmc]] <-
-        (expect_list[[r]]$total_cumulative_cost[[tmc_prev]] +
+      expect_list[[r]]$cost$total[[tmc]] <- sum(combined_cost)
+      expect_list[[r]]$cost$cumulative$total[[tmc]] <-
+        (expect_list[[r]]$cost$cumulative$total[[tmc_prev]] +
            sum(combined_cost))
       expect_list[[r]]$total_cost_plus_impacts[[tmc]] <-
         sum(combined_cost_plus_impacts)
@@ -629,8 +637,8 @@ test_that("collates and finalizes action results with costs", {
       expect_list[[r]]$a5$cost$cumulative$control_growth[[tmc]] <-
         (expect_list[[r]]$a5$cost$cumulative$control_growth[[tmc_prev]] +
            as.numeric(attr(n, "control_growth_cost")))
-      expect_list[[r]]$combined_cumulative_cost[[tmc]] <-
-        expect_list[[r]]$combined_cumulative_cost[[tmc_prev]] + combined_cost
+      expect_list[[r]]$cost$cumulative$combined[[tmc]] <-
+        expect_list[[r]]$cost$cumulative$combined[[tmc_prev]] + combined_cost
       expect_list[[r]]$combined_cum_cost_plus_impacts[[tmc]] <-
         (expect_list[[r]]$combined_cum_cost_plus_impacts[[tmc_prev]] +
            combined_cost_plus_impacts)
@@ -663,21 +671,24 @@ test_that("collates and finalizes action results with costs", {
                                                         "total")],
                expect_list[[1]]$a5$cost$cumulative[c("control_growth",
                                                      "total")])
-  expect_equal(result_list$actions$combined_cost,
-               expect_list[[1]]$combined_cost)
-  expect_equal(result_list$actions$combined_cumulative_cost,
-               expect_list[[1]]$combined_cumulative_cost)
-  expect_equal(result_list$actions$total_cost, expect_list[[1]]$total_cost)
-  expect_equal(result_list$actions$total_cumulative_cost,
-               expect_list[[1]]$total_cumulative_cost)
-  expect_equal(result_list$combined_cost,
+  expect_equal(result_list$actions$cost$combined,
+               expect_list[[1]]$cost$combined)
+  expect_equal(result_list$actions$cost$cumulative$combined,
+               expect_list[[1]]$cost$cumulative$combined)
+  expect_equal(result_list$actions$cost$total,
+               expect_list[[1]]$cost$total)
+  expect_equal(result_list$actions$cost$cumulative$total,
+               expect_list[[1]]$cost$cumulative$total)
+  expect_equal(attr(result_list$actions$cost, "unit"), "$")
+  expect_equal(result_list$cost$combined,
                expect_list[[1]]$combined_cost_plus_impacts)
-  expect_equal(result_list$combined_cumulative_cost,
+  expect_equal(result_list$cost$cumulative$combined,
                expect_list[[1]]$combined_cum_cost_plus_impacts)
-  expect_equal(result_list$total_cost,
+  expect_equal(result_list$cost$total,
                expect_list[[1]]$total_cost_plus_impacts)
-  expect_equal(result_list$total_cumulative_cost,
+  expect_equal(result_list$cost$cumulative$total,
                expect_list[[1]]$total_cum_cost_plus_impacts)
+  expect_equal(attr(result_list$cost, "unit"), "$")
   # multiple replicates
   expect_silent(
     results <- ManageResults(region, population_model = population_model,
@@ -818,51 +829,53 @@ test_that("collates and finalizes action results with costs", {
              function(i) expect_list[[i]]$a5$cost$cumulative$total),
       expect_totals))
   expect_equal(
-    result_list$actions$combined_cost,
+    result_list$actions$cost$combined,
     generate_summary(lapply(as.list(1:3),
-                            function(i) expect_list[[i]]$combined_cost),
+                            function(i) expect_list[[i]]$cost$combined),
                      expect_collated))
   expect_equal(
-    result_list$actions$combined_cumulative_cost,
+    result_list$actions$cost$cumulative$combined,
     generate_summary(
       lapply(as.list(1:3),
-             function(i) expect_list[[i]]$combined_cumulative_cost),
+             function(i) expect_list[[i]]$cost$cumulative$combined),
       expect_collated))
   expect_equal(
-    result_list$actions$total_cost,
+    result_list$actions$cost$total,
     generate_summary(lapply(as.list(1:3),
-                            function(i) expect_list[[i]]$total_cost),
+                            function(i) expect_list[[i]]$cost$total),
                      expect_totals))
   expect_equal(
-    result_list$actions$total_cumulative_cost,
+    result_list$actions$cost$cumulative$total,
     generate_summary(
       lapply(as.list(1:3),
-             function(i) expect_list[[i]]$total_cumulative_cost),
+             function(i) expect_list[[i]]$cost$cumulative$total),
       expect_totals))
+  expect_equal(attr(result_list$actions$cost, "unit"), "$")
   expect_equal(
-    result_list$combined_cost,
+    result_list$cost$combined,
     generate_summary(
       lapply(as.list(1:3),
              function(i) expect_list[[i]]$combined_cost_plus_impacts),
       expect_collated))
   expect_equal(
-    result_list$combined_cumulative_cost,
+    result_list$cost$cumulative$combined,
     generate_summary(
       lapply(as.list(1:3),
              function(i) expect_list[[i]]$combined_cum_cost_plus_impacts),
       expect_collated))
   expect_equal(
-    result_list$total_cost,
+    result_list$cost$total,
     generate_summary(
       lapply(as.list(1:3),
              function(i) expect_list[[i]]$total_cost_plus_impacts),
       expect_totals))
   expect_equal(
-    result_list$total_cumulative_cost,
+    result_list$cost$cumulative$total,
     generate_summary(
       lapply(as.list(1:3),
              function(i) expect_list[[i]]$total_cum_cost_plus_impacts),
       expect_totals))
+  expect_equal(attr(result_list$cost, "unit"), "$")
 })
 
 test_that("collates and finalizes staged action results", {

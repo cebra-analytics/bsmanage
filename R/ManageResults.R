@@ -239,6 +239,8 @@ ManageResults.Region <- function(region, population_model,
       if (impacts_i$get_context()$get_valuation_type() == "monetary") {
         impact_aspects$cumulative <- impact_aspects
       }
+      attr(impact_aspects, "unit") <-
+        impacts_i$get_context()$get_impact_measures()
       impact_aspects
     })
   }
@@ -286,7 +288,7 @@ ManageResults.Region <- function(region, population_model,
                                     sd = zeros$action_cost)
           if (include_collated) {
             zeros$total_action_cost <- list(mean = zeros$total_action_cost,
-                                       sd = zeros$total_action_cost)
+                                            sd = zeros$total_action_cost)
           }
         }
       }
@@ -326,19 +328,23 @@ ManageResults.Region <- function(region, population_model,
           }
         }
         actions_list$cost$cumulative <- actions_list$cost
+        attr(actions_list$cost, "unit") <- actions_i$get_cost_unit()
       }
       actions_list
     })
 
     # Combined cost for multiple actions
     if (length(actions) > 1 &&
-        all(sapply(actions, function(a) a$include_cost()))) {
-      results$actions$combined_cost <- results$actions[[1]]$cost[[1]]
-      results$actions$combined_cumulative_cost <-
-        results$actions[[1]]$cost$cumulative[[1]]
+        all(sapply(actions, function(a) a$include_cost())) &&
+        all(sapply(actions, function(a) a$get_cost_unit()) ==
+            actions[[1]]$get_cost_unit())) {
+      results$actions$cost <- list(combined = results$actions[[1]]$cost[[1]])
+      results$actions$cost$cumulative <-
+        list(combined = results$actions[[1]]$cost$cumulative[[1]])
+      attr(results$actions$cost, "unit") <- actions[[1]]$get_cost_unit()
       if (include_collated) {
-        results$actions$total_cost <- results$actions[[1]]$cost$total
-        results$actions$total_cumulative_cost <-
+        results$actions$cost$total <- results$actions[[1]]$cost$total
+        results$actions$cost$cumulative$total <-
           results$actions[[1]]$cost$cumulative$total
       }
     }
@@ -348,14 +354,10 @@ ManageResults.Region <- function(region, population_model,
   if (length(impacts) > 0 &&
       all(sapply(impacts, function(i) {
         i$get_context()$get_valuation_type() == "monetary" })) &&
-      length(actions) > 0 && is.list(results$actions$combined_cost)) {
-    results$combined_cost <- results$actions$combined_cost
-    results$combined_cumulative_cost <-
-      results$actions$combined_cumulative_cost
-    if (include_collated) {
-      results$total_cost <- results$actions$total_cost
-      results$total_cumulative_cost <- results$actions$total_cumulative_cost
-    }
+      length(actions) > 0 && is.list(results$actions$cost) &&
+      all(sapply(results$impacts, function(i) attr(i, "unit")) ==
+          actions[[1]]$get_cost_unit())) {
+    results$cost <- results$actions$cost
   }
 
   # Extended collate results
@@ -380,7 +382,7 @@ ManageResults.Region <- function(region, population_model,
     if (length(impacts) > 0) {
 
       # Combined monetary impacts and action costs
-      if (is.list(results$combined_cost)) {
+      if (is.list(results$cost$combined)) {
         combined_cost <- rep(0, region$get_locations())
         combined_cumulative_cost <- rep(0, region$get_locations())
         if (include_collated) {
@@ -394,7 +396,7 @@ ManageResults.Region <- function(region, population_model,
 
         # Calculate total impact
         if ("total" %in% names(results$impacts[[i]]) ||
-            is.list(results$total_cost)) {
+            is.list(results$cost$total)) {
           total_impact <- 0
           if ("combined" %in% names(calc_impacts[[i]])) {
             total_impact <- sum(calc_impacts[[i]]$combined)
@@ -427,7 +429,7 @@ ManageResults.Region <- function(region, population_model,
         }
 
         # Add to combined monetary impacts and action costs when present
-        if (is.list(results$combined_cost)) {
+        if (is.list(results$cost$combined)) {
           if ("combined" %in% names(results$impacts[[i]])) {
             combined_cost <- combined_cost + unname(calc_impacts[[i]]$combined)
             combined_cumulative_cost <-
@@ -439,7 +441,7 @@ ManageResults.Region <- function(region, population_model,
               (combined_cumulative_cost +
                  results$impacts[[i]]$cumulative[[1]]$current)
           }
-          if (is.list(results$total_cost)) {
+          if (is.list(results$cost$total)) {
             total_cost <- total_cost + total_impact
             if ("total" %in% names(results$impacts[[i]]$cumulative)) {
               total_cumulative_cost <-
@@ -562,8 +564,8 @@ ManageResults.Region <- function(region, population_model,
     if (length(actions) > 0) {
 
       # Place applied actions in existing results structure
-      if (is.list(results$actions$combined_cost) ||
-          is.list(results$combined_cost)) {
+      if (is.list(results$actions$cost$combined) ||
+          is.list(results$cost$combined)) {
         combined_actions_cost <- rep(0, region$get_locations())
         combined_actions_cumulative_cost <- rep(0, region$get_locations())
         if (include_collated) {
@@ -613,8 +615,8 @@ ManageResults.Region <- function(region, population_model,
           }
 
           # Add to combined action costs and combined costs when present
-          if (is.list(results$actions$combined_cost) ||
-              is.list(results$combined_cost)) {
+          if (is.list(results$actions$cost$combined) ||
+              is.list(results$cost$combined)) {
             combined_actions_cost <- combined_actions_cost + a_cost
             combined_actions_cumulative_cost <-
               (combined_actions_cumulative_cost +
@@ -627,7 +629,7 @@ ManageResults.Region <- function(region, population_model,
             }
 
             # Add to combined monetary impacts and action costs
-            if (is.list(results$combined_cost)) {
+            if (is.list(results$cost$combined)) {
               combined_cost <- combined_cost + a_cost
               combined_cumulative_cost <-
                 (combined_cumulative_cost +
@@ -732,7 +734,7 @@ ManageResults.Region <- function(region, population_model,
                        previous_mean)*
                       (sum(results$actions[[i]]$cost$cumulative[[a]]$current) -
                          results$actions[[i]]$cost$cumulative$total[[tmc]]$mean)
-                    ))
+                   ))
             }
           }
 
@@ -765,7 +767,7 @@ ManageResults.Region <- function(region, population_model,
       }
 
       # Collate combined action costs when present
-      if (is.list(results$actions$combined_cost)) {
+      if (is.list(results$actions$cost)) {
         if (replicates > 1) { # summaries
 
           # Calculates running mean and standard deviation (note: variance*r is
@@ -774,69 +776,69 @@ ManageResults.Region <- function(region, population_model,
           if (!include_collated || tm %% collation_steps == 0) {
 
             # Combined costs
-            previous_mean <- results$actions$combined_cost[[tmc]]$mean
-            results$actions$combined_cost[[tmc]]$mean <<-
+            previous_mean <- results$actions$cost$combined[[tmc]]$mean
+            results$actions$cost$combined[[tmc]]$mean <<-
               previous_mean + (combined_actions_cost - previous_mean)/r
-            previous_sd <- results$actions$combined_cost[[tmc]]$sd
-            results$actions$combined_cost[[tmc]]$sd <<-
+            previous_sd <- results$actions$cost$combined[[tmc]]$sd
+            results$actions$cost$combined[[tmc]]$sd <<-
               (previous_sd +
                  ((combined_actions_cost - previous_mean)*
                     (combined_actions_cost -
-                       results$actions$combined_cost[[tmc]]$mean)))
+                       results$actions$cost$combined[[tmc]]$mean)))
 
             # Combined cumulative costs
             previous_mean <-
-              results$actions$combined_cumulative_cost[[tmc]]$mean
-            results$actions$combined_cumulative_cost[[tmc]]$mean <<-
+              results$actions$cost$cumulative$combined[[tmc]]$mean
+            results$actions$cost$cumulative$combined[[tmc]]$mean <<-
               (previous_mean +
                  (combined_actions_cumulative_cost - previous_mean)/r)
             previous_sd <-
-              results$actions$combined_cumulative_cost[[tmc]]$sd
-            results$actions$combined_cumulative_cost[[tmc]]$sd <<-
+              results$actions$cost$cumulative$combined[[tmc]]$sd
+            results$actions$cost$cumulative$combined[[tmc]]$sd <<-
               (previous_sd +
                  ((combined_actions_cumulative_cost - previous_mean)*
                     (combined_actions_cumulative_cost -
-                       results$actions$combined_cumulative_cost[[tmc]]$mean)
+                       results$actions$cost$cumulative$combined[[tmc]]$mean)
                  ))
           }
 
           if (include_collated) {
 
             # Total costs
-            previous_mean <- results$actions$total_cost[[tmc]]$mean
-            results$actions$total_cost[[tmc]]$mean <<-
+            previous_mean <- results$actions$cost$total[[tmc]]$mean
+            results$actions$cost$total[[tmc]]$mean <<-
               previous_mean + (total_actions_cost - previous_mean)/r
-            previous_sd <- results$actions$total_cost[[tmc]]$sd
-            results$actions$total_cost[[tmc]]$sd <<-
+            previous_sd <- results$actions$cost$total[[tmc]]$sd
+            results$actions$cost$total[[tmc]]$sd <<-
               (previous_sd +
                  ((total_actions_cost - previous_mean)*
                     (total_actions_cost -
-                       results$actions$total_cost[[tmc]]$mean)))
+                       results$actions$cost$total[[tmc]]$mean)))
 
             # Total cumulative costs
             previous_mean <-
-              results$actions$total_cumulative_cost[[tmc]]$mean
-            results$actions$total_cumulative_cost[[tmc]]$mean <<-
+              results$actions$cost$cumulative$total[[tmc]]$mean
+            results$actions$cost$cumulative$total[[tmc]]$mean <<-
               (previous_mean +
                  (total_actions_cumulative_cost - previous_mean)/r)
             previous_sd <-
-              results$actions$total_cumulative_cost[[tmc]]$sd
-            results$actions$total_cumulative_cost[[tmc]]$sd <<-
+              results$actions$cost$cumulative$total[[tmc]]$sd
+            results$actions$cost$cumulative$total[[tmc]]$sd <<-
               (previous_sd +
                  ((total_actions_cumulative_cost - previous_mean)*
                     (total_actions_cumulative_cost -
-                       results$actions$total_cumulative_cost[[tmc]]$mean)
+                       results$actions$cost$cumulative$total[[tmc]]$mean)
                  ))
           }
         } else {
           if (!include_collated || tm %% collation_steps == 0) {
-            results$actions$combined_cost[[tmc]] <<- combined_actions_cost
-            results$actions$combined_cumulative_cost[[tmc]] <<-
+            results$actions$cost$combined[[tmc]] <<- combined_actions_cost
+            results$actions$cost$cumulative$combined[[tmc]] <<-
               combined_actions_cumulative_cost
           }
           if (include_collated) {
-            results$actions$total_cost[[tmc]] <<- total_actions_cost
-            results$actions$total_cumulative_cost[[tmc]] <<-
+            results$actions$cost$total[[tmc]] <<- total_actions_cost
+            results$actions$cost$cumulative$total[[tmc]] <<-
               total_actions_cumulative_cost
           }
         }
@@ -844,7 +846,7 @@ ManageResults.Region <- function(region, population_model,
     }
 
     # Collate total combined monetary impacts and action costs when present
-    if (is.list(results$combined_cost)) {
+    if (is.list(results$cost)) {
       if (replicates > 1) { # summaries
 
         # Calculates running mean and standard deviation (note: variance*r is
@@ -853,67 +855,67 @@ ManageResults.Region <- function(region, population_model,
         if (!include_collated || tm %% collation_steps == 0) {
 
           # Combined costs
-          previous_mean <- results$combined_cost[[tmc]]$mean
-          results$combined_cost[[tmc]]$mean <<-
+          previous_mean <- results$cost$combined[[tmc]]$mean
+          results$cost$combined[[tmc]]$mean <<-
             previous_mean + (combined_cost - previous_mean)/r
-          previous_sd <- results$combined_cost[[tmc]]$sd
-          results$combined_cost[[tmc]]$sd <<-
+          previous_sd <- results$cost$combined[[tmc]]$sd
+          results$cost$combined[[tmc]]$sd <<-
             (previous_sd +
                ((combined_cost - previous_mean)*
                   (combined_cost -
-                     results$combined_cost[[tmc]]$mean)))
+                     results$cost$combined[[tmc]]$mean)))
 
           # Combined cumulative costs
           previous_mean <-
-            results$combined_cumulative_cost[[tmc]]$mean
-          results$combined_cumulative_cost[[tmc]]$mean <<-
+            results$cost$cumulative$combined[[tmc]]$mean
+          results$cost$cumulative$combined[[tmc]]$mean <<-
             (previous_mean +
                (combined_cumulative_cost - previous_mean)/r)
           previous_sd <-
-            results$combined_cumulative_cost[[tmc]]$sd
-          results$combined_cumulative_cost[[tmc]]$sd <<-
+            results$cost$cumulative$combined[[tmc]]$sd
+          results$cost$cumulative$combined[[tmc]]$sd <<-
             (previous_sd +
                ((combined_cumulative_cost - previous_mean)*
                   (combined_cumulative_cost -
-                     results$combined_cumulative_cost[[tmc]]$mean)
+                     results$cost$cumulative$combined[[tmc]]$mean)
                ))
         }
 
         if (include_collated) {
 
           # Total costs
-          previous_mean <- results$total_cost[[tmc]]$mean
-          results$total_cost[[tmc]]$mean <<-
+          previous_mean <- results$cost$total[[tmc]]$mean
+          results$cost$total[[tmc]]$mean <<-
             previous_mean + (total_cost - previous_mean)/r
-          previous_sd <- results$total_cost[[tmc]]$sd
-          results$total_cost[[tmc]]$sd <<-
+          previous_sd <- results$cost$total[[tmc]]$sd
+          results$cost$total[[tmc]]$sd <<-
             (previous_sd +
                ((total_cost - previous_mean)*
-                  (total_cost - results$total_cost[[tmc]]$mean)))
+                  (total_cost - results$cost$total[[tmc]]$mean)))
 
           # Total cumulative costs
           previous_mean <-
-            results$total_cumulative_cost[[tmc]]$mean
-          results$total_cumulative_cost[[tmc]]$mean <<-
+            results$cost$cumulative$total[[tmc]]$mean
+          results$cost$cumulative$total[[tmc]]$mean <<-
             (previous_mean +
                (total_cumulative_cost - previous_mean)/r)
           previous_sd <-
-            results$total_cumulative_cost[[tmc]]$sd
-          results$total_cumulative_cost[[tmc]]$sd <<-
+            results$cost$cumulative$total[[tmc]]$sd
+          results$cost$cumulative$total[[tmc]]$sd <<-
             (previous_sd +
                ((total_cumulative_cost - previous_mean)*
                   (total_cumulative_cost -
-                     results$total_cumulative_cost[[tmc]]$mean)
+                     results$cost$cumulative$total[[tmc]]$mean)
                ))
         }
       } else {
         if (!include_collated || tm %% collation_steps == 0) {
-          results$combined_cost[[tmc]] <<- combined_cost
-          results$combined_cumulative_cost[[tmc]] <<- combined_cumulative_cost
+          results$cost$combined[[tmc]] <<- combined_cost
+          results$cost$cumulative$combined[[tmc]] <<- combined_cumulative_cost
         }
         if (include_collated) {
-          results$total_cost[[tmc]] <<- total_cost
-          results$total_cumulative_cost[[tmc]] <<- total_cumulative_cost
+          results$cost$total[[tmc]] <<- total_cost
+          results$cost$cumulative$total[[tmc]] <<- total_cumulative_cost
         }
       }
     }
@@ -967,7 +969,7 @@ ManageResults.Region <- function(region, population_model,
     if (length(actions) > 0) {
 
       # Clear working memory for current cumulative costs
-      for (i in 1:length(results$actions)) {
+      for (i in 1:length(actions)) {
         if ("cost" %in% names(results$actions[[i]]) &&
             "cumulative" %in% names(results$actions[[i]]$cost)) {
           for (a in names(results$actions[[i]]$cost$cumulative)) {
@@ -978,7 +980,7 @@ ManageResults.Region <- function(region, population_model,
 
       # Transform action standard deviations
       if (replicates > 1) { # summaries
-        for (i in 1:length(results$actions)) {
+        for (i in 1:length(actions)) {
           i_names <- names(results$actions[[i]])
           for (a in i_names[i_names != "cost"]) {
             if (include_collated && a == "total" ||
@@ -1012,22 +1014,22 @@ ManageResults.Region <- function(region, population_model,
         }
 
         # Combined action costs
-        if (is.list(results$actions$combined_cost)) {
-          for (tmc in names(results$actions$combined_cost)) {
-            results$actions$combined_cost[[tmc]]$sd <<-
-              sqrt(results$actions$combined_cost[[tmc]]$sd/
+        if (is.list(results$actions$cost)) {
+          for (tmc in names(results$actions$cost$combined)) {
+            results$actions$cost$combined[[tmc]]$sd <<-
+              sqrt(results$actions$cost$combined[[tmc]]$sd/
                      (replicates - 1))
-            results$actions$combined_cumulative_cost[[tmc]]$sd <<-
-              sqrt(results$actions$combined_cumulative_cost[[tmc]]$sd/
+            results$actions$cost$cumulative$combined[[tmc]]$sd <<-
+              sqrt(results$actions$cost$cumulative$combined[[tmc]]$sd/
                      (replicates - 1))
           }
           if (include_collated) {
-            for (tmc in names(results$actions$total_cost)) {
-              results$actions$total_cost[[tmc]]$sd <<-
-                sqrt(results$actions$total_cost[[tmc]]$sd/
+            for (tmc in names(results$actions$cost$total)) {
+              results$actions$cost$total[[tmc]]$sd <<-
+                sqrt(results$actions$cost$total[[tmc]]$sd/
                        (replicates - 1))
-              results$actions$total_cumulative_cost[[tmc]]$sd <<-
-                sqrt(results$actions$total_cumulative_cost[[tmc]]$sd/
+              results$actions$cost$cumulative$total[[tmc]]$sd <<-
+                sqrt(results$actions$cost$cumulative$total[[tmc]]$sd/
                        (replicates - 1))
             }
           }
@@ -1036,20 +1038,20 @@ ManageResults.Region <- function(region, population_model,
     }
 
     # Finalise summary combined monetary impacts and action costs
-    if (is.list(results$total_cost) && replicates > 1) {}
-    if (is.list(results$combined_cost) && replicates > 1) {
-      for (tmc in names(results$combined_cost)) {
-        results$combined_cost[[tmc]]$sd <<-
-          sqrt(results$combined_cost[[tmc]]$sd/(replicates - 1))
-        results$combined_cumulative_cost[[tmc]]$sd <<-
-          sqrt(results$combined_cumulative_cost[[tmc]]$sd/(replicates - 1))
+    if (is.list(results$cost$total) && replicates > 1) {}
+    if (is.list(results$cost$combined) && replicates > 1) {
+      for (tmc in names(results$cost$combined)) {
+        results$cost$combined[[tmc]]$sd <<-
+          sqrt(results$cost$combined[[tmc]]$sd/(replicates - 1))
+        results$cost$cumulative$combined[[tmc]]$sd <<-
+          sqrt(results$cost$cumulative$combined[[tmc]]$sd/(replicates - 1))
       }
       if (include_collated) {
-        for (tmc in names(results$total_cost)) {
-          results$total_cost[[tmc]]$sd <<-
-            sqrt(results$total_cost[[tmc]]$sd/(replicates - 1))
-          results$total_cumulative_cost[[tmc]]$sd <<-
-            sqrt(results$total_cumulative_cost[[tmc]]$sd/(replicates - 1))
+        for (tmc in names(results$cost$total)) {
+          results$cost$total[[tmc]]$sd <<-
+            sqrt(results$cost$total[[tmc]]$sd/(replicates - 1))
+          results$cost$cumulative$total[[tmc]]$sd <<-
+            sqrt(results$cost$cumulative$total[[tmc]]$sd/(replicates - 1))
         }
       }
     }
@@ -1681,7 +1683,8 @@ ManageResults.Region <- function(region, population_model,
                                                   "labels")[combine_stages]
                     } else {
                       rownames(output_df) <- sprintf(
-                        "stages %s-%s", min(combine_stages), max(combine_stages))
+                        "stages %s-%s", min(combine_stages),
+                        max(combine_stages))
                     }
                   } else {
                     output_df <- sapply(results$actions[[i]][[a]],

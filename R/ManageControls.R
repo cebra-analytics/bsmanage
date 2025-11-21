@@ -31,10 +31,12 @@
 #'   population attribute).
 #' @param control_cost Numeric vector of distributed control costs (combined
 #'   resource and fixed costs) or a single cost value for each location where
-#'   control is applied. Costs are accumulated for each application of the
-#'   control at each (scheduled) simulation time step. The cost unit may be
-#'   added as an attribute (\code{attr(control_cost, "unit")}), or set within
-#'   the \code{ControlDesign} object associated with the \code{control_design}
+#'   control is applied. For spatially-implicit area-based regions, costs
+#'   should be specified as cost per metres squared. Costs are accumulated for
+#'   each application of the control at each (scheduled) simulation time step.
+#'   The cost unit may be added as an attribute
+#'   (\code{attr(control_cost, "unit")}), or set within the
+#'   \code{ControlDesign} object associated with the \code{control_design}
 #'   when given. Default is \code{NULL} when costs are unavailable.
 #' @param radius Optional radius (m) of the applied control for types
 #'   \code{"growth"}, \code{"spread"}, or \code{"establishment"} only.
@@ -68,6 +70,7 @@
 #'       which management controls are applied.}
 #'     \item{\code{include_cost()}}{Logical indication of a cost parameter
 #'       having a value (named as per population attachment).}
+#'     \item{\code{get_cost_unit()}}{Get the unit of control cost.}
 #'     \item{\code{apply(n, tm)}}{Apply management controls to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, providing the time
@@ -187,6 +190,11 @@ ManageControls.Region <- function(region, population_model,
     include_cost <- is.numeric(control_cost)
     names(include_cost) <- paste0(self$get_label(), "_cost")
     return(include_cost)
+  }
+
+  # Get the unit of control cost
+  self$get_cost_unit <- function() {
+    return(attr(control_cost, "unit"))
   }
 
   # Control apply method

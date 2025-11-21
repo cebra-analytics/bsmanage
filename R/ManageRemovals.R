@@ -28,10 +28,12 @@
 #'   the invasive species has been detected (e.g. via treatment).
 #' @param removal_cost Numeric vector of distributed removal costs (combined
 #'   resource and fixed costs) or a single cost value for each location where
-#'   removal is applied. Costs are accumulated for each application of the
-#'   removal at each (scheduled) simulation time step. The cost unit may be
-#'   added as an attribute (\code{attr(removal_cost, "unit")}). Default is
-#'   \code{NULL} when costs are unavailable.
+#'   removal is applied. For spatially-implicit area-based regions, costs
+#'   should be specified as cost per metres squared. Costs are accumulated for
+#'   each application of the removal at each (scheduled) simulation time step.
+#'   The cost unit may be added as an attribute
+#'   (\code{attr(removal_cost, "unit")}). Default is \code{NULL} when costs
+#'   are unavailable.
 #' @param radius Optional radius (m) of the removal. Stochastic removal is
 #'   applied to all locations within the specified radius of each location
 #'   where the invasive species has been detected. Default is \code{NULL},
@@ -56,6 +58,7 @@
 #'       which management removals are applied.}
 #'     \item{\code{include_cost()}}{Logical indication of a cost parameter
 #'       having a value (named as per population attachment).}
+#'     \item{\code{get_cost_unit()}}{Get the unit of removal cost.}
 #'     \item{\code{apply(n, tm)}}{Apply management removals to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, providing the time
@@ -137,6 +140,11 @@ ManageRemovals.Region <- function(region, population_model,
     include_cost <- is.numeric(removal_cost)
     names(include_cost) <- "removal_cost"
     return(include_cost)
+  }
+
+  # Get the unit of removal cost
+  self$get_cost_unit <- function() {
+    return(attr(removal_cost, "unit"))
   }
 
   # Removal apply method
