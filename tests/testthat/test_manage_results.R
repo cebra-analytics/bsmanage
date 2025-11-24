@@ -503,6 +503,149 @@ test_that("collates and finalizes impact results", {
                list(a1 = "$", a2 = "$"))
 })
 
+test_that("collates and finalizes spatially implicit impact results", {
+  context <- list(bsimpact::Context("My species",
+                                    impact_scope = c("aspect1", "aspect2")),
+                  bsimpact::Context("My species",
+                                    impact_scope = "aspect3",
+                                    valuation_type = "non-monetary"))
+  aspects <- list(aspect1 = "aspect1", aspect2 = "aspect2",
+                  aspect3 = "aspect3")
+  loss_rates <- c(aspect1 = 0.1, aspect2 = 0.2, aspect3 = 0.3)
+  region <- bsspread::Region()
+  population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
+  n <- 8
+  attr(n, "spread_area") <- 10000
+  incursion <- bsimpact::Incursion(8, region, type = "area", multiplier = 0.1)
+  impact_layers <- list(aspect1 = 100, aspect2 = 200, aspect3 = 300)
+  tmc_list <- as.list(1:5)
+  names(tmc_list) <- as.character(0:4)
+  impacts <- list(
+    a1 = ManageImpacts(
+      bsimpact::ValueImpacts(context[[1]], region, incursion,
+                             impact_layers[1:2], loss_rates = loss_rates[1:2]),
+      population_model),
+    a2 = ManageImpacts(
+      bsimpact::ValueImpacts(context[[2]], region, incursion,
+                             impact_layers[3], loss_rates = loss_rates[3],
+                             combine_function = "none"),
+      population_model, calc_total = TRUE))
+  calc_impacts <- lapply(impacts,
+                         function(impacts_i)
+                           attr(impacts_i$calculate(n), "impacts"))
+  # single replicate
+  expect_silent(
+    results <- ManageResults(region, population_model = population_model,
+                             impacts = impacts, time_steps = 4,
+                             collation_steps = 2, replicates = 1))
+  for (tm in 0:4) {
+    results$collate(r = 1, tm = tm, n = n, calc_impacts)
+  }
+  expect_silent(results$finalize())
+  expect_silent(result_list <- results$get_list())
+  expect_equal(
+    lapply(result_list$impacts, names),
+    list(a1 = c("aspect1", "aspect2", "combined", "cumulative"),
+         a2 = "aspect3"))
+  expect_equal(
+    result_list$impacts$a1[1:3],
+    lapply(calc_impacts$a1, function(i) lapply(tmc_list, function(tmc) i)))
+  expect_equal(
+    result_list$impacts$a1$cumulative,
+    lapply(calc_impacts$a1, function(i) lapply(tmc_list, function(tmc) i*tmc)))
+  expect_equal(attr(result_list$impacts$a1, "unit"), "$")
+  expect_equal(
+    result_list$impacts$a2[1],
+    lapply(calc_impacts$a2, function(i) lapply(tmc_list, function(tmc) i)))
+  expect_equal(attr(result_list$impacts$a2, "unit"), "$")
+  # multiple replicates
+  expect_silent(
+    results <- ManageResults(region, population_model = population_model,
+                             impacts = impacts, time_steps = 4,
+                             collation_steps = 2, replicates = 3))
+  expect_silent(result_list_0 <- results$get_list())
+  calc_impacts <- list()
+  n <- 6; attr(n,"spread_area") <- 8000
+  calc_impacts[[1]] <-
+    lapply(impacts,
+           function(impacts_i) attr(impacts_i$calculate(n), "impacts"))
+  n <- 8; attr(n,"spread_area") <- 10000
+  calc_impacts[[2]] <-
+    lapply(impacts,
+           function(impacts_i) attr(impacts_i$calculate(n), "impacts"))
+  n <- 10; attr(n,"spread_area") <- 12000
+  calc_impacts[[3]] <-
+    lapply(impacts,
+           function(impacts_i) attr(impacts_i$calculate(n), "impacts"))
+  for (i in 1:3) {
+    for (tm in 0:4) {
+      results$collate(r = i, tm = tm, n = n, calc_impacts[[i]])
+    }
+  }
+  expect_silent(results$finalize())
+  expect_silent(result_list <- results$get_list())
+  expect_collated <- result_list_0$impacts[[1]][[1]]
+  generate_summary <- function(rep_list, summary_list) {
+    for (i in 1:length(summary_list)) {
+      nrow <- length(summary_list[[i]][[1]])
+      rep_values <- matrix(sapply(rep_list, function(l) l[[i]]), nrow = nrow)
+      summary_list[[i]]$mean <- rowMeans(rep_values)
+      if (any(sapply(summary_list, function(sl) "sd" %in% names(sl)))) {
+        summary_list[[i]]$sd <- apply(rep_values, 1, sd)
+      }
+    }
+    return(summary_list)
+  }
+  expect_equal(
+    lapply(result_list$impacts, names),
+    list(a1 = c("aspect1", "aspect2", "combined", "cumulative"),
+         a2 = "aspect3"))
+  expect_equal(
+    result_list$impacts$a1$aspect1,
+    generate_summary(
+      lapply(calc_impacts,
+             function(i) lapply(tmc_list, function(tmc) i$a1$aspect1)),
+      expect_collated))
+  expect_equal(
+    result_list$impacts$a1$aspect2,
+    generate_summary(
+      lapply(calc_impacts,
+             function(i) lapply(tmc_list, function(tmc) i$a1$aspect2)),
+      expect_collated))
+  expect_equal(
+    result_list$impacts$a1$combined,
+    generate_summary(
+      lapply(calc_impacts,
+             function(i) lapply(tmc_list, function(tmc) i$a1$combined)),
+      expect_collated))
+  expect_equal(
+    result_list$impacts$a1$cumulative$aspect1,
+    generate_summary(
+      lapply(calc_impacts,
+             function(i) lapply(tmc_list, function(tmc) i$a1$aspect1*tmc)),
+      expect_collated))
+  expect_equal(
+    result_list$impacts$a1$cumulative$aspect2,
+    generate_summary(
+      lapply(calc_impacts,
+             function(i) lapply(tmc_list, function(tmc) i$a1$aspect2*tmc)),
+      expect_collated))
+  expect_equal(
+    result_list$impacts$a1$cumulative$combined,
+    generate_summary(
+      lapply(calc_impacts,
+             function(i) lapply(tmc_list, function(tmc) i$a1$combined*tmc)),
+      expect_collated))
+  expect_equal(attr(result_list$impacts$a1, "unit"), "$")
+  expect_equal(
+    result_list$impacts$a2$aspect3,
+    generate_summary(
+      lapply(calc_impacts,
+             function(i) lapply(tmc_list, function(tmc) i$a2$aspect3)),
+      expect_collated))
+  expect_equal(attr(result_list$impacts$a2, "unit"), "$")
+})
+
 test_that("collates and finalizes action results with costs", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
