@@ -1137,6 +1137,12 @@ ManageResults.Region <- function(region, population_model,
             cum_aspects <- NULL
           }
           for (a in aspects) {
+            unit <- impacts[[i]]$get_context()$get_impact_measures()
+            if (length(unit) > 1 && any(names(unit) == a)) {
+              unit <- unname(unit[a])
+            } else {
+              unit <- unname(unit[1])
+            }
             for (s in summaries) {
 
               # Summary post-fix
@@ -1217,6 +1223,9 @@ ManageResults.Region <- function(region, population_model,
                 output_list[[output_key]][[tmc]] <-
                   terra::writeRaster(output_rast, filename, ...)
               }
+
+              # Add unit as an attribute
+              attr(output_list[[output_key]], "unit") <- unit
 
               # Add non-zero indicator as an attribute
               attr(output_list[[output_key]], "nonzero") <-
@@ -1354,6 +1363,7 @@ ManageResults.Region <- function(region, population_model,
       return(c(spread_rast_list,
                lapply(output_list, function(rast_list) {
                  raster_layers <- terra::rast(rast_list)
+                 attr(raster_layers, "unit") <- attr(rast_list, "unit")
                  attr(raster_layers, "nonzero") <- attr(rast_list, "nonzero")
                  raster_layers
                })))
