@@ -33,6 +33,8 @@
 #' @return A \code{ManageImpacts} class object (list) containing functions for
 #'   getting the impact context and performing impact calculations:
 #'   \describe{
+#'     \item{\code{get_impacts()}}{Get \code{bsimpact::ImpactAnalysis} or
+#'       inherited class object.}
 #'     \item{\code{get_context()}}{Get \code{bsimpact::Context} object.}
 #'     \item{\code{get_calc_total()}}{Get calculate total indicator.}
 #'     \item{\code{includes_combined()}}{Logical indicator for when impacts are
@@ -116,6 +118,11 @@ ManageImpacts <- function(impacts, population_model,
 
   # Create a class structure
   self <- structure(list(), class = "ManageImpacts")
+
+  # Get impacts object
+  self$get_impacts <- function() {
+    return(impacts)
+  }
 
   # Get context
   self$get_context <- function() {

@@ -1128,21 +1128,31 @@ ManageResults.Region <- function(region, population_model,
           # Impact aspects and their cumulative when present
           aspects <- names(results$impacts[[i]])
           aspects <- aspects[which(!aspects %in% c("total", "cumulative"))]
+          unit_map <- rep("", length(aspects))
+          names(unit_map) <- aspects
+          if (!is.null(attr(results$impacts[[i]], "unit"))) {
+            unit <- attr(results$impacts[[i]], "unit")
+            if (length(unit) > 1 && length(aspects) >= length(unit)) {
+              unit_map[1:length(unit)] <- unit
+              if (length(aspects) > length(unit)) { # assume same for combined
+                unit_map[(length(unit) + 1):length(aspects)] <- unit[1]
+              }
+            } else {
+              unit_map[] <- unit
+            }
+          }
           if ("cumulative" %in% names(results$impacts[[i]])) {
             cum_aspects <- names(results$impacts[[i]]$cumulative)
             cum_aspects <- cum_aspects[which(cum_aspects != "total")]
             names(cum_aspects) <- paste0("cum_", cum_aspects)
             aspects <- c(aspects, names(cum_aspects))
+            unit_map_cum <- unit_map[cum_aspects]
+            names(unit_map_cum) <- names(cum_aspects)
+            unit_map <- c(unit_map, unit_map_cum)
           } else {
             cum_aspects <- NULL
           }
           for (a in aspects) {
-            unit <- impacts[[i]]$get_context()$get_impact_measures()
-            if (length(unit) > 1 && any(names(unit) == a)) {
-              unit <- unname(unit[a])
-            } else {
-              unit <- unname(unit[1])
-            }
             for (s in summaries) {
 
               # Summary post-fix
@@ -1224,12 +1234,32 @@ ManageResults.Region <- function(region, population_model,
                   terra::writeRaster(output_rast, filename, ...)
               }
 
-              # Add unit as an attribute
-              attr(output_list[[output_key]], "unit") <- unit
-
-              # Add non-zero indicator as an attribute
-              attr(output_list[[output_key]], "nonzero") <-
-                nonzero_list[[output_key]]
+              # Add list of metadata as an attribute
+              if (impacts[[i]]$get_impacts()$get_is_dynamic()) {
+                impact_type <- "dynamic"
+              } else {
+                impact_type <- impacts[[i]]$get_context()$get_valuation_type()
+              }
+              incursion_type <-
+                impacts[[i]]$get_impacts()$get_incursion()$get_type()
+              if (a %in% names(cum_aspects)) {
+                aspect <- unname(cum_aspects[a])
+                cumulative <- TRUE
+              } else {
+                aspect <- a
+                cumulative <- FALSE
+              }
+              attr(output_list[[output_key]], "metadata") <- list(
+                category = "impact",
+                type = impact_type,
+                name = aspect,
+                incursion = incursion_type,
+                cost = FALSE,
+                cumulative = cumulative,
+                summary = s,
+                unit = unname(unit_map[a]),
+                nonzero = nonzero_list[[output_key]]
+              )
             }
           }
         }
@@ -1239,10 +1269,10 @@ ManageResults.Region <- function(region, population_model,
       if (length(actions) > 0) {
 
         # Save rasters for each impact aspect at each time step
-        if (!is.null(names(results$actions))) {
-          action_i <- names(results$actions)    # named actions
+        if (!is.null(names(actions))) {
+          action_i <- names(actions)    # named actions
         } else {
-          action_i <- 1:length(results$actions) # indices
+          action_i <- 1:length(actions) # indices
         }
         for (i in action_i) {
 
@@ -1254,7 +1284,7 @@ ManageResults.Region <- function(region, population_model,
           }
 
           aspects <- names(results$actions[[i]])
-          for (a in aspects[which(aspects != "total")]) {
+          for (a in aspects[which(!aspects %in% c("total", "cost"))]) {
 
             direct_action <-
               (a %in%  c("detected", "control_search_destroy", "removed"))
@@ -1300,6 +1330,27 @@ ManageResults.Region <- function(region, population_model,
 
                 # Initialise non-zero indicator
                 nonzero_list[[output_key]] <- FALSE
+
+                # Add cost and cumulative cost to output list (not staged)
+                if ("cost" %in% names(results$actions[[i]]) && j == 1) {
+                  if (a == "detected") {
+                    cost_a <- "detection"
+                  } else if (a == "removed") {
+                    cost_a <- "removal"
+                  } else {
+                    cost_a <- a
+                  }
+                  output_cost_key <- paste0("actions", ic, "_", cost_a,
+                                            "_cost", sc)
+                  output_list[[output_cost_key]] <- list()
+                  nonzero_list[[output_cost_key]] <- FALSE
+                  if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                    output_cum_cost_key <- paste0("actions", ic, "_", cost_a,
+                                                  "_cum_cost", sc)
+                    output_list[[output_cum_cost_key]] <- list()
+                    nonzero_list[[output_cum_cost_key]] <- FALSE
+                  }
+                }
 
                 for (tmc in names(results$actions[[i]][[a]])) {
 
@@ -1348,23 +1399,110 @@ ManageResults.Region <- function(region, population_model,
                     ic, a, jc, as.integer(tmc), sc)
                   output_list[[output_key]][[tmc]] <-
                     terra::writeRaster(output_rast, filename, ...)
+
+                  # Write cost and cumulative cost to raster files (not staged)
+                  if ("cost" %in% names(results$actions[[i]]) && j == 1) {
+                    if (replicates > 1) {
+                      output_rast <- region$get_rast(
+                        results$actions[[i]]$cost[[a]][[tmc]][[s]])
+                      nonzero_list[[output_cost_key]] <-
+                        (nonzero_list[[output_cost_key]] |
+                           sum(results$actions[[i]]$cost[[a]][[tmc]][[s]]) > 0)
+                    } else {
+                      output_rast <-
+                        region$get_rast(results$actions[[i]]$cost[[a]][[tmc]])
+                      nonzero_list[[output_cost_key]] <-
+                        (nonzero_list[[output_cost_key]] |
+                           sum(results$actions[[i]]$cost[[a]][[tmc]]) > 0)
+                    }
+                    filename <- sprintf(
+                      paste0(output_cost_key, "_t%0",
+                             nchar(as.character(time_steps)), "d.tif"),
+                      as.integer(tmc))
+                    output_list[[output_cost_key]][[tmc]] <-
+                      terra::writeRaster(output_rast, filename, ...)
+                    if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                      if (replicates > 1) {
+                        output_rast <- region$get_rast(
+                          results$actions[[i]]$cost$cumulative[[a]][[
+                            tmc]][[s]])
+                        nonzero_list[[output_cum_cost_key]] <-
+                          (nonzero_list[[output_cum_cost_key]] |
+                             (sum(results$actions[[i]]$cost$cumulative[[a]][[
+                               tmc]][[s]]) > 0))
+                      } else {
+                        output_rast <- region$get_rast(
+                          results$actions[[i]]$cost$cumulative[[a]][[tmc]])
+                        nonzero_list[[output_cum_cost_key]] <-
+                          (nonzero_list[[output_cum_cost_key]] |
+                             sum(results$actions[[i]]$cost$cumulative[[a]][[
+                               tmc]]) > 0)
+                      }
+                      filename <- sprintf(
+                        paste0(output_cum_cost_key, "_t%0",
+                               nchar(as.character(time_steps)), "d.tif"),
+                        as.integer(tmc))
+                      output_list[[output_cum_cost_key]][[tmc]] <-
+                        terra::writeRaster(output_rast, filename, ...)
+                    }
+                  }
                 }
 
-                # Add non-zero indicator as an attribute
-                attr(output_list[[output_key]], "nonzero") <-
-                  nonzero_list[[output_key]]
+                # Add list of metadata as an attribute
+                name <- sub("control_", "", actions[[i]]$get_label(),
+                            fixed = TRUE)
+                if (name == "removed") {
+                  cost_name <- "removal"
+                } else if (name == "detected") {
+                  cost_name <- "detection"
+                } else if (name == "search_destroy") {
+                  cost_name <- name <- "search & destroy"
+                } else {
+                  cost_name <- name
+                }
+                if (actions[[i]]$get_type() == "control") {
+                  cost_name <- name <- paste(name, "control")
+                }
+                cost_unit <- attr(results$actions[[i]]$cost, "unit")
+                attr_list <- list(
+                  category = "action",
+                  type = actions[[i]]$get_type(),
+                  name = name,
+                  cost = FALSE,
+                  cumulative = FALSE,
+                  summary = s,
+                  unit = "",
+                  nonzero = nonzero_list[[output_key]]
+                )
+                attr(output_list[[output_key]], "metadata") <- attr_list
+                if ("cost" %in% names(results$actions[[i]]) && j == 1) {
+                  attr_list$cost <- TRUE
+                  attr_list$name <- cost_name
+                  attr_list$unit <- cost_unit
+                  attr(output_list[[output_cost_key]], "metadata") <- attr_list
+                  if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                    attr_list$cumulative <- TRUE
+                    attr(output_list[[output_cum_cost_key]], "metadata") <-
+                      attr_list
+                  }
+                }
               }
             }
           }
         }
+
+        # Combined action costs # TODO ####
+        if ("cost" %in% names(results$actions)) {}
+
+        # Combined monetary impacts and action costs # TODO ####
+        if ("cost" %in% names(results)) {}
       }
 
       # Return output list as multi-layer rasters
       return(c(spread_rast_list,
                lapply(output_list, function(rast_list) {
                  raster_layers <- terra::rast(rast_list)
-                 attr(raster_layers, "unit") <- attr(rast_list, "unit")
-                 attr(raster_layers, "nonzero") <- attr(rast_list, "nonzero")
+                 attr(raster_layers, "metadata") <- attr(rast_list, "metadata")
                  raster_layers
                })))
     }

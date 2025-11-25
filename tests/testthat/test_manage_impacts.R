@@ -50,9 +50,10 @@ test_that("initializes with impacts, populations and impact stages", {
                                                 dynamic_links = "suitability",
                                                 recovery_delay = 2))
   expect_is(manage_impacts, "ManageImpacts")
-  expect_named(manage_impacts, c("get_context", "get_calc_total",
-                                 "includes_combined", "update_recovery_delay",
-                                 "calculate"))
+  expect_named(manage_impacts,
+               c("get_impacts", "get_context", "get_calc_total",
+                 "includes_combined", "update_recovery_delay", "calculate"))
+  expect_is(manage_impacts$get_impacts(), "ValueImpacts")
   expect_is(manage_impacts$get_context(), "Context")
   expect_true(manage_impacts$includes_combined())
   expect_true(manage_impacts$get_calc_total())

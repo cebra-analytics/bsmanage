@@ -53,6 +53,8 @@ explicit grid or network models. Default \code{NULL} assumes no delay.}
 A \code{ManageImpacts} class object (list) containing functions for
 getting the impact context and performing impact calculations:
 \describe{
+\item{\code{get_impacts()}}{Get \code{bsimpact::ImpactAnalysis} or
+inherited class object.}
 \item{\code{get_context()}}{Get \code{bsimpact::Context} object.}
 \item{\code{get_calc_total()}}{Get calculate total indicator.}
 \item{\code{includes_combined()}}{Logical indicator for when impacts are
