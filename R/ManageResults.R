@@ -1491,11 +1491,183 @@ ManageResults.Region <- function(region, population_model,
           }
         }
 
-        # Combined action costs # TODO ####
-        if ("cost" %in% names(results$actions)) {}
+        # Combined action costs and/or monetary impacts
+        if ("cost" %in% names(results$actions) || "cost" %in% names(results)) {
 
-        # Combined monetary impacts and action costs # TODO ####
-        if ("cost" %in% names(results)) {}
+          # Replicate summaries or single replicate
+          if (replicates > 1) {
+            summaries <- c("mean", "sd")
+          } else {
+            summaries <- ""
+          }
+
+          for (s in summaries) {
+
+            # Summary post-fix
+            if (replicates > 1) {
+              sc <- paste0("_", s)
+            } else {
+              sc <- s
+            }
+
+            # Combined action costs
+            if ("cost" %in% names(results$actions)) {
+
+              # Add cost and cumulative cost to output list
+              output_cost_key <- paste0("actions_combined_cost", sc)
+              output_list[[output_cost_key]] <- list()
+              nonzero_list[[output_cost_key]] <- FALSE
+              if ("cumulative" %in% names(results$actions$cost)) {
+                output_cum_cost_key <- paste0("actions_combined_cum_cost", sc)
+                output_list[[output_cum_cost_key]] <- list()
+                nonzero_list[[output_cum_cost_key]] <- FALSE
+              }
+
+              # Write combined actions cost to raster files
+              for (tmc in names(results$actions$cost$combined)) {
+                if (replicates > 1) {
+                  output_rast <- region$get_rast(
+                    results$actions$cost$combined[[tmc]][[s]])
+                  nonzero_list[[output_cost_key]] <-
+                    (nonzero_list[[output_cost_key]] |
+                       sum(results$actions$cost$combined[[tmc]][[s]]) > 0)
+                } else {
+                  output_rast <-
+                    region$get_rast(results$actions$cost$combined[[tmc]])
+                  nonzero_list[[output_cost_key]] <-
+                    (nonzero_list[[output_cost_key]] |
+                       sum(results$actions$cost$combined[[tmc]]) > 0)
+                }
+                filename <- sprintf(
+                  paste0(output_cost_key, "_t%0",
+                         nchar(as.character(time_steps)), "d.tif"),
+                  as.integer(tmc))
+                output_list[[output_cost_key]][[tmc]] <-
+                  terra::writeRaster(output_rast, filename, ...)
+                if ("cumulative" %in% names(results$actions$cost)) {
+                  if (replicates > 1) {
+                    output_rast <- region$get_rast(
+                      results$actions$cost$cumulative$combined[[tmc]][[s]])
+                    nonzero_list[[output_cum_cost_key]] <-
+                      (nonzero_list[[output_cum_cost_key]] |
+                         (sum(results$actions$cost$cumulative$combined[[
+                           tmc]][[s]]) > 0))
+                  } else {
+                    output_rast <- region$get_rast(
+                      results$actions$cost$cumulative$combined[[tmc]])
+                    nonzero_list[[output_cum_cost_key]] <-
+                      (nonzero_list[[output_cum_cost_key]] |
+                         sum(results$actions$cost$cumulative$combined[[
+                           tmc]]) > 0)
+                  }
+                  filename <- sprintf(
+                    paste0(output_cum_cost_key, "_t%0",
+                           nchar(as.character(time_steps)), "d.tif"),
+                    as.integer(tmc))
+                  output_list[[output_cum_cost_key]][[tmc]] <-
+                    terra::writeRaster(output_rast, filename, ...)
+                }
+              }
+
+              # Add list of metadata as an attribute
+              cost_unit <- attr(results$actions$cost, "unit")
+              attr_list <- list(
+                category = "action",
+                type = "combined",
+                name = "combined",
+                cost = TRUE,
+                cumulative = FALSE,
+                summary = s,
+                unit = cost_unit,
+                nonzero = nonzero_list[[output_cost_key]]
+              )
+              attr(output_list[[output_cost_key]], "metadata") <- attr_list
+              if ("cumulative" %in% names(results$actions$cost)) {
+                attr_list$cumulative <- TRUE
+                attr(output_list[[output_cum_cost_key]], "metadata") <-
+                  attr_list
+              }
+            }
+
+            # Combined monetary impacts and action costs # TODO ####
+            if ("cost" %in% names(results)) {
+
+              # Add cost and cumulative cost to output list
+              output_cost_key <- paste0("combined_cost", sc)
+              output_list[[output_cost_key]] <- list()
+              nonzero_list[[output_cost_key]] <- FALSE
+              if ("cumulative" %in% names(results$actions$cost)) {
+                output_cum_cost_key <- paste0("combined_cum_cost", sc)
+                output_list[[output_cum_cost_key]] <- list()
+                nonzero_list[[output_cum_cost_key]] <- FALSE
+              }
+
+              # Write combined cost to raster files
+              for (tmc in names(results$cost$combined)) {
+                if (replicates > 1) {
+                  output_rast <- region$get_rast(
+                    results$cost$combined[[tmc]][[s]])
+                  nonzero_list[[output_cost_key]] <-
+                    (nonzero_list[[output_cost_key]] |
+                       sum(results$cost$combined[[tmc]][[s]]) > 0)
+                } else {
+                  output_rast <-
+                    region$get_rast(results$cost$combined[[tmc]])
+                  nonzero_list[[output_cost_key]] <-
+                    (nonzero_list[[output_cost_key]] |
+                       sum(results$cost$combined[[tmc]]) > 0)
+                }
+                filename <- sprintf(
+                  paste0(output_cost_key, "_t%0",
+                         nchar(as.character(time_steps)), "d.tif"),
+                  as.integer(tmc))
+                output_list[[output_cost_key]][[tmc]] <-
+                  terra::writeRaster(output_rast, filename, ...)
+                if ("cumulative" %in% names(results$cost)) {
+                  if (replicates > 1) {
+                    output_rast <- region$get_rast(
+                      results$cost$cumulative$combined[[tmc]][[s]])
+                    nonzero_list[[output_cum_cost_key]] <-
+                      (nonzero_list[[output_cum_cost_key]] |
+                         (sum(results$cost$cumulative$combined[[
+                           tmc]][[s]]) > 0))
+                  } else {
+                    output_rast <- region$get_rast(
+                      results$cost$cumulative$combined[[tmc]])
+                    nonzero_list[[output_cum_cost_key]] <-
+                      (nonzero_list[[output_cum_cost_key]] |
+                         sum(results$cost$cumulative$combined[[tmc]]) > 0)
+                  }
+                  filename <- sprintf(
+                    paste0(output_cum_cost_key, "_t%0",
+                           nchar(as.character(time_steps)), "d.tif"),
+                    as.integer(tmc))
+                  output_list[[output_cum_cost_key]][[tmc]] <-
+                    terra::writeRaster(output_rast, filename, ...)
+                }
+              }
+
+              # Add list of metadata as an attribute
+              cost_unit <- attr(results$cost, "unit")
+              attr_list <- list(
+                category = "combined",
+                type = "combined",
+                name = "combined",
+                cost = TRUE,
+                cumulative = FALSE,
+                summary = s,
+                unit = cost_unit,
+                nonzero = nonzero_list[[output_cost_key]]
+              )
+              attr(output_list[[output_cost_key]], "metadata") <- attr_list
+              if ("cumulative" %in% names(results$cost)) {
+                attr_list$cumulative <- TRUE
+                attr(output_list[[output_cum_cost_key]], "metadata") <-
+                  attr_list
+              }
+            }
+          }
+        }
       }
 
       # Return output list as multi-layer rasters
