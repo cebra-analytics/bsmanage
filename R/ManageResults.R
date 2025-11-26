@@ -1038,7 +1038,6 @@ ManageResults.Region <- function(region, population_model,
     }
 
     # Finalise summary combined monetary impacts and action costs
-    if (is.list(results$cost$total) && replicates > 1) {}
     if (is.list(results$cost$combined) && replicates > 1) {
       for (tmc in names(results$cost$combined)) {
         results$cost$combined[[tmc]]$sd <<-
@@ -1290,11 +1289,12 @@ ManageResults.Region <- function(region, population_model,
               (a %in%  c("detected", "control_search_destroy", "removed"))
 
             # Create and save an action results raster per stage
+            result_stages <- stages
             if (is.null(stages) || is.numeric(combine_stages) ||
                 !direct_action) {
-              stages <- 1
+              result_stages <- 1
             }
-            for (j in 1:stages) {
+            for (j in 1:result_stages) {
 
               # Stage post-fix
               if (population_model$get_type() == "stage_structured" &&
@@ -1399,58 +1399,119 @@ ManageResults.Region <- function(region, population_model,
                     ic, a, jc, as.integer(tmc), sc)
                   output_list[[output_key]][[tmc]] <-
                     terra::writeRaster(output_rast, filename, ...)
-
-                  # Write cost and cumulative cost to raster files (not staged)
-                  if ("cost" %in% names(results$actions[[i]]) && j == 1) {
-                    if (replicates > 1) {
-                      output_rast <- region$get_rast(
-                        results$actions[[i]]$cost[[a]][[tmc]][[s]])
-                      nonzero_list[[output_cost_key]] <-
-                        (nonzero_list[[output_cost_key]] |
-                           sum(results$actions[[i]]$cost[[a]][[tmc]][[s]]) > 0)
-                    } else {
-                      output_rast <-
-                        region$get_rast(results$actions[[i]]$cost[[a]][[tmc]])
-                      nonzero_list[[output_cost_key]] <-
-                        (nonzero_list[[output_cost_key]] |
-                           sum(results$actions[[i]]$cost[[a]][[tmc]]) > 0)
-                    }
-                    filename <- sprintf(
-                      paste0(output_cost_key, "_t%0",
-                             nchar(as.character(time_steps)), "d.tif"),
-                      as.integer(tmc))
-                    output_list[[output_cost_key]][[tmc]] <-
-                      terra::writeRaster(output_rast, filename, ...)
-                    if ("cumulative" %in% names(results$actions[[i]]$cost)) {
-                      if (replicates > 1) {
-                        output_rast <- region$get_rast(
-                          results$actions[[i]]$cost$cumulative[[a]][[
-                            tmc]][[s]])
-                        nonzero_list[[output_cum_cost_key]] <-
-                          (nonzero_list[[output_cum_cost_key]] |
-                             (sum(results$actions[[i]]$cost$cumulative[[a]][[
-                               tmc]][[s]]) > 0))
-                      } else {
-                        output_rast <- region$get_rast(
-                          results$actions[[i]]$cost$cumulative[[a]][[tmc]])
-                        nonzero_list[[output_cum_cost_key]] <-
-                          (nonzero_list[[output_cum_cost_key]] |
-                             sum(results$actions[[i]]$cost$cumulative[[a]][[
-                               tmc]]) > 0)
-                      }
-                      filename <- sprintf(
-                        paste0(output_cum_cost_key, "_t%0",
-                               nchar(as.character(time_steps)), "d.tif"),
-                        as.integer(tmc))
-                      output_list[[output_cum_cost_key]][[tmc]] <-
-                        terra::writeRaster(output_rast, filename, ...)
-                    }
-                  }
                 }
 
                 # Add list of metadata as an attribute
                 name <- sub("control_", "", actions[[i]]$get_label(),
                             fixed = TRUE)
+                if (actions[[i]]$get_type() == "control") {
+                  name <- paste(name, "control")
+                }
+                if (is.null(stages)) {
+                  stage_attr <- NULL
+                } else {
+                  stage_attr <- j
+                }
+                attr_list <- list(
+                  category = "action",
+                  type = actions[[i]]$get_type(),
+                  name = name,
+                  stage = stage_attr,
+                  cost = FALSE,
+                  cumulative = FALSE,
+                  summary = s,
+                  unit = "",
+                  nonzero = nonzero_list[[output_key]]
+                )
+                attr(output_list[[output_key]], "metadata") <- attr_list
+              }
+            }
+
+            # Action cost and cumulative cost
+            if ("cost" %in% names(results$actions[[i]])) {
+
+              # Replicate summaries or single replicate
+              if (replicates > 1) {
+                summaries <- c("mean", "sd")
+              } else {
+                summaries <- ""
+              }
+              for (s in summaries) {
+
+                # Summary post-fix
+                if (replicates > 1) {
+                  sc <- paste0("_", s)
+                } else {
+                  sc <- s
+                }
+
+                # Add nested list to output list
+                if (a == "detected") {
+                  cost_a <- "detection"
+                } else if (a == "removed") {
+                  cost_a <- "removal"
+                } else {
+                  cost_a <- a
+                }
+                output_cost_key <- paste0("actions", ic, "_", cost_a,
+                                          "_cost", sc)
+                output_list[[output_cost_key]] <- list()
+                nonzero_list[[output_cost_key]] <- FALSE
+                if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                  output_cum_cost_key <- paste0("actions", ic, "_", cost_a,
+                                                "_cum_cost", sc)
+                  output_list[[output_cum_cost_key]] <- list()
+                  nonzero_list[[output_cum_cost_key]] <- FALSE
+                }
+
+                # Write cost and cumulative cost to raster files
+                for (tmc in names(results$actions[[i]][[a]])) {
+                  if (replicates > 1) {
+                    output_rast <- region$get_rast(
+                      results$actions[[i]]$cost[[a]][[tmc]][[s]])
+                    nonzero_list[[output_cost_key]] <-
+                      (nonzero_list[[output_cost_key]] |
+                         sum(results$actions[[i]]$cost[[a]][[tmc]][[s]]) > 0)
+                  } else {
+                    output_rast <-
+                      region$get_rast(results$actions[[i]]$cost[[a]][[tmc]])
+                    nonzero_list[[output_cost_key]] <-
+                      (nonzero_list[[output_cost_key]] |
+                         sum(results$actions[[i]]$cost[[a]][[tmc]]) > 0)
+                  }
+                  filename <- sprintf(
+                    paste0(output_cost_key, "_t%0",
+                           nchar(as.character(time_steps)), "d.tif"),
+                    as.integer(tmc))
+                  output_list[[output_cost_key]][[tmc]] <-
+                    terra::writeRaster(output_rast, filename, ...)
+                  if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                    if (replicates > 1) {
+                      output_rast <- region$get_rast(
+                        results$actions[[i]]$cost$cumulative[[a]][[
+                          tmc]][[s]])
+                      nonzero_list[[output_cum_cost_key]] <-
+                        (nonzero_list[[output_cum_cost_key]] |
+                           (sum(results$actions[[i]]$cost$cumulative[[a]][[
+                             tmc]][[s]]) > 0))
+                    } else {
+                      output_rast <- region$get_rast(
+                        results$actions[[i]]$cost$cumulative[[a]][[tmc]])
+                      nonzero_list[[output_cum_cost_key]] <-
+                        (nonzero_list[[output_cum_cost_key]] |
+                           sum(results$actions[[i]]$cost$cumulative[[a]][[
+                             tmc]]) > 0)
+                    }
+                    filename <- sprintf(
+                      paste0(output_cum_cost_key, "_t%0",
+                             nchar(as.character(time_steps)), "d.tif"),
+                      as.integer(tmc))
+                    output_list[[output_cum_cost_key]][[tmc]] <-
+                      terra::writeRaster(output_rast, filename, ...)
+                  }
+                }
+
+                # Add list of metadata as an attribute
                 if (name == "removed") {
                   cost_name <- "removal"
                 } else if (name == "detected") {
@@ -1467,24 +1528,19 @@ ManageResults.Region <- function(region, population_model,
                 attr_list <- list(
                   category = "action",
                   type = actions[[i]]$get_type(),
-                  name = name,
-                  cost = FALSE,
+                  name = cost_name,
+                  stage = NULL,
+                  cost = TRUE,
                   cumulative = FALSE,
                   summary = s,
-                  unit = "",
-                  nonzero = nonzero_list[[output_key]]
+                  unit = cost_unit,
+                  nonzero = nonzero_list[[output_cost_key]]
                 )
-                attr(output_list[[output_key]], "metadata") <- attr_list
-                if ("cost" %in% names(results$actions[[i]]) && j == 1) {
-                  attr_list$cost <- TRUE
-                  attr_list$name <- cost_name
-                  attr_list$unit <- cost_unit
-                  attr(output_list[[output_cost_key]], "metadata") <- attr_list
-                  if ("cumulative" %in% names(results$actions[[i]]$cost)) {
-                    attr_list$cumulative <- TRUE
-                    attr(output_list[[output_cum_cost_key]], "metadata") <-
-                      attr_list
-                  }
+                attr(output_list[[output_cost_key]], "metadata") <- attr_list
+                if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                  attr_list$cumulative <- TRUE
+                  attr(output_list[[output_cum_cost_key]], "metadata") <-
+                    attr_list
                 }
               }
             }
@@ -1589,7 +1645,7 @@ ManageResults.Region <- function(region, population_model,
               }
             }
 
-            # Combined monetary impacts and action costs # TODO ####
+            # Combined monetary impacts and action costs
             if ("cost" %in% names(results)) {
 
               # Add cost and cumulative cost to output list
@@ -1892,10 +1948,10 @@ ManageResults.Region <- function(region, population_model,
     if (length(actions) > 0) {
 
       # Save CSV files for each action
-      if (!is.null(names(results$actions))) {
-        action_i <- names(results$actions)    # named actions
+      if (!is.null(names(actions))) {
+        action_i <- names(actions)    # named actions
       } else {
-        action_i <- 1:length(results$actions) # indices
+        action_i <- 1:length(actions) # indices
       }
 
       # Results for single or multi-patch only
@@ -1926,6 +1982,7 @@ ManageResults.Region <- function(region, population_model,
             j_fname <- paste0("_stage_", 1:result_stages)
           }
 
+          # Save collated action results with coordinates
           if (include_collated) {
 
             # Replicate summaries or single replicate
@@ -1944,42 +2001,87 @@ ManageResults.Region <- function(region, population_model,
 
               # Action aspects
               aspects <- names(results$actions[[i]])
-              for (a in aspects[which(aspects != "total")]) {
+              for (a in aspects[which(!aspects %in% c("total", "cost"))]) {
 
-                # Combine coordinates and collated action values
-                output_df <- list()
+                # Combine coordinates and collated values & write to CSV files
                 for (s in summaries) {
                   if (population_model$get_type() == "stage_structured" &&
                       direct_action) {
                     if (replicates > 1) {
-                      output_df[[s]] <- lapply(results$actions[[i]][[a]],
-                                               function(a_tm) a_tm[[s]][,j])
+                      output_df <- lapply(results$actions[[i]][[a]],
+                                          function(a_tm) a_tm[[s]][,j])
                     } else {
-                      output_df[[s]] <- lapply(results$actions[[i]][[a]],
-                                               function(a_tm) a_tm[,j])
+                      output_df <- lapply(results$actions[[i]][[a]],
+                                          function(a_tm) a_tm[,j])
                     }
                   } else {
                     if (replicates > 1) {
-                      output_df[[s]] <- lapply(results$actions[[i]][[a]],
-                                               function(a_tm) a_tm[[s]])
+                      output_df <- lapply(results$actions[[i]][[a]],
+                                          function(a_tm) a_tm[[s]])
                     } else {
-                      output_df[[s]] <- results$actions[[i]][[a]]
+                      output_df <- results$actions[[i]][[a]]
                     }
                   }
-                  names(output_df[[s]]) <- collated_labels
-                  output_df[[s]] <- cbind(coords, as.data.frame(output_df[[s]]))
-                }
-
-                # Write to CSV files
-                for (s in summaries) {
-                  filename <- sprintf("actions%s_%s%s%s.csv", ic, a, j_fname[j],
-                                      s_fname[[s]])
-                  utils::write.csv(output_df[[s]], filename, row.names = FALSE)
+                  names(output_df) <- collated_labels
+                  output_df <- cbind(coords, as.data.frame(output_df))
+                  filename <- sprintf("actions%s_%s%s%s.csv", ic, a,
+                                      j_fname[j], s_fname[[s]])
+                  utils::write.csv(output_df, filename, row.names = FALSE)
                 }
               }
             }
 
-          } else {
+            # Cost and cumulative cost
+            if ("cost" %in% names(results$actions[[i]])) {
+
+              # Replicate summaries or single replicate
+              if (replicates > 1) {
+                summaries <- c("mean", "sd")
+              } else {
+                summaries <- 1
+              }
+
+              # Write cost and cumulative cost for each action (aspect)
+              for (a in aspects[which(!aspects %in% c("total", "cost"))]) {
+                if (a == "detected") {
+                  cost_a <- "detection"
+                } else if (a == "removed") {
+                  cost_a <- "removal"
+                } else {
+                  cost_a <- a
+                }
+                for (s in summaries) {
+                  if (replicates > 1) {
+                    output_df <- lapply(results$actions[[i]]$cost[[a]],
+                                        function(a_tm) a_tm[[s]])
+                  } else {
+                    output_df <- results$actions[[i]]$cost[[a]]
+                  }
+                  names(output_df) <- collated_labels
+                  output_df <- cbind(coords, as.data.frame(output_df))
+                  filename <- sprintf("actions%s_%s_cost%s.csv", ic, cost_a,
+                                      s_fname[[s]])
+                  utils::write.csv(output_df, filename, row.names = FALSE)
+                  if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                    if (replicates > 1) {
+                      output_df <-
+                        lapply(results$actions[[i]]$cost$cumulative[[a]],
+                               function(a_tm) a_tm[[s]])
+                    } else {
+                      output_df <- results$actions[[i]]$cost$cumulative[[a]]
+                    }
+                    names(output_df) <- collated_labels
+                    output_df <- cbind(coords, as.data.frame(output_df))
+                    filename <- sprintf("actions%s_%s_cum_cost%s.csv", ic,
+                                        cost_a, s_fname[[s]])
+                    utils::write.csv(output_df, filename,
+                                     row.names = FALSE)
+                  }
+                }
+              }
+            }
+
+          } else { # TODO costs ####
 
             # Save CSVs without coordinates (spatially implicit)
             for (a in names(results$actions[[i]])) {
@@ -2034,10 +2136,71 @@ ManageResults.Region <- function(region, population_model,
             }
           }
         }
+
+        # Combined action costs and/or monetary impacts # TODO ####
+        if ("cost" %in% names(results$actions) || "cost" %in% names(results)) {
+
+          # Save collated action costs with coordinates
+          if (include_collated) {
+
+            # Replicate summaries or single replicate
+            if (replicates > 1) {
+              summaries <- c("mean", "sd")
+            } else {
+              summaries <- 1
+            }
+
+            # Combined action costs
+            if ("cost" %in% names(results$actions)) {
+              for (s in summaries) {
+                if (replicates > 1) {
+                  output_df <- lapply(results$actions[[i]]$cost[[a]],
+                                      function(a_tm) a_tm[[s]])
+                } else {
+                  output_df <- results$actions[[i]]$cost[[a]]
+                }
+                names(output_df) <- collated_labels
+                output_df <- cbind(coords, as.data.frame(output_df))
+                filename <- sprintf("actions%s_%s_cost%s.csv", ic, cost_a,
+                                    s_fname[[s]])
+                utils::write.csv(output_df, filename, row.names = FALSE)
+              }
+              if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                for (s in summaries) {
+                  if (replicates > 1) {
+                    output_df <-
+                      lapply(results$actions[[i]]$cost$cumulative[[a]],
+                             function(a_tm) a_tm[[s]])
+                  } else {
+                    output_df <- results$actions[[i]]$cost$cumulative[[a]]
+                  }
+                  names(output_df) <- collated_labels
+                  output_df <- cbind(coords, as.data.frame(output_df))
+                  filename <- sprintf("actions%s_%s_cum_cost%s.csv", ic,
+                                      cost_a, s_fname[[s]])
+                  utils::write.csv(output_df, filename,
+                                   row.names = FALSE)
+                }
+              }
+
+            }
+
+            # Combined monetary impacts and action costs
+            if ("cost" %in% names(results)) {
+
+            }
+
+          } else { # TODO costs ####
+
+            # Save CSVs without coordinates (spatially implicit)
+          }
+        }
       }
 
-      # Save totals CSV for each action
+      # Save totals CSV
       if (include_collated) {
+
+        # Save totals CSV for each action
         for (i in action_i) {
 
           # Action label. Direct action?
@@ -2107,7 +2270,68 @@ ManageResults.Region <- function(region, population_model,
               utils::write.csv(output_df, filename, row.names = TRUE)
             }
           }
+
+          # Action cost and cumulative cost totals when present
+          if ("cost" %in% names(results$actions[[i]]) &&
+              is.list(results$actions[[i]]$cost$total)) {
+            if (a_lab == "detected") {
+              cost_a <- "detection"
+            } else if (a_lab == "removed") {
+              cost_a <- "removal"
+            } else {
+              cost_a <- a_lab
+            }
+            if (replicates > 1) {
+              output_df <- sapply(results$actions[[i]]$cost$total,
+                                  function(tot) tot)
+              colnames(output_df) <- time_steps_labels
+              filename <- sprintf("total_actions%s_%s_cost.csv", ic, cost_a)
+              utils::write.csv(output_df, filename)
+            } else {
+              output_df <- as.data.frame(results$actions[[i]]$cost$total)
+              rownames(output_df) <- paste(cost_a, "cost")
+              colnames(output_df) <- time_steps_labels
+              filename <- sprintf("total_actions%s_%s_cost.csv", ic, cost_a)
+              utils::write.csv(output_df, filename, row.names = TRUE)
+            }
+            if ("cumulative" %in% names(results$actions[[i]]$cost) &&
+                is.list(results$actions[[i]]$cost$cumulative$total)) {
+              if (replicates > 1) {
+                output_df <- sapply(results$actions[[i]]$cost$cumulative$total,
+                                    function(tot) tot)
+                colnames(output_df) <- time_steps_labels
+                filename <- sprintf("total_actions%s_%s_cum_cost.csv",
+                                    ic, cost_a)
+                utils::write.csv(output_df, filename)
+              } else {
+                output_df <-
+                  as.data.frame(results$actions[[i]]$cost$cumulative$total)
+                rownames(output_df) <- paste(cost_a, "cost")
+                colnames(output_df) <- time_steps_labels
+                filename <- sprintf("total_actions%s_%s_cum_cost.csv",
+                                    ic, cost_a)
+                utils::write.csv(output_df, filename, row.names = TRUE)
+              }
+            }
+          }
         }
+
+        # Combined action costs and/or monetary impacts totals # TODO ####
+        if ("cost" %in% names(results$actions) || "cost" %in% names(results)) {
+
+          # Combined action cost totals
+          if ("cost" %in% names(results$actions) &&
+              is.list(results$actions$cost$total)) {
+
+          }
+
+          # Combined monetary impacts and action costs totals
+          if ("cost" %in% names(results) && is.list(results$cost$total)) {
+
+          }
+
+        }
+
       }
     }
   }
