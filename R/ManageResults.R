@@ -2137,7 +2137,7 @@ ManageResults.Region <- function(region, population_model,
           }
         }
 
-        # Combined action costs and/or monetary impacts # TODO ####
+        # Combined action costs and/or monetary impacts
         if ("cost" %in% names(results$actions) || "cost" %in% names(results)) {
 
           # Save collated action costs with coordinates
@@ -2154,40 +2154,66 @@ ManageResults.Region <- function(region, population_model,
             if ("cost" %in% names(results$actions)) {
               for (s in summaries) {
                 if (replicates > 1) {
-                  output_df <- lapply(results$actions[[i]]$cost[[a]],
+                  output_df <- lapply(results$actions$cost$combined,
                                       function(a_tm) a_tm[[s]])
                 } else {
-                  output_df <- results$actions[[i]]$cost[[a]]
+                  output_df <- results$actions$cost$combined
                 }
                 names(output_df) <- collated_labels
                 output_df <- cbind(coords, as.data.frame(output_df))
-                filename <- sprintf("actions%s_%s_cost%s.csv", ic, cost_a,
+                filename <- sprintf("actions_combined_cost%s.csv",
                                     s_fname[[s]])
                 utils::write.csv(output_df, filename, row.names = FALSE)
               }
-              if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+              if ("cumulative" %in% names(results$actions$cost)) {
                 for (s in summaries) {
                   if (replicates > 1) {
                     output_df <-
-                      lapply(results$actions[[i]]$cost$cumulative[[a]],
+                      lapply(results$actions$cost$cumulative$combined,
                              function(a_tm) a_tm[[s]])
                   } else {
-                    output_df <- results$actions[[i]]$cost$cumulative[[a]]
+                    output_df <- results$actions$cost$cumulative$combined
                   }
                   names(output_df) <- collated_labels
                   output_df <- cbind(coords, as.data.frame(output_df))
-                  filename <- sprintf("actions%s_%s_cum_cost%s.csv", ic,
-                                      cost_a, s_fname[[s]])
-                  utils::write.csv(output_df, filename,
-                                   row.names = FALSE)
+                  filename <- sprintf("actions_combined_cum_cost%s.csv",
+                                      s_fname[[s]])
+                  utils::write.csv(output_df, filename, row.names = FALSE)
                 }
               }
-
             }
 
             # Combined monetary impacts and action costs
             if ("cost" %in% names(results)) {
-
+              for (s in summaries) {
+                if (replicates > 1) {
+                  output_df <- lapply(results$cost$combined,
+                                      function(a_tm) a_tm[[s]])
+                } else {
+                  output_df <- results$cost$combined
+                }
+                names(output_df) <- collated_labels
+                output_df <- cbind(coords, as.data.frame(output_df))
+                filename <- sprintf("combined_cost%s.csv",
+                                    s_fname[[s]])
+                utils::write.csv(output_df, filename, row.names = FALSE)
+              }
+              if ("cumulative" %in% names(results$cost)) {
+                for (s in summaries) {
+                  if (replicates > 1) {
+                    output_df <-
+                      lapply(results$cost$cumulative$combined,
+                             function(a_tm) a_tm[[s]])
+                  } else {
+                    output_df <- results$cost$cumulative$combined
+                  }
+                  names(output_df) <- collated_labels
+                  output_df <- cbind(coords, as.data.frame(output_df))
+                  filename <- sprintf("combined_cum_cost%s.csv",
+                                      s_fname[[s]])
+                  utils::write.csv(output_df, filename, row.names = FALSE)
+                }
+              }
             }
 
           } else { # TODO costs ####
@@ -2203,10 +2229,17 @@ ManageResults.Region <- function(region, population_model,
         # Save totals CSV for each action
         for (i in action_i) {
 
-          # Action label. Direct action?
+          # Action label and name. Direct action?
           a_lab <- actions[[i]]$get_label()
           direct_action <- (a_lab %in% c("detected", "control_search_destroy",
                                          "removed"))
+          a_name <- sub("control_", "", a_lab, fixed = TRUE)
+          if (a_name == "search_destroy") {
+            a_name <- "search & destroy"
+          }
+          if (actions[[i]]$get_type() == "control") {
+            a_name <- paste(a_name, "control")
+          }
 
           # Include action name or numeric index
           if (length(action_i) == 1 && is.numeric(i)) {
@@ -2264,7 +2297,7 @@ ManageResults.Region <- function(region, population_model,
 
             } else {
               output_df <- as.data.frame(results$actions[[i]]$total)
-              rownames(output_df) <- a_lab
+              rownames(output_df) <- a_name
               colnames(output_df) <- time_steps_labels
               filename <- sprintf("total_actions%s_%s.csv", ic, a_lab)
               utils::write.csv(output_df, filename, row.names = TRUE)
@@ -2275,65 +2308,103 @@ ManageResults.Region <- function(region, population_model,
           if ("cost" %in% names(results$actions[[i]]) &&
               is.list(results$actions[[i]]$cost$total)) {
             if (a_lab == "detected") {
-              cost_a <- "detection"
+              cost_a <- cost_name <- "detection"
             } else if (a_lab == "removed") {
-              cost_a <- "removal"
+              cost_a <- cost_name <- "removal"
             } else {
               cost_a <- a_lab
+              cost_name <- a_name
             }
             if (replicates > 1) {
               output_df <- sapply(results$actions[[i]]$cost$total,
                                   function(tot) tot)
-              colnames(output_df) <- time_steps_labels
-              filename <- sprintf("total_actions%s_%s_cost.csv", ic, cost_a)
-              utils::write.csv(output_df, filename)
             } else {
               output_df <- as.data.frame(results$actions[[i]]$cost$total)
-              rownames(output_df) <- paste(cost_a, "cost")
-              colnames(output_df) <- time_steps_labels
-              filename <- sprintf("total_actions%s_%s_cost.csv", ic, cost_a)
-              utils::write.csv(output_df, filename, row.names = TRUE)
+              rownames(output_df) <- paste(cost_name, "cost")
             }
+            colnames(output_df) <- time_steps_labels
+            filename <- sprintf("total_actions%s_%s_cost.csv", ic, cost_a)
+            utils::write.csv(output_df, filename, row.names = TRUE)
             if ("cumulative" %in% names(results$actions[[i]]$cost) &&
                 is.list(results$actions[[i]]$cost$cumulative$total)) {
               if (replicates > 1) {
                 output_df <- sapply(results$actions[[i]]$cost$cumulative$total,
                                     function(tot) tot)
-                colnames(output_df) <- time_steps_labels
-                filename <- sprintf("total_actions%s_%s_cum_cost.csv",
-                                    ic, cost_a)
-                utils::write.csv(output_df, filename)
               } else {
                 output_df <-
                   as.data.frame(results$actions[[i]]$cost$cumulative$total)
-                rownames(output_df) <- paste(cost_a, "cost")
-                colnames(output_df) <- time_steps_labels
-                filename <- sprintf("total_actions%s_%s_cum_cost.csv",
-                                    ic, cost_a)
-                utils::write.csv(output_df, filename, row.names = TRUE)
+                rownames(output_df) <- paste("cumulative", cost_name, "cost")
               }
+              colnames(output_df) <- time_steps_labels
+              filename <- sprintf("total_actions%s_%s_cum_cost.csv",
+                                  ic, cost_a)
+              utils::write.csv(output_df, filename, row.names = TRUE)
             }
           }
         }
 
-        # Combined action costs and/or monetary impacts totals # TODO ####
+        # Combined action costs and/or monetary impacts totals
         if ("cost" %in% names(results$actions) || "cost" %in% names(results)) {
 
           # Combined action cost totals
           if ("cost" %in% names(results$actions) &&
               is.list(results$actions$cost$total)) {
-
+            if (replicates > 1) {
+              output_df <- sapply(results$actions$cost$total,
+                                  function(tot) tot)
+            } else {
+              output_df <- as.data.frame(results$actions$cost$total)
+              rownames(output_df) <- "combined cost"
+            }
+            colnames(output_df) <- time_steps_labels
+            filename <- "total_actions_combined_cost.csv"
+            utils::write.csv(output_df, filename, row.names = TRUE)
+            if ("cumulative" %in% names(results$actions$cost) &&
+                is.list(results$actions$cost$cumulative$total)) {
+              if (replicates > 1) {
+                output_df <- sapply(results$actions$cost$cumulative$total,
+                                    function(tot) tot)
+              } else {
+                output_df <-
+                  as.data.frame(results$actions$cost$cumulative$total)
+                rownames(output_df) <- "cumulative cost"
+              }
+              colnames(output_df) <- time_steps_labels
+              filename <- "total_actions_cumulative_cost.csv"
+              utils::write.csv(output_df, filename, row.names = TRUE)
+            }
           }
 
           # Combined monetary impacts and action costs totals
           if ("cost" %in% names(results) && is.list(results$cost$total)) {
-
+            if (replicates > 1) {
+              output_df <- sapply(results$cost$total,
+                                  function(tot) tot)
+            } else {
+              output_df <- as.data.frame(results$cost$total)
+              rownames(output_df) <- "combined cost"
+            }
+            colnames(output_df) <- time_steps_labels
+            filename <- "total_combined_cost.csv"
+            utils::write.csv(output_df, filename, row.names = TRUE)
+            if ("cumulative" %in% names(results$cost) &&
+                is.list(results$cost$cumulative$total)) {
+              if (replicates > 1) {
+                output_df <- sapply(results$cost$cumulative$total,
+                                    function(tot) tot)
+              } else {
+                output_df <-
+                  as.data.frame(results$cost$cumulative$total)
+                rownames(output_df) <- "cumulative cost"
+              }
+              colnames(output_df) <- time_steps_labels
+              filename <- "total_cumulative_cost.csv"
+              utils::write.csv(output_df, filename, row.names = TRUE)
+            }
           }
-
         }
-
       }
-    }
+    } # actions
   }
 
   # Extended save plots as PNG files
@@ -2530,10 +2601,10 @@ ManageResults.Region <- function(region, population_model,
 
     # Plot actions when present
     if (length(actions) > 0) {
-      if (!is.null(names(results$actions))) {
-        action_i <- names(results$actions)    # named actions
+      if (!is.null(names(actions))) {
+        action_i <- names(actions)    # named actions
       } else {
-        action_i <- 1:length(results$actions) # indices
+        action_i <- 1:length(actions) # indices
       }
       for (i in action_i) {
 
@@ -2543,10 +2614,21 @@ ManageResults.Region <- function(region, population_model,
         } else {
           ic <- c(paste0("_", i), paste0(" : ", i))
         }
-        # units <- actions[[i]]$get_context()$get_action_measures()
-        a_lab <- actions[[which(action_i == i)]]$get_label()
+
+        # Action label and name. Direct action?
+        a_lab <- actions[[i]]$get_label()
         direct_action <- (a_lab %in% c("detected", "control_search_destroy",
                                        "removed"))
+        a_name <- sub("control_", "", a_lab, fixed = TRUE)
+        if (a_name == "search_destroy") {
+          a_name <- "search & destroy"
+        }
+        if (actions[[i]]$get_type() == "control") {
+          a_name <- paste(a_name, "control")
+          plot_y_label <- sprintf("Locations %s applied", a_name)
+        } else {
+          plot_y_label <- sprintf("Number %s", a_name)
+        }
 
         # Resolve the number of (combined) stages used in the results
         result_stages <- stages
@@ -2609,6 +2691,113 @@ ManageResults.Region <- function(region, population_model,
               filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
                                   stage_file[s])
               main_title <- sprintf("Total actions%s %s%s (mean +/- 2 SD)",
+                                    ic[2], stage_label[s], a_name)
+            } else {
+              filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
+                                  stage_file[s])
+              if (direct_action) {
+                main_title <- sprintf("Actions%s %s%s (mean +/- 2 SD)", ic[2],
+                                      stage_label[s], a_name)
+              } else {
+                main_title <- sprintf("Actions%s %s%s (mean)", ic[2],
+                                      stage_label[s], a_name)
+              }
+            }
+            if (include_collated || direct_action) {
+              ylim <- c(0, 1.1*max(values$mean + 2*values$sd))
+            } else {
+              ylim <- c(0, 1.1*max(values$mean))
+            }
+            grDevices::png(filename = filename, width = width, height = height)
+            graphics::plot(0:time_steps, values$mean, type = "l",
+                           main = main_title,
+                           xlab = plot_x_label,
+                           ylab = plot_y_label,
+                           ylim = ylim)
+            if (include_collated || direct_action) {
+              graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                              lty = "dashed")
+              graphics::lines(0:time_steps,
+                              pmax(0, values$mean - 2*values$sd),
+                              lty = "dashed")
+            }
+            invisible(grDevices::dev.off())
+          } else {
+            if (include_collated) {
+              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
+                                  stage_file[s])
+              main_title <- sprintf("Total actions%s %s%s", ic[2],
+                                    stage_label[s], a_lab)
+            } else {
+              filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
+                                  stage_file[s])
+              main_title <- sprintf("Actions%s %s%s", ic[2], stage_label[s],
+                                    a_lab)
+            }
+            grDevices::png(filename = filename, width = width,
+                           height = height)
+            graphics::plot(0:time_steps, values, type = "l",
+                           main = main_title,
+                           xlab = plot_x_label,
+                           ylab = plot_y_label,
+                           ylim = c(0, 1.1*max(values)))
+            invisible(grDevices::dev.off())
+          }
+        }
+
+        # Plot action cost and cumulative cost
+        if ("cost" %in% names(results$actions[[i]])) {
+
+          # Cost label and name
+          if (a_lab == "detected") {
+            cost_a <- cost_name <- "detection"
+          } else if (a_lab == "removed") {
+            cost_a <- cost_name <- "removal"
+          } else {
+            cost_a <- a_lab
+            cost_name <- a_name
+          }
+
+          # Unit label
+          unit <- attr(results$actions[[i]]$cost, "unit")
+          if (!is.null(unit) && unit != "") {
+            unit_lab <- paste0(" (", unit, ")")
+          } else {
+            unit_lab <- ""
+          }
+
+          # Plot action totals/values
+          if (include_collated) {
+            a <- "total"
+          } else {
+            a <- a_lab
+          }
+          if (replicates > 1) {
+            # TODO ####
+            if (include_collated || direct_action) {
+              values <- sapply(results$actions[[i]]$cost[[a]],
+                               function(tot) as.data.frame(
+                                 lapply(tot, function(m) m)))
+            } else {
+              values <- t(as.matrix(sapply(results$actions[[i]]$cost[[a]],
+                                           function(tot) tot$mean[s])))
+              rownames(values) <- "mean"
+            }
+          } else {
+            values <- as.numeric(results$actions[[i]]$cost[[a]])
+          }
+          if (replicates > 1) { # plot summary mean +/- 2 SD
+            # TODO ####
+            if (include_collated || direct_action) {
+              values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                             sd = as.numeric(values["sd",,drop = FALSE]))
+            } else {
+              values <- list(mean = as.numeric(values["mean",,drop = FALSE]))
+            }
+            if (include_collated) {
+              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
+                                  stage_file[s])
+              main_title <- sprintf("Total actions%s %s%s (mean +/- 2 SD)",
                                     ic[2], stage_label[s], a_lab)
             } else {
               filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
@@ -2642,28 +2831,196 @@ ManageResults.Region <- function(region, population_model,
             invisible(grDevices::dev.off())
           } else {
             if (include_collated) {
-              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
-                                  stage_file[s])
-              main_title <- sprintf("Total actions%s %s%s", ic[2],
-                                    stage_label[s], a_lab)
+              filename <- sprintf("total_actions%s_%s_cost.png", ic[1], cost_a)
+              main_title <- sprintf("Total actions%s %s cost", ic[2],
+                                    cost_name)
             } else {
-              filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
-                                  stage_file[s])
-              main_title <- sprintf("Actions%s %s%s", ic[2], stage_label[s],
-                                    a_lab)
+              filename <- sprintf("actions%s_%s_cost.png", ic[1], cost_a)
+              main_title <- sprintf("Actions%s %s cost", ic[2], cost_name)
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
             graphics::plot(0:time_steps, values, type = "l",
                            main = main_title,
                            xlab = plot_x_label,
-                           ylab = sprintf("Number %s", a_lab),
+                           ylab = sprintf("Cost%s", unit_lab),
                            ylim = c(0, 1.1*max(values)))
             invisible(grDevices::dev.off())
           }
+          if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+            if (replicates > 1) {
+              # TODO ####
+            } else {
+              values <- as.numeric(results$actions[[i]]$cost$cumulative[[a]])
+            }
+            if (replicates > 1) { # plot summary mean +/- 2 SD
+              # TODO ####
+            } else {
+              if (include_collated) {
+                filename <- sprintf("total_actions%s_%s_cum_cost.png",
+                                    ic[1], cost_a)
+                main_title <- sprintf("Total actions%s cumulative %s cost",
+                                      ic[2], cost_name)
+              } else {
+                filename <- sprintf("actions%s_%s_cum_cost.png", ic[1], cost_a)
+                main_title <- sprintf("Actions%s cumulative %s cost",
+                                      ic[2], cost_name)
+              }
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values, type = "l",
+                             main = main_title,
+                             xlab = plot_x_label,
+                             ylab = sprintf("Cumulative cost%s", unit_lab),
+                             ylim = c(0, 1.1*max(values)))
+              invisible(grDevices::dev.off())
+            }
+          }
         }
       }
-    }
+
+      # Plot combined action costs and/or monetary impacts
+      if ("cost" %in% names(results$actions) || "cost" %in% names(results)) {
+
+        # Combined action cost
+        if ("cost" %in% names(results$actions)) {
+
+          # Unit label
+          unit <- attr(results$actions$cost, "unit")
+          if (!is.null(unit) && unit != "") {
+            unit_lab <- paste0(" (", unit, ")")
+          } else {
+            unit_lab <- ""
+          }
+
+          # Plot action totals/values
+          if (include_collated) {
+            a <- "total"
+          } else {
+            a <- "combined"
+          }
+          if (replicates > 1) {
+            # TODO ####
+          } else {
+            values <- as.numeric(results$actions$cost[[a]])
+          }
+          if (replicates > 1) { # plot summary mean +/- 2 SD
+            # TODO ####
+          } else {
+            if (include_collated) {
+              filename <- "total_actions_combined_cost.png"
+              main_title <- "Total actions combined cost"
+            } else {
+              filename <- "actions_combined_cost.png"
+              main_title <- "Actions combined cost"
+            }
+            grDevices::png(filename = filename, width = width,
+                           height = height)
+            graphics::plot(0:time_steps, values, type = "l",
+                           main = main_title,
+                           xlab = plot_x_label,
+                           ylab = sprintf("Cost%s", unit_lab),
+                           ylim = c(0, 1.1*max(values)))
+            invisible(grDevices::dev.off())
+          }
+          if ("cumulative" %in% names(results$actions$cost)) {
+            if (replicates > 1) {
+              # TODO ####
+            } else {
+              values <- as.numeric(results$actions$cost$cumulative[[a]])
+            }
+            if (replicates > 1) { # plot summary mean +/- 2 SD
+              # TODO ####
+            } else {
+              if (include_collated) {
+                filename <- "total_actions_cumulative_cost.png"
+                main_title <- "Total actions cumulative cost"
+              } else {
+                filename <- "actions_cumulative_cost.png"
+                main_title <- "Actions cumulative cost"
+              }
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values, type = "l",
+                             main = main_title,
+                             xlab = plot_x_label,
+                             ylab = sprintf("Cumulative cost%s", unit_lab),
+                             ylim = c(0, 1.1*max(values)))
+              invisible(grDevices::dev.off())
+            }
+          }
+        }
+
+        # Combined monetary impacts and action costs
+        if ("cost" %in% names(results)) {
+
+          # Unit label
+          unit <- attr(results$cost, "unit")
+          if (!is.null(unit) && unit != "") {
+            unit_lab <- paste0(" (", unit, ")")
+          } else {
+            unit_lab <- ""
+          }
+
+          # Plot totals/values
+          if (include_collated) {
+            a <- "total"
+          } else {
+            a <- "combined"
+          }
+          if (replicates > 1) {
+            # TODO ####
+          } else {
+            values <- as.numeric(results$cost[[a]])
+          }
+          if (replicates > 1) { # plot summary mean +/- 2 SD
+            # TODO ####
+          } else {
+            if (include_collated) {
+              filename <- "total_combined_cost.png"
+              main_title <- "Total combined impact and action cost"
+            } else {
+              filename <- "combined_cost.png"
+              main_title <- "Combined impact and action cost"
+            }
+            grDevices::png(filename = filename, width = width,
+                           height = height)
+            graphics::plot(0:time_steps, values, type = "l",
+                           main = main_title,
+                           xlab = plot_x_label,
+                           ylab = sprintf("Cost%s", unit_lab),
+                           ylim = c(0, 1.1*max(values)))
+            invisible(grDevices::dev.off())
+          }
+          if ("cumulative" %in% names(results$cost)) {
+            if (replicates > 1) {
+              # TODO ####
+            } else {
+              values <- as.numeric(results$cost$cumulative[[a]])
+            }
+            if (replicates > 1) { # plot summary mean +/- 2 SD
+              # TODO ####
+            } else {
+              if (include_collated) {
+                filename <- "total_cumulative_cost.png"
+                main_title <- "Total cumulative impact and action cost"
+              } else {
+                filename <- "cumulative_cost.png"
+                main_title <- "Cumulative impact and action cost"
+              }
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values, type = "l",
+                             main = main_title,
+                             xlab = plot_x_label,
+                             ylab = sprintf("Cumulative cost%s", unit_lab),
+                             ylim = c(0, 1.1*max(values)))
+              invisible(grDevices::dev.off())
+            }
+          }
+        }
+      }
+    } # actions
   }
 
   return(self)
