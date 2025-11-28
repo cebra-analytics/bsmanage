@@ -2370,7 +2370,7 @@ ManageResults.Region <- function(region, population_model,
                 rownames(output_df) <- "cumulative cost"
               }
               colnames(output_df) <- time_steps_labels
-              filename <- "total_actions_cumulative_cost.csv"
+              filename <- "total_actions_combined_cum_cost.csv"
               utils::write.csv(output_df, filename, row.names = TRUE)
             }
           }
@@ -2398,7 +2398,7 @@ ManageResults.Region <- function(region, population_model,
                 rownames(output_df) <- "cumulative cost"
               }
               colnames(output_df) <- time_steps_labels
-              filename <- "total_cumulative_cost.csv"
+              filename <- "total_combined_cum_cost.csv"
               utils::write.csv(output_df, filename, row.names = TRUE)
             }
           }
@@ -2621,13 +2621,15 @@ ManageResults.Region <- function(region, population_model,
                                        "removed"))
         a_name <- sub("control_", "", a_lab, fixed = TRUE)
         if (a_name == "search_destroy") {
-          a_name <- "search & destroy"
+          a_name <- "found & destroyed"
         }
-        if (actions[[i]]$get_type() == "control") {
-          a_name <- paste(a_name, "control")
-          plot_y_label <- sprintf("Locations %s applied", a_name)
-        } else {
+        if (direct_action) {
           plot_y_label <- sprintf("Number %s", a_name)
+        } else {
+          if (actions[[i]]$get_type() == "control") {
+            a_name <- paste(a_name, "control")
+          }
+          plot_y_label <- sprintf("Locations %s applied", a_name)
         }
 
         # Resolve the number of (combined) stages used in the results
@@ -2753,6 +2755,9 @@ ManageResults.Region <- function(region, population_model,
             cost_a <- cost_name <- "detection"
           } else if (a_lab == "removed") {
             cost_a <- cost_name <- "removal"
+          } else if (a_lab == "control_search_destroy") {
+            cost_a <- a_lab
+            cost_name <- "search & destroy control"
           } else {
             cost_a <- a_lab
             cost_name <- a_name
@@ -2773,61 +2778,34 @@ ManageResults.Region <- function(region, population_model,
             a <- a_lab
           }
           if (replicates > 1) {
-            # TODO ####
-            if (include_collated || direct_action) {
-              values <- sapply(results$actions[[i]]$cost[[a]],
-                               function(tot) as.data.frame(
-                                 lapply(tot, function(m) m)))
-            } else {
-              values <- t(as.matrix(sapply(results$actions[[i]]$cost[[a]],
-                                           function(tot) tot$mean[s])))
-              rownames(values) <- "mean"
-            }
+            values <- sapply(results$actions[[i]]$cost[[a]],
+                             function(tot) as.data.frame(tot))
           } else {
             values <- as.numeric(results$actions[[i]]$cost[[a]])
           }
           if (replicates > 1) { # plot summary mean +/- 2 SD
-            # TODO ####
-            if (include_collated || direct_action) {
-              values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
-                             sd = as.numeric(values["sd",,drop = FALSE]))
-            } else {
-              values <- list(mean = as.numeric(values["mean",,drop = FALSE]))
-            }
+            values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                           sd = as.numeric(values["sd",,drop = FALSE]))
             if (include_collated) {
-              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
-                                  stage_file[s])
-              main_title <- sprintf("Total actions%s %s%s (mean +/- 2 SD)",
-                                    ic[2], stage_label[s], a_lab)
+              filename <- sprintf("total_actions%s_%s_cost.png", ic[1], cost_a)
+              main_title <- sprintf("Total actions%s %s cost (mean +/- 2 SD)",
+                                    ic[2], cost_name)
             } else {
-              filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
-                                  stage_file[s])
-              if (direct_action) {
-                main_title <- sprintf("Actions%s %s%s (mean +/- 2 SD)", ic[2],
-                                      stage_label[s], a_lab)
-              } else {
-                main_title <- sprintf("Actions%s %s%s (mean)", ic[2],
-                                      stage_label[s], a_lab)
-              }
-            }
-            if (include_collated || direct_action) {
-              ylim <- c(0, 1.1*max(values$mean + 2*values$sd))
-            } else {
-              ylim <- c(0, 1.1*max(values$mean))
+              filename <- sprintf("actions%s_%s_cost.png", ic[1], cost_a)
+              main_title <- sprintf("Actions%s %s cost (mean +/- 2 SD)",
+                                    ic[2], cost_name)
             }
             grDevices::png(filename = filename, width = width, height = height)
             graphics::plot(0:time_steps, values$mean, type = "l",
                            main = main_title,
                            xlab = plot_x_label,
-                           ylab = sprintf("Number %s", a_lab),
-                           ylim = ylim)
-            if (include_collated || direct_action) {
-              graphics::lines(0:time_steps, values$mean + 2*values$sd,
-                              lty = "dashed")
-              graphics::lines(0:time_steps,
-                              pmax(0, values$mean - 2*values$sd),
-                              lty = "dashed")
-            }
+                           ylab = sprintf("Cost%s", unit_lab),
+                           ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
+            graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                            lty = "dashed")
+            graphics::lines(0:time_steps,
+                            pmax(0, values$mean - 2*values$sd),
+                            lty = "dashed")
             invisible(grDevices::dev.off())
           } else {
             if (include_collated) {
@@ -2849,12 +2827,39 @@ ManageResults.Region <- function(region, population_model,
           }
           if ("cumulative" %in% names(results$actions[[i]]$cost)) {
             if (replicates > 1) {
-              # TODO ####
+              values <- sapply(results$actions[[i]]$cost$cumulative[[a]],
+                               function(tot) as.data.frame(tot))
             } else {
               values <- as.numeric(results$actions[[i]]$cost$cumulative[[a]])
             }
             if (replicates > 1) { # plot summary mean +/- 2 SD
-              # TODO ####
+              values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                             sd = as.numeric(values["sd",,drop = FALSE]))
+              if (include_collated) {
+                filename <- sprintf("total_actions%s_%s_cum_cost.png",
+                                    ic[1], cost_a)
+                main_title <-
+                  sprintf("Total actions%s %s cumulative cost (mean +/- 2 SD)",
+                          ic[2], cost_name)
+              } else {
+                filename <- sprintf("actions%s_%s_cum_cost.png", ic[1], cost_a)
+                main_title <-
+                  sprintf("Actions%s %s cumulative cost (mean +/- 2 SD)",
+                          ic[2], cost_name)
+              }
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values$mean, type = "l",
+                             main = main_title,
+                             xlab = plot_x_label,
+                             ylab = sprintf("Cumulative cost%s", unit_lab),
+                             ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
+              graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                              lty = "dashed")
+              graphics::lines(0:time_steps,
+                              pmax(0, values$mean - 2*values$sd),
+                              lty = "dashed")
+              invisible(grDevices::dev.off())
             } else {
               if (include_collated) {
                 filename <- sprintf("total_actions%s_%s_cum_cost.png",
@@ -2900,12 +2905,33 @@ ManageResults.Region <- function(region, population_model,
             a <- "combined"
           }
           if (replicates > 1) {
-            # TODO ####
+            values <- sapply(results$actions$cost[[a]],
+                             function(tot) as.data.frame(tot))
           } else {
             values <- as.numeric(results$actions$cost[[a]])
           }
           if (replicates > 1) { # plot summary mean +/- 2 SD
-            # TODO ####
+            values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                           sd = as.numeric(values["sd",,drop = FALSE]))
+            if (include_collated) {
+              filename <- "total_actions_combined_cost.png"
+              main_title <- "Total actions combined cost (mean +/- 2 SD)"
+            } else {
+              filename <- "actions_combined_cost.png"
+              main_title <- "Actions combined cost (mean +/- 2 SD)"
+            }
+            grDevices::png(filename = filename, width = width, height = height)
+            graphics::plot(0:time_steps, values$mean, type = "l",
+                           main = main_title,
+                           xlab = plot_x_label,
+                           ylab = sprintf("Cost%s", unit_lab),
+                           ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
+            graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                            lty = "dashed")
+            graphics::lines(0:time_steps,
+                            pmax(0, values$mean - 2*values$sd),
+                            lty = "dashed")
+            invisible(grDevices::dev.off())
           } else {
             if (include_collated) {
               filename <- "total_actions_combined_cost.png"
@@ -2925,12 +2951,33 @@ ManageResults.Region <- function(region, population_model,
           }
           if ("cumulative" %in% names(results$actions$cost)) {
             if (replicates > 1) {
-              # TODO ####
+              values <- sapply(results$actions$cost$cumulative[[a]],
+                               function(tot) as.data.frame(tot))
             } else {
               values <- as.numeric(results$actions$cost$cumulative[[a]])
             }
             if (replicates > 1) { # plot summary mean +/- 2 SD
-              # TODO ####
+              values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                             sd = as.numeric(values["sd",,drop = FALSE]))
+              if (include_collated) {
+                filename <- "total_actions_combined_cum_cost.png"
+                main_title <- "Total actions cumulative cost (mean +/- 2 SD)"
+              } else {
+                filename <- "actions_combined_cum_cost.png"
+                main_title <- "Actions cumulative cost (mean +/- 2 SD)"
+              }
+              grDevices::png(filename = filename, width = width, height = height)
+              graphics::plot(0:time_steps, values$mean, type = "l",
+                             main = main_title,
+                             xlab = plot_x_label,
+                             ylab = sprintf("Cumulative cost%s", unit_lab),
+                             ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
+              graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                              lty = "dashed")
+              graphics::lines(0:time_steps,
+                              pmax(0, values$mean - 2*values$sd),
+                              lty = "dashed")
+              invisible(grDevices::dev.off())
             } else {
               if (include_collated) {
                 filename <- "total_actions_cumulative_cost.png"
@@ -2969,12 +3016,34 @@ ManageResults.Region <- function(region, population_model,
             a <- "combined"
           }
           if (replicates > 1) {
-            # TODO ####
+            values <- sapply(results$cost[[a]],
+                             function(tot) as.data.frame(tot))
           } else {
             values <- as.numeric(results$cost[[a]])
           }
           if (replicates > 1) { # plot summary mean +/- 2 SD
-            # TODO ####
+            values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                           sd = as.numeric(values["sd",,drop = FALSE]))
+            if (include_collated) {
+              filename <- "total_combined_cost.png"
+              main_title <-
+                "Total combined impact and action cost (mean +/- 2 SD)"
+            } else {
+              filename <- "combined_cost.png"
+              main_title <- "Combined impact and action cost (mean +/- 2 SD)"
+            }
+            grDevices::png(filename = filename, width = width, height = height)
+            graphics::plot(0:time_steps, values$mean, type = "l",
+                           main = main_title,
+                           xlab = plot_x_label,
+                           ylab = sprintf("Cost%s", unit_lab),
+                           ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
+            graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                            lty = "dashed")
+            graphics::lines(0:time_steps,
+                            pmax(0, values$mean - 2*values$sd),
+                            lty = "dashed")
+            invisible(grDevices::dev.off())
           } else {
             if (include_collated) {
               filename <- "total_combined_cost.png"
@@ -2994,18 +3063,42 @@ ManageResults.Region <- function(region, population_model,
           }
           if ("cumulative" %in% names(results$cost)) {
             if (replicates > 1) {
-              # TODO ####
+              values <- sapply(results$cost$cumulative[[a]],
+                               function(tot) as.data.frame(tot))
             } else {
               values <- as.numeric(results$cost$cumulative[[a]])
             }
             if (replicates > 1) { # plot summary mean +/- 2 SD
-              # TODO ####
+              values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                             sd = as.numeric(values["sd",,drop = FALSE]))
+              if (include_collated) {
+                filename <- "total_combined_cum_cost.png"
+                main_title <-
+                  "Total cumulative impact and action cost (mean +/- 2 SD)"
+              } else {
+                filename <- "combined_cum_cost.png"
+                main_title <-
+                  "Cumulative impact and action cost (mean +/- 2 SD)"
+              }
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values$mean, type = "l",
+                             main = main_title,
+                             xlab = plot_x_label,
+                             ylab = sprintf("Cumulative cost%s", unit_lab),
+                             ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
+              graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                              lty = "dashed")
+              graphics::lines(0:time_steps,
+                              pmax(0, values$mean - 2*values$sd),
+                              lty = "dashed")
+              invisible(grDevices::dev.off())
             } else {
               if (include_collated) {
-                filename <- "total_cumulative_cost.png"
+                filename <- "total_combined_cum_cost.png"
                 main_title <- "Total cumulative impact and action cost"
               } else {
-                filename <- "cumulative_cost.png"
+                filename <- "combined_cum_cost.png"
                 main_title <- "Cumulative impact and action cost"
               }
               grDevices::png(filename = filename, width = width,
