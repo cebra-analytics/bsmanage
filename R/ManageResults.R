@@ -1960,10 +1960,17 @@ ManageResults.Region <- function(region, population_model,
         # Results for each action
         for (i in action_i) {
 
-          # Direct action?
-          direct_action <- (actions[[i]]$get_label() %in%
-                              c("detected", "control_search_destroy",
-                                "removed"))
+          # Action label and name. Direct action?
+          a <- actions[[i]]$get_label()
+          direct_action <- (a %in% c("detected", "control_search_destroy",
+                                     "removed"))
+          a_name <- sub("control_", "", a, fixed = TRUE)
+          if (a_name == "search_destroy") {
+            a_name <- "search & destroy"
+          }
+          if (actions[[i]]$get_type() == "control") {
+            a_name <- paste(a_name, "control")
+          }
 
           # Include action name or numeric index
           if (length(action_i) == 1 && is.numeric(i)) {
@@ -1999,35 +2006,30 @@ ManageResults.Region <- function(region, population_model,
             # Save stages separately when applicable
             for (j in 1:result_stages) {
 
-              # Action aspects
-              aspects <- names(results$actions[[i]])
-              for (a in aspects[which(!aspects %in% c("total", "cost"))]) {
-
-                # Combine coordinates and collated values & write to CSV files
-                for (s in summaries) {
-                  if (population_model$get_type() == "stage_structured" &&
-                      direct_action) {
-                    if (replicates > 1) {
-                      output_df <- lapply(results$actions[[i]][[a]],
-                                          function(a_tm) a_tm[[s]][,j])
-                    } else {
-                      output_df <- lapply(results$actions[[i]][[a]],
-                                          function(a_tm) a_tm[,j])
-                    }
+              # Combine coordinates and collated values & write to CSV files
+              for (s in summaries) {
+                if (population_model$get_type() == "stage_structured" &&
+                    direct_action) {
+                  if (replicates > 1) {
+                    output_df <- lapply(results$actions[[i]][[a]],
+                                        function(a_tm) a_tm[[s]][,j])
                   } else {
-                    if (replicates > 1) {
-                      output_df <- lapply(results$actions[[i]][[a]],
-                                          function(a_tm) a_tm[[s]])
-                    } else {
-                      output_df <- results$actions[[i]][[a]]
-                    }
+                    output_df <- lapply(results$actions[[i]][[a]],
+                                        function(a_tm) a_tm[,j])
                   }
-                  names(output_df) <- collated_labels
-                  output_df <- cbind(coords, as.data.frame(output_df))
-                  filename <- sprintf("actions%s_%s%s%s.csv", ic, a,
-                                      j_fname[j], s_fname[[s]])
-                  utils::write.csv(output_df, filename, row.names = FALSE)
+                } else {
+                  if (replicates > 1) {
+                    output_df <- lapply(results$actions[[i]][[a]],
+                                        function(a_tm) a_tm[[s]])
+                  } else {
+                    output_df <- results$actions[[i]][[a]]
+                  }
                 }
+                names(output_df) <- collated_labels
+                output_df <- cbind(coords, as.data.frame(output_df))
+                filename <- sprintf("actions%s_%s%s%s.csv", ic, a,
+                                    j_fname[j], s_fname[[s]])
+                utils::write.csv(output_df, filename, row.names = FALSE)
               }
             }
 
@@ -2041,96 +2043,128 @@ ManageResults.Region <- function(region, population_model,
                 summaries <- 1
               }
 
-              # Write cost and cumulative cost for each action (aspect)
-              for (a in aspects[which(!aspects %in% c("total", "cost"))]) {
-                if (a == "detected") {
-                  cost_a <- "detection"
-                } else if (a == "removed") {
-                  cost_a <- "removal"
+              # Write cost and cumulative cost
+              if (a == "detected") {
+                cost_a <- "detection"
+              } else if (a == "removed") {
+                cost_a <- "removal"
+              } else {
+                cost_a <- a
+              }
+              for (s in summaries) {
+                if (replicates > 1) {
+                  output_df <- lapply(results$actions[[i]]$cost[[a]],
+                                      function(a_tm) a_tm[[s]])
                 } else {
-                  cost_a <- a
+                  output_df <- results$actions[[i]]$cost[[a]]
                 }
-                for (s in summaries) {
+                names(output_df) <- collated_labels
+                output_df <- cbind(coords, as.data.frame(output_df))
+                filename <- sprintf("actions%s_%s_cost%s.csv", ic, cost_a,
+                                    s_fname[[s]])
+                utils::write.csv(output_df, filename, row.names = FALSE)
+                if ("cumulative" %in% names(results$actions[[i]]$cost)) {
                   if (replicates > 1) {
-                    output_df <- lapply(results$actions[[i]]$cost[[a]],
-                                        function(a_tm) a_tm[[s]])
+                    output_df <-
+                      lapply(results$actions[[i]]$cost$cumulative[[a]],
+                             function(a_tm) a_tm[[s]])
                   } else {
-                    output_df <- results$actions[[i]]$cost[[a]]
+                    output_df <- results$actions[[i]]$cost$cumulative[[a]]
                   }
                   names(output_df) <- collated_labels
                   output_df <- cbind(coords, as.data.frame(output_df))
-                  filename <- sprintf("actions%s_%s_cost%s.csv", ic, cost_a,
-                                      s_fname[[s]])
-                  utils::write.csv(output_df, filename, row.names = FALSE)
-                  if ("cumulative" %in% names(results$actions[[i]]$cost)) {
-                    if (replicates > 1) {
-                      output_df <-
-                        lapply(results$actions[[i]]$cost$cumulative[[a]],
-                               function(a_tm) a_tm[[s]])
-                    } else {
-                      output_df <- results$actions[[i]]$cost$cumulative[[a]]
-                    }
-                    names(output_df) <- collated_labels
-                    output_df <- cbind(coords, as.data.frame(output_df))
-                    filename <- sprintf("actions%s_%s_cum_cost%s.csv", ic,
-                                        cost_a, s_fname[[s]])
-                    utils::write.csv(output_df, filename,
-                                     row.names = FALSE)
-                  }
+                  filename <- sprintf("actions%s_%s_cum_cost%s.csv", ic,
+                                      cost_a, s_fname[[s]])
+                  utils::write.csv(output_df, filename,
+                                   row.names = FALSE)
                 }
               }
             }
 
-          } else { # TODO costs ####
+          } else {
 
             # Save CSVs without coordinates (spatially implicit)
-            for (a in names(results$actions[[i]])) {
-              if (population_model$get_type() == "stage_structured" &&
-                  direct_action) {
-                if (replicates > 1) {
-                  for (j in 1:result_stages) {
-                    output_df <- sapply(results$actions[[i]][[a]],
-                                        function(a_tm) as.data.frame(
-                                          lapply(a_tm, function(m) m[,j])))
-                    colnames(output_df) <- time_steps_labels
-                    filename <- sprintf("actions%s_%s%s.csv", ic, a,
-                                        j_fname[j])
-                    utils::write.csv(output_df, filename, row.names = TRUE)
-                  }
-                } else {
-                  if (is.numeric(combine_stages)) {
-                    output_df <- as.data.frame(results$actions[[i]][[a]])
-                    if (length(combine_stages) == 1) {
-                      rownames(output_df) <- attr(population_model$get_growth(),
-                                                  "labels")[combine_stages]
-                    } else {
-                      rownames(output_df) <- sprintf(
-                        "stages %s-%s", min(combine_stages),
-                        max(combine_stages))
-                    }
-                  } else {
-                    output_df <- sapply(results$actions[[i]][[a]],
-                                        function(a_tm) as.data.frame(a_tm))
-                  }
+            if (population_model$get_type() == "stage_structured" &&
+                direct_action) {
+              if (replicates > 1) {
+                for (j in 1:result_stages) {
+                  output_df <- sapply(results$actions[[i]][[a]],
+                                      function(a_tm) as.data.frame(
+                                        lapply(a_tm, function(m) m[,j])))
                   colnames(output_df) <- time_steps_labels
-                  filename <- sprintf("actions%s_%s.csv", ic, a)
+                  filename <- sprintf("actions%s_%s%s.csv", ic, a,
+                                      j_fname[j])
                   utils::write.csv(output_df, filename, row.names = TRUE)
                 }
               } else {
-                if (replicates > 1) {
-                  if (direct_action) {
-                    output_df <- sapply(results$actions[[i]][[a]],
-                                        function(a_tm) as.data.frame(a_tm))
+                if (is.numeric(combine_stages)) {
+                  output_df <- as.data.frame(results$actions[[i]][[a]])
+                  if (length(combine_stages) == 1) {
+                    rownames(output_df) <- attr(population_model$get_growth(),
+                                                "labels")[combine_stages]
                   } else {
-                    output_df <- as.data.frame(results$actions[[i]][[a]])
-                    rownames(output_df) <- "mean"
+                    rownames(output_df) <- sprintf(
+                      "stages %s-%s", min(combine_stages),
+                      max(combine_stages))
                   }
                 } else {
-                  output_df <- as.data.frame(results$actions[[i]][[a]])
-                  rownames(output_df) <- a
+                  output_df <- sapply(results$actions[[i]][[a]],
+                                      function(a_tm) as.data.frame(a_tm))
                 }
                 colnames(output_df) <- time_steps_labels
                 filename <- sprintf("actions%s_%s.csv", ic, a)
+                utils::write.csv(output_df, filename, row.names = TRUE)
+              }
+            } else {
+              if (replicates > 1) {
+                if (direct_action) {
+                  output_df <- sapply(results$actions[[i]][[a]],
+                                      function(a_tm) as.data.frame(a_tm))
+                } else {
+                  output_df <- as.data.frame(results$actions[[i]][[a]])
+                  rownames(output_df) <- "mean"
+                }
+              } else {
+                output_df <- as.data.frame(results$actions[[i]][[a]])
+                rownames(output_df) <- a_name
+              }
+              colnames(output_df) <- time_steps_labels
+              filename <- sprintf("actions%s_%s.csv", ic, a)
+              utils::write.csv(output_df, filename, row.names = TRUE)
+            }
+
+            # Action cost and cumulative cost when present
+            if ("cost" %in% names(results$actions[[i]])) {
+              if (a == "detected") {
+                cost_a <- cost_name <- "detection"
+              } else if (a == "removed") {
+                cost_a <- cost_name <- "removal"
+              } else {
+                cost_a <- a
+                cost_name <- a_name
+              }
+              if (replicates > 1) {
+                output_df <- sapply(results$actions[[i]]$cost[[a]],
+                                    function(a_tm) a_tm)
+              } else {
+                output_df <- as.data.frame(results$actions[[i]]$cost[[a]])
+                rownames(output_df) <- paste(cost_name, "cost")
+              }
+              colnames(output_df) <- time_steps_labels
+              filename <- sprintf("actions%s_%s_cost.csv", ic, cost_a)
+              utils::write.csv(output_df, filename, row.names = TRUE)
+              if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                if (replicates > 1) {
+                  output_df <-
+                    sapply(results$actions[[i]]$cost$cumulative[[a]],
+                           function(a_tm) a_tm)
+                } else {
+                  output_df <-
+                    as.data.frame(results$actions[[i]]$cost$cumulative[[a]])
+                  rownames(output_df) <- paste("cumulative", cost_name, "cost")
+                }
+                colnames(output_df) <- time_steps_labels
+                filename <- sprintf("actions%s_%s_cum_cost.csv", ic, cost_a)
                 utils::write.csv(output_df, filename, row.names = TRUE)
               }
             }
@@ -2216,9 +2250,64 @@ ManageResults.Region <- function(region, population_model,
               }
             }
 
-          } else { # TODO costs ####
+          } else {
 
             # Save CSVs without coordinates (spatially implicit)
+
+            # Combined action costs
+            if ("cost" %in% names(results$actions)) {
+              if (replicates > 1) {
+                output_df <- sapply(results$actions$cost$combined,
+                                    function(a_tm) a_tm)
+              } else {
+                output_df <- as.data.frame(results$actions$cost$combined)
+                rownames(output_df) <- "combined cost"
+              }
+              colnames(output_df) <- time_steps_labels
+              filename <- "actions_combined_cost.csv"
+              utils::write.csv(output_df, filename, row.names = TRUE)
+              if ("cumulative" %in% names(results$actions$cost)) {
+                if (replicates > 1) {
+                  output_df <-
+                    sapply(results$actions$cost$cumulative$combined,
+                           function(a_tm) a_tm)
+                } else {
+                  output_df <-
+                    as.data.frame(results$actions$cost$cumulative$combined)
+                  rownames(output_df) <- "cumulative cost"
+                }
+                colnames(output_df) <- time_steps_labels
+                filename <- "actions_combined_cum_cost.csv"
+                utils::write.csv(output_df, filename, row.names = TRUE)
+              }
+            }
+
+            # Combined monetary impacts and action costs
+            if ("cost" %in% names(results)) {
+              if (replicates > 1) {
+                output_df <- sapply(results$cost$combined,
+                                    function(a_tm) a_tm)
+              } else {
+                output_df <- as.data.frame(results$cost$combined)
+                rownames(output_df) <- "combined cost"
+              }
+              colnames(output_df) <- time_steps_labels
+              filename <- "combined_cost.csv"
+              utils::write.csv(output_df, filename, row.names = TRUE)
+              if ("cumulative" %in% names(results$cost)) {
+                if (replicates > 1) {
+                  output_df <- sapply(results$cost$cumulative$combined,
+                                      function(a_tm) a_tm)
+                } else {
+                  output_df <-
+                    as.data.frame(results$cost$cumulative$combined)
+                  rownames(output_df) <- "cumulative cost"
+                }
+                colnames(output_df) <- time_steps_labels
+                filename <- "combined_cum_cost.csv"
+                utils::write.csv(output_df, filename, row.names = TRUE)
+              }
+            }
           }
         }
       }
@@ -2839,12 +2928,12 @@ ManageResults.Region <- function(region, population_model,
                 filename <- sprintf("total_actions%s_%s_cum_cost.png",
                                     ic[1], cost_a)
                 main_title <-
-                  sprintf("Total actions%s %s cumulative cost (mean +/- 2 SD)",
+                  sprintf("Total actions%s cumulative %s cost (mean +/- 2 SD)",
                           ic[2], cost_name)
               } else {
                 filename <- sprintf("actions%s_%s_cum_cost.png", ic[1], cost_a)
                 main_title <-
-                  sprintf("Actions%s %s cumulative cost (mean +/- 2 SD)",
+                  sprintf("Actions%s cumulative %s cost (mean +/- 2 SD)",
                           ic[2], cost_name)
               }
               grDevices::png(filename = filename, width = width,
@@ -2980,10 +3069,10 @@ ManageResults.Region <- function(region, population_model,
               invisible(grDevices::dev.off())
             } else {
               if (include_collated) {
-                filename <- "total_actions_cumulative_cost.png"
+                filename <- "total_actions_combined_cum_cost.png"
                 main_title <- "Total actions cumulative cost"
               } else {
-                filename <- "actions_cumulative_cost.png"
+                filename <- "actions_combined_cum_cost.png"
                 main_title <- "Actions cumulative cost"
               }
               grDevices::png(filename = filename, width = width,
