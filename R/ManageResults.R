@@ -1088,6 +1088,12 @@ ManageResults.Region <- function(region, population_model,
     return(c(super$get_list(), results))
   }
 
+  # Convert first letter of title to upper-case
+  title_first <- function(title_str) {
+    return(paste0(toupper(substr(title_str, 1, 1)),
+                  substr(title_str, 2, nchar(title_str))))
+  }
+
   # Save collated results as raster files
   if (region$get_type() == "grid") {
     self$save_rasters  <- function(...) {
@@ -1282,266 +1288,238 @@ ManageResults.Region <- function(region, population_model,
             ic <- paste0("_", i)
           }
 
-          aspects <- names(results$actions[[i]])
-          for (a in aspects[which(!aspects %in% c("total", "cost"))]) {
-
-            direct_action <-
-              (a %in%  c("detected", "control_search_destroy", "removed"))
-
-            # Create and save an action results raster per stage
-            result_stages <- stages
-            if (is.null(stages) || is.numeric(combine_stages) ||
-                !direct_action) {
-              result_stages <- 1
+          # Action key/name. Direct action?
+          a <- actions[[i]]$get_label()
+          direct_action <-
+            (a %in%  c("detected", "control_search_destroy", "removed"))
+          a_name <- a_key <- sub("control_", "", a, fixed = TRUE)
+          if (actions[[i]]$get_type() == "control") {
+            if (a_key == "search_destroy") {
+              a_name <- "search & destroy"
             }
-            for (j in 1:result_stages) {
+            a_key <- paste0(a_key, "_control")
+            a_name <- paste(a_name, "control")
+          }
 
-              # Stage post-fix
-              if (population_model$get_type() == "stage_structured" &&
-                  is.null(combine_stages) && direct_action) {
-                jc <- paste0("_stage_", j)
-              } else {
-                jc <- ""
-              }
+          # Action cost and cumulative cost key/name
+          if ("cost" %in% names(results$actions[[i]])) {
+            if (a_key == "detected") {
+              cost_name <- cost_key <- "detection"
+            } else if (a_key == "removed") {
+              cost_name <- cost_key <- "removal"
+            } else {
+              cost_key <- a_key
+              cost_name <- a_name
+            }
+          }
 
-              # Replicate summaries or single replicate
-              if (replicates > 1) {
-                if (direct_action) {
-                  summaries <- c("mean", "sd")
-                } else {
-                  summaries <- c("mean")
-                }
-              } else {
-                summaries <- ""
-              }
+          # Create and save an action results raster per stage
+          result_stages <- stages
+          if (is.null(stages) || is.numeric(combine_stages) ||
+              !direct_action) {
+            result_stages <- 1
+          }
+          for (j in 1:result_stages) {
 
-              for (s in summaries) {
-
-                # Summary post-fix
-                if (replicates > 1) {
-                  sc <- paste0("_", s)
-                } else {
-                  sc <- s
-                }
-
-                # Add nested list to output list
-                output_key <- paste0("actions", ic, "_", a, jc, sc)
-                output_list[[output_key]] <- list()
-
-                # Initialise non-zero indicator
-                nonzero_list[[output_key]] <- FALSE
-
-                # Add cost and cumulative cost to output list (not staged)
-                if ("cost" %in% names(results$actions[[i]]) && j == 1) {
-                  if (a == "detected") {
-                    cost_a <- "detection"
-                  } else if (a == "removed") {
-                    cost_a <- "removal"
-                  } else {
-                    cost_a <- a
-                  }
-                  output_cost_key <- paste0("actions", ic, "_", cost_a,
-                                            "_cost", sc)
-                  output_list[[output_cost_key]] <- list()
-                  nonzero_list[[output_cost_key]] <- FALSE
-                  if ("cumulative" %in% names(results$actions[[i]]$cost)) {
-                    output_cum_cost_key <- paste0("actions", ic, "_", cost_a,
-                                                  "_cum_cost", sc)
-                    output_list[[output_cum_cost_key]] <- list()
-                    nonzero_list[[output_cum_cost_key]] <- FALSE
-                  }
-                }
-
-                for (tmc in names(results$actions[[i]][[a]])) {
-
-                  # Copy actions into a raster and update non-zero indicator
-                  if (population_model$get_type() == "stage_structured" &&
-                      direct_action) {
-                    if (replicates > 1) {
-                      output_rast <-
-                        region$get_rast(
-                          results$actions[[i]][[a]][[tmc]][[s]][,j])
-                      nonzero_list[[output_key]] <-
-                        (nonzero_list[[output_key]] |
-                           sum(results$actions[[i]][[a]][[tmc]][[s]][,j]) > 0)
-                    } else {
-                      output_rast <-
-                        region$get_rast(results$actions[[i]][[a]][[tmc]][,j])
-                      nonzero_list[[output_key]] <-
-                        (nonzero_list[[output_key]] |
-                           sum(results$actions[[i]][[a]][[tmc]][,j]) > 0)
-                    }
-                    if (is.null(combine_stages)) {
-                      names(output_rast) <- stage_labels[j]
-                    } else if (is.numeric(combine_stages)) {
-                      names(output_rast) <- "combined"
-                    }
-                  } else {
-                    if (replicates > 1) {
-                      output_rast <-
-                        region$get_rast(results$actions[[i]][[a]][[tmc]][[s]])
-                      nonzero_list[[output_key]] <-
-                        (nonzero_list[[output_key]] |
-                           sum(results$actions[[i]][[a]][[tmc]][[s]]) > 0)
-                    } else {
-                      output_rast <-
-                        region$get_rast(results$actions[[i]][[a]][[tmc]])
-                      nonzero_list[[output_key]] <-
-                        (nonzero_list[[output_key]] |
-                           sum(results$actions[[i]][[a]][[tmc]]) > 0)
-                    }
-                  }
-
-                  # Write raster to file
-                  filename <- sprintf(
-                    paste0("actions%s_%s%s_t%0",
-                           nchar(as.character(time_steps)), "d%s.tif"),
-                    ic, a, jc, as.integer(tmc), sc)
-                  output_list[[output_key]][[tmc]] <-
-                    terra::writeRaster(output_rast, filename, ...)
-                }
-
-                # Add list of metadata as an attribute
-                name <- sub("control_", "", actions[[i]]$get_label(),
-                            fixed = TRUE)
-                if (actions[[i]]$get_type() == "control") {
-                  name <- paste(name, "control")
-                }
-                if (is.null(stages)) {
-                  stage_attr <- NULL
-                } else {
-                  stage_attr <- j
-                }
-                attr_list <- list(
-                  category = "action",
-                  type = actions[[i]]$get_type(),
-                  name = name,
-                  stage = stage_attr,
-                  cost = FALSE,
-                  cumulative = FALSE,
-                  summary = s,
-                  unit = "",
-                  nonzero = nonzero_list[[output_key]]
-                )
-                attr(output_list[[output_key]], "metadata") <- attr_list
-              }
+            # Stage post-fix
+            if (population_model$get_type() == "stage_structured" &&
+                is.null(combine_stages) && direct_action) {
+              jc <- paste0("_stage_", j)
+            } else {
+              jc <- ""
             }
 
-            # Action cost and cumulative cost
-            if ("cost" %in% names(results$actions[[i]])) {
-
-              # Replicate summaries or single replicate
-              if (replicates > 1) {
+            # Replicate summaries or single replicate
+            if (replicates > 1) {
+              if (direct_action) {
                 summaries <- c("mean", "sd")
               } else {
-                summaries <- ""
+                summaries <- c("mean")
               }
-              for (s in summaries) {
+            } else {
+              summaries <- ""
+            }
 
-                # Summary post-fix
-                if (replicates > 1) {
-                  sc <- paste0("_", s)
-                } else {
-                  sc <- s
-                }
+            for (s in summaries) {
 
-                # Add nested list to output list
-                if (a == "detected") {
-                  cost_a <- "detection"
-                } else if (a == "removed") {
-                  cost_a <- "removal"
-                } else {
-                  cost_a <- a
-                }
-                output_cost_key <- paste0("actions", ic, "_", cost_a,
-                                          "_cost", sc)
-                output_list[[output_cost_key]] <- list()
-                nonzero_list[[output_cost_key]] <- FALSE
-                if ("cumulative" %in% names(results$actions[[i]]$cost)) {
-                  output_cum_cost_key <- paste0("actions", ic, "_", cost_a,
-                                                "_cum_cost", sc)
-                  output_list[[output_cum_cost_key]] <- list()
-                  nonzero_list[[output_cum_cost_key]] <- FALSE
-                }
+              # Summary post-fix
+              if (replicates > 1) {
+                sc <- paste0("_", s)
+              } else {
+                sc <- s
+              }
 
-                # Write cost and cumulative cost to raster files
-                for (tmc in names(results$actions[[i]][[a]])) {
+              # Add nested list to output list
+              output_key <- paste0("actions", ic, "_", a_key, jc, sc)
+              output_list[[output_key]] <- list()
+
+              # Initialise non-zero indicator
+              nonzero_list[[output_key]] <- FALSE
+
+              for (tmc in names(results$actions[[i]][[a]])) {
+
+                # Copy actions into a raster and update non-zero indicator
+                if (population_model$get_type() == "stage_structured" &&
+                    direct_action) {
                   if (replicates > 1) {
-                    output_rast <- region$get_rast(
-                      results$actions[[i]]$cost[[a]][[tmc]][[s]])
-                    nonzero_list[[output_cost_key]] <-
-                      (nonzero_list[[output_cost_key]] |
-                         sum(results$actions[[i]]$cost[[a]][[tmc]][[s]]) > 0)
+                    output_rast <-
+                      region$get_rast(
+                        results$actions[[i]][[a]][[tmc]][[s]][,j])
+                    nonzero_list[[output_key]] <-
+                      (nonzero_list[[output_key]] |
+                         sum(results$actions[[i]][[a]][[tmc]][[s]][,j]) > 0)
                   } else {
                     output_rast <-
-                      region$get_rast(results$actions[[i]]$cost[[a]][[tmc]])
-                    nonzero_list[[output_cost_key]] <-
-                      (nonzero_list[[output_cost_key]] |
-                         sum(results$actions[[i]]$cost[[a]][[tmc]]) > 0)
+                      region$get_rast(results$actions[[i]][[a]][[tmc]][,j])
+                    nonzero_list[[output_key]] <-
+                      (nonzero_list[[output_key]] |
+                         sum(results$actions[[i]][[a]][[tmc]][,j]) > 0)
                   }
-                  filename <- sprintf(
-                    paste0(output_cost_key, "_t%0",
-                           nchar(as.character(time_steps)), "d.tif"),
-                    as.integer(tmc))
-                  output_list[[output_cost_key]][[tmc]] <-
-                    terra::writeRaster(output_rast, filename, ...)
-                  if ("cumulative" %in% names(results$actions[[i]]$cost)) {
-                    if (replicates > 1) {
-                      output_rast <- region$get_rast(
-                        results$actions[[i]]$cost$cumulative[[a]][[
-                          tmc]][[s]])
-                      nonzero_list[[output_cum_cost_key]] <-
-                        (nonzero_list[[output_cum_cost_key]] |
-                           (sum(results$actions[[i]]$cost$cumulative[[a]][[
-                             tmc]][[s]]) > 0))
-                    } else {
-                      output_rast <- region$get_rast(
-                        results$actions[[i]]$cost$cumulative[[a]][[tmc]])
-                      nonzero_list[[output_cum_cost_key]] <-
-                        (nonzero_list[[output_cum_cost_key]] |
-                           sum(results$actions[[i]]$cost$cumulative[[a]][[
-                             tmc]]) > 0)
-                    }
-                    filename <- sprintf(
-                      paste0(output_cum_cost_key, "_t%0",
-                             nchar(as.character(time_steps)), "d.tif"),
-                      as.integer(tmc))
-                    output_list[[output_cum_cost_key]][[tmc]] <-
-                      terra::writeRaster(output_rast, filename, ...)
+                  if (is.null(combine_stages)) {
+                    names(output_rast) <- stage_labels[j]
+                  } else if (is.numeric(combine_stages)) {
+                    names(output_rast) <- "combined"
+                  }
+                } else {
+                  if (replicates > 1) {
+                    output_rast <-
+                      region$get_rast(results$actions[[i]][[a]][[tmc]][[s]])
+                    nonzero_list[[output_key]] <-
+                      (nonzero_list[[output_key]] |
+                         sum(results$actions[[i]][[a]][[tmc]][[s]]) > 0)
+                  } else {
+                    output_rast <-
+                      region$get_rast(results$actions[[i]][[a]][[tmc]])
+                    nonzero_list[[output_key]] <-
+                      (nonzero_list[[output_key]] |
+                         sum(results$actions[[i]][[a]][[tmc]]) > 0)
                   }
                 }
 
-                # Add list of metadata as an attribute
-                if (name == "removed") {
-                  cost_name <- "removal"
-                } else if (name == "detected") {
-                  cost_name <- "detection"
-                } else if (name == "search_destroy") {
-                  cost_name <- name <- "search & destroy"
+                # Write raster to file
+                filename <- sprintf(
+                  paste0("actions%s_%s%s_t%0",
+                         nchar(as.character(time_steps)), "d%s.tif"),
+                  ic, a_key, jc, as.integer(tmc), sc)
+                output_list[[output_key]][[tmc]] <-
+                  terra::writeRaster(output_rast, filename, ...)
+              }
+
+              # Add list of metadata as an attribute
+              if (is.null(stages)) {
+                stage_attr <- NULL
+              } else {
+                stage_attr <- j
+              }
+              attr_list <- list(
+                category = "action",
+                type = actions[[i]]$get_type(),
+                name = a_name,
+                stage = stage_attr,
+                cost = FALSE,
+                cumulative = FALSE,
+                summary = s,
+                unit = "",
+                nonzero = nonzero_list[[output_key]]
+              )
+              attr(output_list[[output_key]], "metadata") <- attr_list
+            }
+          }
+
+          # Action cost and cumulative cost
+          if ("cost" %in% names(results$actions[[i]])) {
+
+            # Replicate summaries or single replicate
+            if (replicates > 1) {
+              summaries <- c("mean", "sd")
+            } else {
+              summaries <- ""
+            }
+            for (s in summaries) {
+
+              # Summary post-fix
+              if (replicates > 1) {
+                sc <- paste0("_", s)
+              } else {
+                sc <- s
+              }
+
+              # Add nested list to output list
+              output_cost_key <- paste0("action_costs", ic, "_", cost_key, sc)
+              output_list[[output_cost_key]] <- list()
+              nonzero_list[[output_cost_key]] <- FALSE
+              if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                output_cum_cost_key <- paste0("cumulative_action_costs", ic,
+                                              "_", cost_key, sc)
+                output_list[[output_cum_cost_key]] <- list()
+                nonzero_list[[output_cum_cost_key]] <- FALSE
+              }
+
+              # Write cost and cumulative cost to raster files
+              for (tmc in names(results$actions[[i]][[a]])) {
+                if (replicates > 1) {
+                  output_rast <- region$get_rast(
+                    results$actions[[i]]$cost[[a]][[tmc]][[s]])
+                  nonzero_list[[output_cost_key]] <-
+                    (nonzero_list[[output_cost_key]] |
+                       sum(results$actions[[i]]$cost[[a]][[tmc]][[s]]) > 0)
                 } else {
-                  cost_name <- name
+                  output_rast <-
+                    region$get_rast(results$actions[[i]]$cost[[a]][[tmc]])
+                  nonzero_list[[output_cost_key]] <-
+                    (nonzero_list[[output_cost_key]] |
+                       sum(results$actions[[i]]$cost[[a]][[tmc]]) > 0)
                 }
-                if (actions[[i]]$get_type() == "control") {
-                  cost_name <- name <- paste(name, "control")
-                }
-                cost_unit <- attr(results$actions[[i]]$cost, "unit")
-                attr_list <- list(
-                  category = "action",
-                  type = actions[[i]]$get_type(),
-                  name = cost_name,
-                  stage = NULL,
-                  cost = TRUE,
-                  cumulative = FALSE,
-                  summary = s,
-                  unit = cost_unit,
-                  nonzero = nonzero_list[[output_cost_key]]
-                )
-                attr(output_list[[output_cost_key]], "metadata") <- attr_list
+                filename <- sprintf(
+                  paste0("action_costs%s_%s_t%0",
+                         nchar(as.character(time_steps)), "d%s.tif"),
+                  ic, cost_key, as.integer(tmc), sc)
+                output_list[[output_cost_key]][[tmc]] <-
+                  terra::writeRaster(output_rast, filename, ...)
                 if ("cumulative" %in% names(results$actions[[i]]$cost)) {
-                  attr_list$cumulative <- TRUE
-                  attr(output_list[[output_cum_cost_key]], "metadata") <-
-                    attr_list
+                  if (replicates > 1) {
+                    output_rast <- region$get_rast(
+                      results$actions[[i]]$cost$cumulative[[a]][[
+                        tmc]][[s]])
+                    nonzero_list[[output_cum_cost_key]] <-
+                      (nonzero_list[[output_cum_cost_key]] |
+                         (sum(results$actions[[i]]$cost$cumulative[[a]][[
+                           tmc]][[s]]) > 0))
+                  } else {
+                    output_rast <- region$get_rast(
+                      results$actions[[i]]$cost$cumulative[[a]][[tmc]])
+                    nonzero_list[[output_cum_cost_key]] <-
+                      (nonzero_list[[output_cum_cost_key]] |
+                         sum(results$actions[[i]]$cost$cumulative[[a]][[
+                           tmc]]) > 0)
+                  }
+                  filename <- sprintf(
+                    paste0("cumulative_action_costs%s_%s_t%0",
+                           nchar(as.character(time_steps)), "d%s.tif"),
+                    ic, cost_key, as.integer(tmc), sc)
+                  output_list[[output_cum_cost_key]][[tmc]] <-
+                    terra::writeRaster(output_rast, filename, ...)
                 }
+              }
+
+              # Add list of metadata as an attribute
+              cost_unit <- attr(results$actions[[i]]$cost, "unit")
+              attr_list <- list(
+                category = "action",
+                type = actions[[i]]$get_type(),
+                name = cost_name,
+                stage = NULL,
+                cost = TRUE,
+                cumulative = FALSE,
+                summary = s,
+                unit = cost_unit,
+                nonzero = nonzero_list[[output_cost_key]]
+              )
+              attr(output_list[[output_cost_key]], "metadata") <- attr_list
+              if ("cumulative" %in% names(results$actions[[i]]$cost)) {
+                attr_list$cumulative <- TRUE
+                attr(output_list[[output_cum_cost_key]], "metadata") <-
+                  attr_list
               }
             }
           }
@@ -1570,11 +1548,12 @@ ManageResults.Region <- function(region, population_model,
             if ("cost" %in% names(results$actions)) {
 
               # Add cost and cumulative cost to output list
-              output_cost_key <- paste0("actions_combined_cost", sc)
+              output_cost_key <- paste0("action_costs_combined", sc)
               output_list[[output_cost_key]] <- list()
               nonzero_list[[output_cost_key]] <- FALSE
               if ("cumulative" %in% names(results$actions$cost)) {
-                output_cum_cost_key <- paste0("actions_combined_cum_cost", sc)
+                output_cum_cost_key <-
+                  paste0("cumulative_action_costs_combined", sc)
                 output_list[[output_cum_cost_key]] <- list()
                 nonzero_list[[output_cum_cost_key]] <- FALSE
               }
@@ -1595,9 +1574,9 @@ ManageResults.Region <- function(region, population_model,
                        sum(results$actions$cost$combined[[tmc]]) > 0)
                 }
                 filename <- sprintf(
-                  paste0(output_cost_key, "_t%0",
-                         nchar(as.character(time_steps)), "d.tif"),
-                  as.integer(tmc))
+                  paste0("action_costs_combined_t%0",
+                         nchar(as.character(time_steps)), "d%s.tif"),
+                  as.integer(tmc), sc)
                 output_list[[output_cost_key]][[tmc]] <-
                   terra::writeRaster(output_rast, filename, ...)
                 if ("cumulative" %in% names(results$actions$cost)) {
@@ -1617,9 +1596,9 @@ ManageResults.Region <- function(region, population_model,
                            tmc]]) > 0)
                   }
                   filename <- sprintf(
-                    paste0(output_cum_cost_key, "_t%0",
-                           nchar(as.character(time_steps)), "d.tif"),
-                    as.integer(tmc))
+                    paste0("cumulative_action_costs_combined_t%0",
+                           nchar(as.character(time_steps)), "d%s.tif"),
+                    as.integer(tmc), sc)
                   output_list[[output_cum_cost_key]][[tmc]] <-
                     terra::writeRaster(output_rast, filename, ...)
                 }
@@ -1649,11 +1628,11 @@ ManageResults.Region <- function(region, population_model,
             if ("cost" %in% names(results)) {
 
               # Add cost and cumulative cost to output list
-              output_cost_key <- paste0("combined_cost", sc)
+              output_cost_key <- paste0("combined_costs", sc)
               output_list[[output_cost_key]] <- list()
               nonzero_list[[output_cost_key]] <- FALSE
               if ("cumulative" %in% names(results$actions$cost)) {
-                output_cum_cost_key <- paste0("combined_cum_cost", sc)
+                output_cum_cost_key <- paste0("cumulative_combined_costs", sc)
                 output_list[[output_cum_cost_key]] <- list()
                 nonzero_list[[output_cum_cost_key]] <- FALSE
               }
@@ -1674,9 +1653,9 @@ ManageResults.Region <- function(region, population_model,
                        sum(results$cost$combined[[tmc]]) > 0)
                 }
                 filename <- sprintf(
-                  paste0(output_cost_key, "_t%0",
-                         nchar(as.character(time_steps)), "d.tif"),
-                  as.integer(tmc))
+                  paste0("combined_costs_t%0",
+                         nchar(as.character(time_steps)), "d%s.tif"),
+                  as.integer(tmc), sc)
                 output_list[[output_cost_key]][[tmc]] <-
                   terra::writeRaster(output_rast, filename, ...)
                 if ("cumulative" %in% names(results$cost)) {
@@ -1695,9 +1674,9 @@ ManageResults.Region <- function(region, population_model,
                          sum(results$cost$cumulative$combined[[tmc]]) > 0)
                   }
                   filename <- sprintf(
-                    paste0(output_cum_cost_key, "_t%0",
-                           nchar(as.character(time_steps)), "d.tif"),
-                    as.integer(tmc))
+                    paste0("cumulative_combined_costs_t%0",
+                           nchar(as.character(time_steps)), "d%s.tif"),
+                    as.integer(tmc), sc)
                   output_list[[output_cum_cost_key]][[tmc]] <-
                     terra::writeRaster(output_rast, filename, ...)
                 }
@@ -1960,23 +1939,41 @@ ManageResults.Region <- function(region, population_model,
         # Results for each action
         for (i in action_i) {
 
-          # Action label and name. Direct action?
-          a <- actions[[i]]$get_label()
-          direct_action <- (a %in% c("detected", "control_search_destroy",
-                                     "removed"))
-          a_name <- sub("control_", "", a, fixed = TRUE)
-          if (a_name == "search_destroy") {
-            a_name <- "search & destroy"
-          }
-          if (actions[[i]]$get_type() == "control") {
-            a_name <- paste(a_name, "control")
-          }
-
           # Include action name or numeric index
           if (length(action_i) == 1 && is.numeric(i)) {
             ic <- ""
           } else {
             ic <- paste0("_", i)
+          }
+
+          # Action key/name. Direct action?
+          a <- actions[[i]]$get_label()
+          direct_action <-
+            (a %in%  c("detected", "control_search_destroy", "removed"))
+          a_name <- a_key <- sub("control_", "", a, fixed = TRUE)
+          if (actions[[i]]$get_type() == "control") {
+            a_key <- paste0(a_key, "_control")
+            if (a_key == "search_destroy") {
+              a_name <- "found & destroyed"
+            } else {
+              a_name <- paste(a_name, "control")
+            }
+          }
+
+          # Action cost and cumulative cost key/name
+          if ("cost" %in% names(results$actions[[i]])) {
+            if (a_key == "detected") {
+              cost_name <- cost_key <- "detection"
+            } else if (a_key == "removed") {
+              cost_name <- cost_key <- "removal"
+            } else {
+              cost_key <- a_key
+              if (a_key == "search_destroy") {
+                cost_name <- "search & destroy control"
+              } else {
+                cost_name <- a_name
+              }
+            }
           }
 
           # Resolve result stages
@@ -2027,7 +2024,7 @@ ManageResults.Region <- function(region, population_model,
                 }
                 names(output_df) <- collated_labels
                 output_df <- cbind(coords, as.data.frame(output_df))
-                filename <- sprintf("actions%s_%s%s%s.csv", ic, a,
+                filename <- sprintf("actions%s_%s%s%s.csv", ic, a_key,
                                     j_fname[j], s_fname[[s]])
                 utils::write.csv(output_df, filename, row.names = FALSE)
               }
@@ -2044,13 +2041,6 @@ ManageResults.Region <- function(region, population_model,
               }
 
               # Write cost and cumulative cost
-              if (a == "detected") {
-                cost_a <- "detection"
-              } else if (a == "removed") {
-                cost_a <- "removal"
-              } else {
-                cost_a <- a
-              }
               for (s in summaries) {
                 if (replicates > 1) {
                   output_df <- lapply(results$actions[[i]]$cost[[a]],
@@ -2060,7 +2050,7 @@ ManageResults.Region <- function(region, population_model,
                 }
                 names(output_df) <- collated_labels
                 output_df <- cbind(coords, as.data.frame(output_df))
-                filename <- sprintf("actions%s_%s_cost%s.csv", ic, cost_a,
+                filename <- sprintf("action_costs%s_%s%s.csv", ic, cost_key,
                                     s_fname[[s]])
                 utils::write.csv(output_df, filename, row.names = FALSE)
                 if ("cumulative" %in% names(results$actions[[i]]$cost)) {
@@ -2073,10 +2063,9 @@ ManageResults.Region <- function(region, population_model,
                   }
                   names(output_df) <- collated_labels
                   output_df <- cbind(coords, as.data.frame(output_df))
-                  filename <- sprintf("actions%s_%s_cum_cost%s.csv", ic,
-                                      cost_a, s_fname[[s]])
-                  utils::write.csv(output_df, filename,
-                                   row.names = FALSE)
+                  filename <- sprintf("cumulative_action_costs%s_%s%s.csv", ic,
+                                      cost_key, s_fname[[s]])
+                  utils::write.csv(output_df, filename, row.names = FALSE)
                 }
               }
             }
@@ -2092,7 +2081,7 @@ ManageResults.Region <- function(region, population_model,
                                       function(a_tm) as.data.frame(
                                         lapply(a_tm, function(m) m[,j])))
                   colnames(output_df) <- time_steps_labels
-                  filename <- sprintf("actions%s_%s%s.csv", ic, a,
+                  filename <- sprintf("actions%s_%s%s.csv", ic, a_key,
                                       j_fname[j])
                   utils::write.csv(output_df, filename, row.names = TRUE)
                 }
@@ -2112,7 +2101,7 @@ ManageResults.Region <- function(region, population_model,
                                       function(a_tm) as.data.frame(a_tm))
                 }
                 colnames(output_df) <- time_steps_labels
-                filename <- sprintf("actions%s_%s.csv", ic, a)
+                filename <- sprintf("actions%s_%s.csv", ic, a_key)
                 utils::write.csv(output_df, filename, row.names = TRUE)
               }
             } else {
@@ -2129,47 +2118,39 @@ ManageResults.Region <- function(region, population_model,
                 rownames(output_df) <- a_name
               }
               colnames(output_df) <- time_steps_labels
-              filename <- sprintf("actions%s_%s.csv", ic, a)
+              filename <- sprintf("actions%s_%s.csv", ic, a_key)
               utils::write.csv(output_df, filename, row.names = TRUE)
             }
 
             # Action cost and cumulative cost when present
-            if ("cost" %in% names(results$actions[[i]])) {
-              if (a == "detected") {
-                cost_a <- cost_name <- "detection"
-              } else if (a == "removed") {
-                cost_a <- cost_name <- "removal"
-              } else {
-                cost_a <- a
-                cost_name <- a_name
-              }
+            if (replicates > 1) {
+              output_df <- sapply(results$actions[[i]]$cost[[a]],
+                                  function(a_tm) a_tm)
+            } else {
+              output_df <- as.data.frame(results$actions[[i]]$cost[[a]])
+              rownames(output_df) <- paste(cost_name, "cost")
+            }
+            colnames(output_df) <- time_steps_labels
+            filename <- sprintf("action_costs%s_%s.csv", ic, cost_key)
+            utils::write.csv(output_df, filename, row.names = TRUE)
+            if ("cumulative" %in% names(results$actions[[i]]$cost)) {
               if (replicates > 1) {
-                output_df <- sapply(results$actions[[i]]$cost[[a]],
-                                    function(a_tm) a_tm)
+                output_df <-
+                  sapply(results$actions[[i]]$cost$cumulative[[a]],
+                         function(a_tm) a_tm)
               } else {
-                output_df <- as.data.frame(results$actions[[i]]$cost[[a]])
-                rownames(output_df) <- paste(cost_name, "cost")
+                output_df <-
+                  as.data.frame(results$actions[[i]]$cost$cumulative[[a]])
+                rownames(output_df) <- paste("cumulative", cost_name, "cost")
               }
               colnames(output_df) <- time_steps_labels
-              filename <- sprintf("actions%s_%s_cost.csv", ic, cost_a)
+              filename <- sprintf("cumulative_action_costs%s_%s.csv", ic,
+                                  cost_key)
               utils::write.csv(output_df, filename, row.names = TRUE)
-              if ("cumulative" %in% names(results$actions[[i]]$cost)) {
-                if (replicates > 1) {
-                  output_df <-
-                    sapply(results$actions[[i]]$cost$cumulative[[a]],
-                           function(a_tm) a_tm)
-                } else {
-                  output_df <-
-                    as.data.frame(results$actions[[i]]$cost$cumulative[[a]])
-                  rownames(output_df) <- paste("cumulative", cost_name, "cost")
-                }
-                colnames(output_df) <- time_steps_labels
-                filename <- sprintf("actions%s_%s_cum_cost.csv", ic, cost_a)
-                utils::write.csv(output_df, filename, row.names = TRUE)
-              }
             }
           }
         }
+
 
         # Combined action costs and/or monetary impacts
         if ("cost" %in% names(results$actions) || "cost" %in% names(results)) {
@@ -2195,7 +2176,7 @@ ManageResults.Region <- function(region, population_model,
                 }
                 names(output_df) <- collated_labels
                 output_df <- cbind(coords, as.data.frame(output_df))
-                filename <- sprintf("actions_combined_cost%s.csv",
+                filename <- sprintf("action_costs_combined%s.csv",
                                     s_fname[[s]])
                 utils::write.csv(output_df, filename, row.names = FALSE)
               }
@@ -2210,7 +2191,7 @@ ManageResults.Region <- function(region, population_model,
                   }
                   names(output_df) <- collated_labels
                   output_df <- cbind(coords, as.data.frame(output_df))
-                  filename <- sprintf("actions_combined_cum_cost%s.csv",
+                  filename <- sprintf("cumulative_action_costs_combined%s.csv",
                                       s_fname[[s]])
                   utils::write.csv(output_df, filename, row.names = FALSE)
                 }
@@ -2228,7 +2209,7 @@ ManageResults.Region <- function(region, population_model,
                 }
                 names(output_df) <- collated_labels
                 output_df <- cbind(coords, as.data.frame(output_df))
-                filename <- sprintf("combined_cost%s.csv",
+                filename <- sprintf("combined_costs%s.csv",
                                     s_fname[[s]])
                 utils::write.csv(output_df, filename, row.names = FALSE)
               }
@@ -2243,7 +2224,7 @@ ManageResults.Region <- function(region, population_model,
                   }
                   names(output_df) <- collated_labels
                   output_df <- cbind(coords, as.data.frame(output_df))
-                  filename <- sprintf("combined_cum_cost%s.csv",
+                  filename <- sprintf("cumulative_combined_costs%s.csv",
                                       s_fname[[s]])
                   utils::write.csv(output_df, filename, row.names = FALSE)
                 }
@@ -2261,10 +2242,10 @@ ManageResults.Region <- function(region, population_model,
                                     function(a_tm) a_tm)
               } else {
                 output_df <- as.data.frame(results$actions$cost$combined)
-                rownames(output_df) <- "combined cost"
+                rownames(output_df) <- "combined actions cost"
               }
               colnames(output_df) <- time_steps_labels
-              filename <- "actions_combined_cost.csv"
+              filename <- "action_costs_combined.csv"
               utils::write.csv(output_df, filename, row.names = TRUE)
               if ("cumulative" %in% names(results$actions$cost)) {
                 if (replicates > 1) {
@@ -2274,10 +2255,10 @@ ManageResults.Region <- function(region, population_model,
                 } else {
                   output_df <-
                     as.data.frame(results$actions$cost$cumulative$combined)
-                  rownames(output_df) <- "cumulative cost"
+                  rownames(output_df) <- "cumulative actions cost"
                 }
                 colnames(output_df) <- time_steps_labels
-                filename <- "actions_combined_cum_cost.csv"
+                filename <- "cumulative_action_costs_combined.csv"
                 utils::write.csv(output_df, filename, row.names = TRUE)
               }
             }
@@ -2292,7 +2273,7 @@ ManageResults.Region <- function(region, population_model,
                 rownames(output_df) <- "combined cost"
               }
               colnames(output_df) <- time_steps_labels
-              filename <- "combined_cost.csv"
+              filename <- "combined_costs.csv"
               utils::write.csv(output_df, filename, row.names = TRUE)
               if ("cumulative" %in% names(results$cost)) {
                 if (replicates > 1) {
@@ -2304,7 +2285,7 @@ ManageResults.Region <- function(region, population_model,
                   rownames(output_df) <- "cumulative cost"
                 }
                 colnames(output_df) <- time_steps_labels
-                filename <- "combined_cum_cost.csv"
+                filename <- "cumulative_combined_costs.csv"
                 utils::write.csv(output_df, filename, row.names = TRUE)
               }
             }
@@ -2318,16 +2299,29 @@ ManageResults.Region <- function(region, population_model,
         # Save totals CSV for each action
         for (i in action_i) {
 
-          # Action label and name. Direct action?
-          a_lab <- actions[[i]]$get_label()
-          direct_action <- (a_lab %in% c("detected", "control_search_destroy",
-                                         "removed"))
-          a_name <- sub("control_", "", a_lab, fixed = TRUE)
-          if (a_name == "search_destroy") {
-            a_name <- "search & destroy"
-          }
+          # Action key/name. Direct action?
+          a <- actions[[i]]$get_label()
+          direct_action <-
+            (a %in%  c("detected", "control_search_destroy", "removed"))
+          a_name <- a_key <- sub("control_", "", a, fixed = TRUE)
           if (actions[[i]]$get_type() == "control") {
+            if (a_key == "search_destroy") {
+              a_name <- "search & destroy"
+            }
+            a_key <- paste0(a_key, "_control")
             a_name <- paste(a_name, "control")
+          }
+
+          # Action cost and cumulative cost key/name
+          if ("cost" %in% names(results$actions[[i]])) {
+            if (a_key == "detected") {
+              cost_name <- cost_key <- "detection"
+            } else if (a_key == "removed") {
+              cost_name <- cost_key <- "removal"
+            } else {
+              cost_key <- a_key
+              cost_name <- a_name
+            }
           }
 
           # Include action name or numeric index
@@ -2363,7 +2357,7 @@ ManageResults.Region <- function(region, population_model,
                 colnames(output_df) <- time_steps_labels
 
                 # Write to CSV file
-                filename <- sprintf("total_actions%s_%s%s.csv", ic, a_lab,
+                filename <- sprintf("total_actions%s_%s%s.csv", ic, a_key,
                                     j_fname[j])
                 utils::write.csv(output_df, filename)
               }
@@ -2381,14 +2375,14 @@ ManageResults.Region <- function(region, population_model,
               }
 
               # Write to CSV file
-              filename <- sprintf("total_actions%s_%s.csv", ic, a_lab)
+              filename <- sprintf("total_actions%s_%s.csv", ic, a_key)
               utils::write.csv(output_df, filename)
 
             } else {
               output_df <- as.data.frame(results$actions[[i]]$total)
               rownames(output_df) <- a_name
               colnames(output_df) <- time_steps_labels
-              filename <- sprintf("total_actions%s_%s.csv", ic, a_lab)
+              filename <- sprintf("total_actions%s_%s.csv", ic, a_key)
               utils::write.csv(output_df, filename, row.names = TRUE)
             }
           }
@@ -2396,14 +2390,6 @@ ManageResults.Region <- function(region, population_model,
           # Action cost and cumulative cost totals when present
           if ("cost" %in% names(results$actions[[i]]) &&
               is.list(results$actions[[i]]$cost$total)) {
-            if (a_lab == "detected") {
-              cost_a <- cost_name <- "detection"
-            } else if (a_lab == "removed") {
-              cost_a <- cost_name <- "removal"
-            } else {
-              cost_a <- a_lab
-              cost_name <- a_name
-            }
             if (replicates > 1) {
               output_df <- sapply(results$actions[[i]]$cost$total,
                                   function(tot) tot)
@@ -2412,7 +2398,7 @@ ManageResults.Region <- function(region, population_model,
               rownames(output_df) <- paste(cost_name, "cost")
             }
             colnames(output_df) <- time_steps_labels
-            filename <- sprintf("total_actions%s_%s_cost.csv", ic, cost_a)
+            filename <- sprintf("total_action_costs%s_%s.csv", ic, cost_key)
             utils::write.csv(output_df, filename, row.names = TRUE)
             if ("cumulative" %in% names(results$actions[[i]]$cost) &&
                 is.list(results$actions[[i]]$cost$cumulative$total)) {
@@ -2425,8 +2411,8 @@ ManageResults.Region <- function(region, population_model,
                 rownames(output_df) <- paste("cumulative", cost_name, "cost")
               }
               colnames(output_df) <- time_steps_labels
-              filename <- sprintf("total_actions%s_%s_cum_cost.csv",
-                                  ic, cost_a)
+              filename <- sprintf("total_cumulative_action_costs%s_%s.csv",
+                                  ic, cost_key)
               utils::write.csv(output_df, filename, row.names = TRUE)
             }
           }
@@ -2443,10 +2429,10 @@ ManageResults.Region <- function(region, population_model,
                                   function(tot) tot)
             } else {
               output_df <- as.data.frame(results$actions$cost$total)
-              rownames(output_df) <- "combined cost"
+              rownames(output_df) <- "combined actions cost"
             }
             colnames(output_df) <- time_steps_labels
-            filename <- "total_actions_combined_cost.csv"
+            filename <- "total_action_costs_combined.csv"
             utils::write.csv(output_df, filename, row.names = TRUE)
             if ("cumulative" %in% names(results$actions$cost) &&
                 is.list(results$actions$cost$cumulative$total)) {
@@ -2456,10 +2442,10 @@ ManageResults.Region <- function(region, population_model,
               } else {
                 output_df <-
                   as.data.frame(results$actions$cost$cumulative$total)
-                rownames(output_df) <- "cumulative cost"
+                rownames(output_df) <- "cumulative actions cost"
               }
               colnames(output_df) <- time_steps_labels
-              filename <- "total_actions_combined_cum_cost.csv"
+              filename <- "total_cumulative_action_costs_combined.csv"
               utils::write.csv(output_df, filename, row.names = TRUE)
             }
           }
@@ -2474,7 +2460,7 @@ ManageResults.Region <- function(region, population_model,
               rownames(output_df) <- "combined cost"
             }
             colnames(output_df) <- time_steps_labels
-            filename <- "total_combined_cost.csv"
+            filename <- "total_combined_costs.csv"
             utils::write.csv(output_df, filename, row.names = TRUE)
             if ("cumulative" %in% names(results$cost) &&
                 is.list(results$cost$cumulative$total)) {
@@ -2487,7 +2473,7 @@ ManageResults.Region <- function(region, population_model,
                 rownames(output_df) <- "cumulative cost"
               }
               colnames(output_df) <- time_steps_labels
-              filename <- "total_combined_cum_cost.csv"
+              filename <- "total_cumulative_combined_costs.csv"
               utils::write.csv(output_df, filename, row.names = TRUE)
             }
           }
@@ -2704,21 +2690,39 @@ ManageResults.Region <- function(region, population_model,
           ic <- c(paste0("_", i), paste0(" : ", i))
         }
 
-        # Action label and name. Direct action?
+        # Action label/key/name. Direct action?
         a_lab <- actions[[i]]$get_label()
-        direct_action <- (a_lab %in% c("detected", "control_search_destroy",
-                                       "removed"))
-        a_name <- sub("control_", "", a_lab, fixed = TRUE)
-        if (a_name == "search_destroy") {
-          a_name <- "found & destroyed"
+        direct_action <-
+          (a_lab %in%  c("detected", "control_search_destroy", "removed"))
+        a_name <- a_key <- sub("control_", "", a_lab, fixed = TRUE)
+        if (actions[[i]]$get_type() == "control") {
+          a_key <- paste0(a_key, "_control")
+          if (a_key == "search_destroy") {
+            a_name <- "found & destroyed"
+          } else {
+            a_name <- paste(a_name, "control")
+          }
         }
         if (direct_action) {
           plot_y_label <- sprintf("Number %s", a_name)
         } else {
-          if (actions[[i]]$get_type() == "control") {
-            a_name <- paste(a_name, "control")
-          }
           plot_y_label <- sprintf("Locations %s applied", a_name)
+        }
+
+        # Action cost and cumulative cost key/name
+        if ("cost" %in% names(results$actions[[i]])) {
+          if (a_key == "detected") {
+            cost_name <- cost_key <- "detection"
+          } else if (a_key == "removed") {
+            cost_name <- cost_key <- "removal"
+          } else {
+            cost_key <- a_key
+            if (a_key == "search_destroy") {
+              cost_name <- "search & destroy control"
+            } else {
+              cost_name <- a_name
+            }
+          }
         }
 
         # Resolve the number of (combined) stages used in the results
@@ -2779,12 +2783,12 @@ ManageResults.Region <- function(region, population_model,
               values <- list(mean = as.numeric(values["mean",,drop = FALSE]))
             }
             if (include_collated) {
-              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
+              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
               main_title <- sprintf("Total actions%s %s%s (mean +/- 2 SD)",
                                     ic[2], stage_label[s], a_name)
             } else {
-              filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
+              filename <- sprintf("actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
               if (direct_action) {
                 main_title <- sprintf("Actions%s %s%s (mean +/- 2 SD)", ic[2],
@@ -2815,15 +2819,15 @@ ManageResults.Region <- function(region, population_model,
             invisible(grDevices::dev.off())
           } else {
             if (include_collated) {
-              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_lab,
+              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
               main_title <- sprintf("Total actions%s %s%s", ic[2],
-                                    stage_label[s], a_lab)
+                                    stage_label[s], a_key)
             } else {
-              filename <- sprintf("actions%s_%s%s.png", ic[1], a_lab,
+              filename <- sprintf("actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
               main_title <- sprintf("Actions%s %s%s", ic[2], stage_label[s],
-                                    a_lab)
+                                    a_key)
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
@@ -2838,19 +2842,6 @@ ManageResults.Region <- function(region, population_model,
 
         # Plot action cost and cumulative cost
         if ("cost" %in% names(results$actions[[i]])) {
-
-          # Cost label and name
-          if (a_lab == "detected") {
-            cost_a <- cost_name <- "detection"
-          } else if (a_lab == "removed") {
-            cost_a <- cost_name <- "removal"
-          } else if (a_lab == "control_search_destroy") {
-            cost_a <- a_lab
-            cost_name <- "search & destroy control"
-          } else {
-            cost_a <- a_lab
-            cost_name <- a_name
-          }
 
           # Unit label
           unit <- attr(results$actions[[i]]$cost, "unit")
@@ -2876,12 +2867,13 @@ ManageResults.Region <- function(region, population_model,
             values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
                            sd = as.numeric(values["sd",,drop = FALSE]))
             if (include_collated) {
-              filename <- sprintf("total_actions%s_%s_cost.png", ic[1], cost_a)
-              main_title <- sprintf("Total actions%s %s cost (mean +/- 2 SD)",
+              filename <- sprintf("total_action_costs%s_%s.png", ic[1],
+                                  cost_key)
+              main_title <- sprintf("Total action costs%s %s (mean +/- 2 SD)",
                                     ic[2], cost_name)
             } else {
-              filename <- sprintf("actions%s_%s_cost.png", ic[1], cost_a)
-              main_title <- sprintf("Actions%s %s cost (mean +/- 2 SD)",
+              filename <- sprintf("action_costs%s_%s.png", ic[1], cost_key)
+              main_title <- sprintf("Action costs%s %s (mean +/- 2 SD)",
                                     ic[2], cost_name)
             }
             grDevices::png(filename = filename, width = width, height = height)
@@ -2898,12 +2890,13 @@ ManageResults.Region <- function(region, population_model,
             invisible(grDevices::dev.off())
           } else {
             if (include_collated) {
-              filename <- sprintf("total_actions%s_%s_cost.png", ic[1], cost_a)
-              main_title <- sprintf("Total actions%s %s cost", ic[2],
+              filename <- sprintf("total_action_costs%s_%s.png", ic[1],
+                                  cost_key)
+              main_title <- sprintf("Total action costs%s %s", ic[2],
                                     cost_name)
             } else {
-              filename <- sprintf("actions%s_%s_cost.png", ic[1], cost_a)
-              main_title <- sprintf("Actions%s %s cost", ic[2], cost_name)
+              filename <- sprintf("action_costs%s_%s.png", ic[1], cost_key)
+              main_title <- sprintf("Action costs%s %s", ic[2], cost_name)
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
@@ -2925,15 +2918,16 @@ ManageResults.Region <- function(region, population_model,
               values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
                              sd = as.numeric(values["sd",,drop = FALSE]))
               if (include_collated) {
-                filename <- sprintf("total_actions%s_%s_cum_cost.png",
-                                    ic[1], cost_a)
+                filename <- sprintf("total_cumulative_action_costs%s_%s.png",
+                                    ic[1], cost_key)
                 main_title <-
-                  sprintf("Total actions%s cumulative %s cost (mean +/- 2 SD)",
+                  sprintf("Total cumulative action costs%s %s (mean +/- 2 SD)",
                           ic[2], cost_name)
               } else {
-                filename <- sprintf("actions%s_%s_cum_cost.png", ic[1], cost_a)
+                filename <- sprintf("cumulative_action_costs%s_%s.png",
+                                    ic[1], cost_key)
                 main_title <-
-                  sprintf("Actions%s cumulative %s cost (mean +/- 2 SD)",
+                  sprintf("Cumulative action costs%s %s (mean +/- 2 SD)",
                           ic[2], cost_name)
               }
               grDevices::png(filename = filename, width = width,
@@ -2951,13 +2945,14 @@ ManageResults.Region <- function(region, population_model,
               invisible(grDevices::dev.off())
             } else {
               if (include_collated) {
-                filename <- sprintf("total_actions%s_%s_cum_cost.png",
-                                    ic[1], cost_a)
-                main_title <- sprintf("Total actions%s cumulative %s cost",
+                filename <- sprintf("total_cumulative_action_costs%s_%s.png",
+                                    ic[1], cost_key)
+                main_title <- sprintf("Total cumulative action costs%s %s",
                                       ic[2], cost_name)
               } else {
-                filename <- sprintf("actions%s_%s_cum_cost.png", ic[1], cost_a)
-                main_title <- sprintf("Actions%s cumulative %s cost",
+                filename <- sprintf("cumulative_action_costs%s_%s.png",
+                                    ic[1], cost_key)
+                main_title <- sprintf("Cumulative action costs%s %s",
                                       ic[2], cost_name)
               }
               grDevices::png(filename = filename, width = width,
@@ -3003,11 +2998,11 @@ ManageResults.Region <- function(region, population_model,
             values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
                            sd = as.numeric(values["sd",,drop = FALSE]))
             if (include_collated) {
-              filename <- "total_actions_combined_cost.png"
-              main_title <- "Total actions combined cost (mean +/- 2 SD)"
+              filename <- "total_action_costs_combined.png"
+              main_title <- "Total action costs : combined (mean +/- 2 SD)"
             } else {
-              filename <- "actions_combined_cost.png"
-              main_title <- "Actions combined cost (mean +/- 2 SD)"
+              filename <- "action_costs_combined.png"
+              main_title <- "Action costs : combined (mean +/- 2 SD)"
             }
             grDevices::png(filename = filename, width = width, height = height)
             graphics::plot(0:time_steps, values$mean, type = "l",
@@ -3023,11 +3018,11 @@ ManageResults.Region <- function(region, population_model,
             invisible(grDevices::dev.off())
           } else {
             if (include_collated) {
-              filename <- "total_actions_combined_cost.png"
-              main_title <- "Total actions combined cost"
+              filename <- "total_action_costs_combined.png"
+              main_title <- "Total action costs : combined"
             } else {
-              filename <- "actions_combined_cost.png"
-              main_title <- "Actions combined cost"
+              filename <- "action_costs_combined.png"
+              main_title <- "Action costs : combined "
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
@@ -3049,11 +3044,13 @@ ManageResults.Region <- function(region, population_model,
               values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
                              sd = as.numeric(values["sd",,drop = FALSE]))
               if (include_collated) {
-                filename <- "total_actions_combined_cum_cost.png"
-                main_title <- "Total actions cumulative cost (mean +/- 2 SD)"
+                filename <- "total_cumulative_action_costs_combined.png"
+                main_title <-
+                  "Total cumulative action costs : combined (mean +/- 2 SD)"
               } else {
-                filename <- "actions_combined_cum_cost.png"
-                main_title <- "Actions cumulative cost (mean +/- 2 SD)"
+                filename <- "cumulative_action_costs_combined.png"
+                main_title <-
+                  "Cumulative action costs : combined (mean +/- 2 SD)"
               }
               grDevices::png(filename = filename, width = width, height = height)
               graphics::plot(0:time_steps, values$mean, type = "l",
@@ -3069,11 +3066,11 @@ ManageResults.Region <- function(region, population_model,
               invisible(grDevices::dev.off())
             } else {
               if (include_collated) {
-                filename <- "total_actions_combined_cum_cost.png"
-                main_title <- "Total actions cumulative cost"
+                filename <- "total_cumulative_action_costs_combined.png"
+                main_title <- "Total cumulative action costs : combined"
               } else {
-                filename <- "actions_combined_cum_cost.png"
-                main_title <- "Actions cumulative cost"
+                filename <- "cumulative_action_costs_combined.png"
+                main_title <- "Cumulative action costs : combined"
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
@@ -3114,12 +3111,12 @@ ManageResults.Region <- function(region, population_model,
             values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
                            sd = as.numeric(values["sd",,drop = FALSE]))
             if (include_collated) {
-              filename <- "total_combined_cost.png"
+              filename <- "total_combined_costs.png"
               main_title <-
-                "Total combined impact and action cost (mean +/- 2 SD)"
+                "Total combined impact and action costs (mean +/- 2 SD)"
             } else {
-              filename <- "combined_cost.png"
-              main_title <- "Combined impact and action cost (mean +/- 2 SD)"
+              filename <- "combined_costs.png"
+              main_title <- "Combined impact and action costs (mean +/- 2 SD)"
             }
             grDevices::png(filename = filename, width = width, height = height)
             graphics::plot(0:time_steps, values$mean, type = "l",
@@ -3135,11 +3132,11 @@ ManageResults.Region <- function(region, population_model,
             invisible(grDevices::dev.off())
           } else {
             if (include_collated) {
-              filename <- "total_combined_cost.png"
-              main_title <- "Total combined impact and action cost"
+              filename <- "total_combined_costs.png"
+              main_title <- "Total combined impact and action costs"
             } else {
-              filename <- "combined_cost.png"
-              main_title <- "Combined impact and action cost"
+              filename <- "combined_costs.png"
+              main_title <- "Combined impact and action costs"
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
@@ -3161,13 +3158,13 @@ ManageResults.Region <- function(region, population_model,
               values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
                              sd = as.numeric(values["sd",,drop = FALSE]))
               if (include_collated) {
-                filename <- "total_combined_cum_cost.png"
+                filename <- "total_cumulative_combined_costs.png"
                 main_title <-
-                  "Total cumulative impact and action cost (mean +/- 2 SD)"
+                  "Total cumulative impact and action costs (mean +/- 2 SD)"
               } else {
-                filename <- "combined_cum_cost.png"
+                filename <- "cumulative_combined_costs.png"
                 main_title <-
-                  "Cumulative impact and action cost (mean +/- 2 SD)"
+                  "Cumulative impact and action costs (mean +/- 2 SD)"
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
@@ -3184,11 +3181,11 @@ ManageResults.Region <- function(region, population_model,
               invisible(grDevices::dev.off())
             } else {
               if (include_collated) {
-                filename <- "total_combined_cum_cost.png"
-                main_title <- "Total cumulative impact and action cost"
+                filename <- "total_cumulative_combined_costs.png"
+                main_title <- "Total cumulative impact and action costs"
               } else {
-                filename <- "combined_cum_cost.png"
-                main_title <- "Cumulative impact and action cost"
+                filename <- "cumulative_combined_costs.png"
+                main_title <- "Cumulative impact and action costs"
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
