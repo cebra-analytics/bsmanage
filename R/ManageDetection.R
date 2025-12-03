@@ -196,7 +196,7 @@ ManageDetection.Region <- function(region,
     } else {
 
       # Attach/update surveillance costs as an attribute
-      if (is.null(surv_cost)) {
+      if (!is.null(surv_cost) && is.null(attr(n, "surv_cost"))) {
         attr(n, "surv_cost") <- surv_cost*0
       }
     }
