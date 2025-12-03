@@ -46,7 +46,8 @@ test_that("initializes with region, population, and other parameters", {
   expect_s3_class(manage_controls, "ManageActions")
   expect_named(manage_controls,
                c(c("get_type", "get_label", "get_stages", "get_schedule",
-                   "include_cost", "get_cost_unit", "apply")))
+                   "include_cost", "get_cost_unit", "clear_attributes",
+                   "apply")))
   expect_equal(manage_controls$get_type(), "control")
   expect_equal(manage_controls$get_label(), "control_search_destroy")
   expect_equal(manage_controls$get_stages(), 2:3)

@@ -59,6 +59,9 @@
 #'     \item{\code{include_cost()}}{Logical indication of a cost parameter
 #'       having a value (named as per population attachment).}
 #'     \item{\code{get_cost_unit()}}{Get the unit of removal cost.}
+#'     \item{\code{clear_attributes(n)}}{Clear attached attributes associated
+#'       with this action from a simulated population vector or matrix
+#'       \code{n}, and return \code{n} without the attached attributes.}
 #'     \item{\code{apply(n, tm)}}{Apply management removals to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, providing the time
@@ -147,6 +150,13 @@ ManageRemovals.Region <- function(region, population_model,
     return(attr(removal_cost, "unit"))
   }
 
+  # Clear attached attributes
+  self$clear_attributes <- function(n) {
+    attr(n, "removed") <- NULL
+    attr(n, "removal_cost") <- NULL
+    return(n)
+  }
+
   # Removal apply method
   self$apply <- function(n, tm) {
 
@@ -157,6 +167,11 @@ ManageRemovals.Region <- function(region, population_model,
       colnames(removed) <- attr(population_model$get_growth(), "labels")
     }
 
+    # Initially no removal cost locations
+    if (!is.null(removal_cost)) {
+      cost_apply <- rep(FALSE, region$get_locations())
+    }
+
     # Scheduled time step?
     if (is.null(schedule) || tm %in% schedule) {
 
@@ -164,7 +179,11 @@ ManageRemovals.Region <- function(region, population_model,
       if (!remove_always && "detected" %in% names(attributes(n))) {
 
         # Removal locations
-        idx <- which(rowSums(as.matrix(attr(n, "detected"))) > 0)
+        if (population_model$get_type() == "stage_structured") {
+          idx <- which(rowSums(attr(n, "detected")[,self$get_stages()]) > 0)
+        } else {
+          idx <- which(attr(n, "detected") > 0)
+        }
 
         # Individuals to which to apply removal
         if (detected_only) {
@@ -179,7 +198,11 @@ ManageRemovals.Region <- function(region, population_model,
         if (!remove_always && detected_only) {
           idx <- c() # none detected
         } else {
-          idx <- which(rowSums(as.matrix(n)) > 0)
+          if (population_model$get_type() == "stage_structured") {
+            idx <- which(rowSums(n[,self$get_stages()]) > 0)
+          } else {
+            idx <- which(n > 0)
+          }
         }
 
         # Apply to all individuals
@@ -216,7 +239,6 @@ ManageRemovals.Region <- function(region, population_model,
 
       # Set removal cost locations
       if (!is.null(removal_cost)) {
-        cost_apply <- rep(FALSE, region$get_locations())
         if (length(idx) > 0) {
           cost_apply[idx] <- TRUE
         }
@@ -238,12 +260,13 @@ ManageRemovals.Region <- function(region, population_model,
       }
     }
 
-    # Attach removal costs as an attribute
+    # Attach (additional) removal costs as an attribute
     if (!is.null(removal_cost)) {
-      if (is.null(schedule) || tm %in% schedule) {
+      if (is.null(attr(n, "removal_cost"))) {
         attr(n, "removal_cost") <- removal_cost*cost_apply
       } else {
-        attr(n, "removal_cost") <- removal_cost*0
+        attr(n, "removal_cost") <-
+          attr(n, "removal_cost") + removal_cost*cost_apply
       }
     }
 

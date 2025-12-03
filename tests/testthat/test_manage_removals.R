@@ -44,7 +44,8 @@ test_that("initializes with region, population, and other parameters", {
   expect_s3_class(manage_removals, "ManageActions")
   expect_named(manage_removals,
                c(c("get_type", "get_label", "get_stages", "get_schedule",
-                   "include_cost", "get_cost_unit", "apply")))
+                   "include_cost", "get_cost_unit", "clear_attributes",
+                   "apply")))
   expect_equal(manage_removals$get_type(), "removal")
   expect_equal(manage_removals$get_label(), "removed")
   expect_equal(manage_removals$get_stages(), 2:3)
@@ -64,8 +65,10 @@ test_that("applies stochastic removals to invasive population", {
   TEST_DIRECTORY <- test_path("test_inputs")
 
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
+  idx <- 5916:5922
   region <- bsspread::Region(template)
-  template[region$get_indices()][5916:5922,] <- c(rep(0.5, 4), 0.5, 0.75, 1)
+  template[region$get_indices()][idx,] <- c(rep(0.5, 4), 0.5, 0.75, 1)
+  idx <- idx[5:7]
   template_vect <- template[region$get_indices()][,1]
   stage_matrix <- matrix(c(0.0, 2.0, 5.0,
                            0.3, 0.0, 0.0,
@@ -73,17 +76,18 @@ test_that("applies stochastic removals to invasive population", {
                          nrow = 3, ncol = 3, byrow = TRUE)
   population_model <- bsspread::StagedPopulation(region, stage_matrix)
   initial_n <- rep(0, region$get_locations())
-  initial_n[5920:5922] <- (10:12)*10
+  initial_n[idx] <- (10:12)*10
   initializer <- bsspread::Initializer(initial_n, region = region,
                                        population_model = population_model)
   # without detected
+  set.seed(1234)
   n <- initializer$initialize()
   set.seed(1234)
   expected_removals1 <- array(c(rep(0, 3),
-                                stats::rbinom(6, size = n[5920:5922,2:3],
+                                stats::rbinom(6, size = n[idx,2:3],
                                               c(0.5, 0.75, 1))), c(3, 3))
   colnames(expected_removals1) <- colnames(n)
-  new_n <- n[5920:5922,] - expected_removals1
+  new_n <- n[idx,] - expected_removals1
   set.seed(1234)
   expected_removals2 <- array(c(rep(0, 3),
                                 stats::rbinom(6, size = new_n[,2:3],
@@ -98,30 +102,43 @@ test_that("applies stochastic removals to invasive population", {
                                                   radius = NULL,
                                                   stages = 2:3,
                                                   schedule = 4:6))
+  expected_removal_cost <- rep(0, region$get_locations())
+  attr(expected_removal_cost, "unit") <- "$"
+  expect_silent(new_n <- manage_removals$apply(n, 2)) # not scheduled
+  expect_equal(attr(new_n, "removed")[idx,], expected_removals1*0)
+  expect_equal(new_n[idx,], n[idx,])
+  expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
   set.seed(1234)
   expect_silent(new_n <- manage_removals$apply(n, 4))
-  expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals1)
-  expect_equal(new_n[5920:5922,], n[5920:5922,] - expected_removals1)
-  expected_removal_cost <- rep(0, region$get_locations())
-  expected_removal_cost[5920:5922] <- 2
-  attr(expected_removal_cost, "unit") <- "$"
+  expect_equal(attr(new_n, "removed")[idx,], expected_removals1)
+  expect_equal(new_n[idx,], n[idx,] - expected_removals1)
+  expected_removal_cost[idx] <- 2
   expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
   expect_equal(attr(attr(new_n, "removal_cost"), "unit"), "$")
   set.seed(1234)
-  expect_silent(new_n <- manage_removals$apply(new_n, 4))
-  expect_equal(attr(new_n, "removed")[5920:5922,],
+  expect_silent(new_n2 <- manage_removals$apply(new_n, 4))
+  expect_equal(attr(new_n2, "removed")[idx,],
                expected_removals1 + expected_removals2)
-  expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
-  expect_silent(new_n <- manage_removals$apply(n, 2))
-  expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals1*0)
-  expect_equal(new_n[5920:5922,], n[5920:5922,])
-  expect_equal(attr(new_n, "removal_cost"), expected_removal_cost*0)
+  expected_removal_cost <-
+    expected_removal_cost + (rowSums(new_n2[,2:3]) > 0)*2
+  expect_equal(attr(new_n2, "removal_cost"), expected_removal_cost)
+  set.seed(1234)
+  expect_silent(new_n <- manage_removals$clear_attributes(new_n))
+  expect_null(attr(new_n, "removed"))
+  expect_null(attr(new_n, "removal_cost"))
+  expect_silent(new_n2 <- manage_removals$apply(new_n, 5))
+  expect_equal(attr(new_n2, "removed")[idx,], expected_removals2)
+  expected_removal_cost <-
+    expected_removal_cost*0 + (rowSums(new_n2[,2:3]) > 0)*2
+  expect_equal(attr(new_n2, "removal_cost"), expected_removal_cost)
   # single value removal_pr
   set.seed(1234)
   expected_removals <- array(c(rep(0, 3),
-                               stats::rbinom(6, size = n[5920:5922,2:3],
+                               stats::rbinom(6, size = n[idx,2:3],
                                              0.65)), c(3, 3))
   colnames(expected_removals) <- colnames(n)
+  expected_removal_cost[] <- 0
+  expected_removal_cost[idx] <- 2
   expect_silent(manage_removals <- ManageRemovals(region, population_model,
                                                   removal_pr = 0.65,
                                                   detected_only = FALSE,
@@ -130,7 +147,7 @@ test_that("applies stochastic removals to invasive population", {
                                                   stages = 2:3, schedule = 4:6))
   set.seed(1234)
   expect_silent(new_n <- manage_removals$apply(n, 4))
-  expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals)
+  expect_equal(attr(new_n, "removed")[idx,], expected_removals)
   expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
   # detection only
   expect_silent(manage_removals <- ManageRemovals(region, population_model,
@@ -141,22 +158,22 @@ test_that("applies stochastic removals to invasive population", {
                                                   stages = 2:3,
                                                   schedule = 4:6))
   expect_silent(new_n <- manage_removals$apply(n, 4))
-  expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals*0)
-  expect_equal(new_n[5920:5922,], n[5920:5922,])
+  expect_equal(attr(new_n, "removed")[idx,], expected_removals*0)
+  expect_equal(new_n[idx,], n[idx,])
   expect_equal(attr(new_n, "removal_cost"), expected_removal_cost*0)
   # with detected
   attr(n, "detected") <- n*0
-  attr(n, "detected")[5920:5922,2:3] <- trunc(n[5920:5922,2:3]*c(0, 0.5, 1))
+  attr(n, "detected")[idx,2:3] <- trunc(n[idx,2:3]*c(0, 0.5, 1))
   set.seed(1234)
   expected_removals <- array(
-    c(rep(0, 3), stats::rbinom(6, size = attr(n, "detected")[5920:5922,2:3],
+    c(rep(0, 3), stats::rbinom(6, size = attr(n, "detected")[idx,2:3],
                                c(0.5, 0.75, 1))), c(3, 3))
   colnames(expected_removals) <- colnames(n)
   attr(n, "attachment") <- "extra"
   set.seed(1234)
   expect_silent(new_n <- manage_removals$apply(n, 4))
-  expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals)
-  expect_equal(new_n[5920:5922,], n[5920:5922,] - expected_removals)
+  expect_equal(attr(new_n, "removed")[idx,], expected_removals)
+  expect_equal(new_n[idx,], n[idx,] - expected_removals)
   expect_equal(attr(new_n, "attachment"), "extra")
   expect_equal(attr(new_n, "detected"), attr(n, "detected"))
   expect_equal(attr(new_n, "removal_cost"),
@@ -171,13 +188,13 @@ test_that("applies stochastic removals to invasive population", {
   n_detected <- n*(attr(n, "detected") > 0)
   set.seed(1234)
   expected_removals <- array(
-    c(rep(0, 3), stats::rbinom(6, size = n_detected[5920:5922,2:3],
+    c(rep(0, 3), stats::rbinom(6, size = n_detected[idx,2:3],
                                c(0.5, 0.75, 1))), c(3, 3))
   colnames(expected_removals) <- colnames(n)
   set.seed(1234)
   expect_silent(new_n <- manage_removals$apply(n, 4))
-  expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals)
-  expect_equal(new_n[5920:5922,], n[5920:5922,] - expected_removals)
+  expect_equal(attr(new_n, "removed")[idx,], expected_removals)
+  expect_equal(new_n[idx,], n[idx,] - expected_removals)
   expect_equal(attr(new_n, "removal_cost"),
                expected_removal_cost*(rowSums(attr(n, "detected")) > 0))
   # remove always (as per without detected)
@@ -190,8 +207,8 @@ test_that("applies stochastic removals to invasive population", {
                                  stages = 2:3, schedule = 4:6))
   set.seed(1234)
   expect_silent(new_n <- manage_removals$apply(n, 4))
-  expect_equal(attr(new_n, "removed")[5920:5922,], expected_removals1)
-  expect_equal(new_n[5920:5922,], n[5920:5922,] - expected_removals1)
+  expect_equal(attr(new_n, "removed")[idx,], expected_removals1)
+  expect_equal(new_n[idx,], n[idx,] - expected_removals1)
   expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
   # with radius
   expect_silent(manage_removals <- ManageRemovals(region, population_model,

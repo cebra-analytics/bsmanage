@@ -45,6 +45,9 @@
 #'     \item{\code{include_cost()}}{Logical indication of a cost parameter
 #'       having a value (named as per population attachment).}
 #'     \item{\code{get_cost_unit()}}{Get the unit of surveillance cost.}
+#'     \item{\code{clear_attributes(n)}}{Clear attached attributes associated
+#'       with this action from a simulated population vector or matrix
+#'       \code{n}, and return \code{n} without the attached attributes.}
 #'     \item{\code{apply(n, tm)}}{Apply management detection to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, providing the time
@@ -129,6 +132,14 @@ ManageDetection.Region <- function(region,
     return(attr(surv_cost, "unit"))
   }
 
+  # Clear attached attributes
+  self$clear_attributes <- function(n) {
+    attr(n, "detected") <- NULL
+    attr(n, "undetected") <- NULL
+    attr(n, "surv_cost") <- NULL
+    return(n)
+  }
+
   # Detection/surveillance apply method
   self$apply <- function(n, tm) {
 
@@ -139,11 +150,19 @@ ManageDetection.Region <- function(region,
       colnames(detected) <- attr(population_model$get_growth(), "labels")
     }
 
+    # Only survey undetected population
+    if (!is.null(attr(n, "undetected"))) {
+      undetected <- attr(n, "undetected")
+    } else {
+      undetected <- detected
+      undetected[] <- n[]
+    }
+
     # Scheduled time step?
     if (is.null(schedule) || tm %in% schedule) {
 
       # Occupied locations
-      idx <- which(rowSums(as.matrix(n)) > 0)
+      idx <- which(rowSums(as.matrix(undetected)) > 0)
       if (length(idx) > 0) {
 
         # Get detection sensitivity (probability)
@@ -152,30 +171,51 @@ ManageDetection.Region <- function(region,
         # Sample detections
         if (population_model$get_type() == "stage_structured") {
           for (i in self$get_stages()) {
-            detected[idx,i] <- stats::rbinom(length(idx), size = n[idx,i],
+            detected[idx,i] <- stats::rbinom(length(idx),
+                                             size = undetected[idx,i],
                                              prob = detect_pr)
           }
+          undetected[idx,] <- undetected[idx,] - detected[idx,]
         } else {
-          detected[idx] <- stats::rbinom(length(idx), size = n[idx],
+          detected[idx] <- stats::rbinom(length(idx),
+                                         size = undetected[idx],
                                          prob = detect_pr)
+          undetected[idx] <- undetected[idx] - detected[idx]
         }
       }
-    }
 
-    # Attach detected as an attribute
-    if (population_model$get_type() == "presence_only") {
-      attr(n, "detected") <- as.logical(detected)
+      # Attach/update surveillance costs as an attribute
+      if (!is.null(surv_cost)) {
+        if (!is.null(attr(n, "surv_cost"))) {
+            attr(n, "surv_cost") <- attr(n, "surv_cost") + surv_cost
+        } else {
+            attr(n, "surv_cost") <- surv_cost
+        }
+      }
+
     } else {
-      attr(n, "detected") <- detected
-    }
 
-    # Attach surveillance costs as an attribute
-    if (!is.null(surv_cost)) {
-      if (is.null(schedule) || tm %in% schedule) {
-        attr(n, "surv_cost") <- surv_cost
-      } else {
+      # Attach/update surveillance costs as an attribute
+      if (is.null(surv_cost)) {
         attr(n, "surv_cost") <- surv_cost*0
       }
+    }
+
+    # Attach/update detected and undetected as attributes
+    if (population_model$get_type() == "presence_only") {
+      if (!is.null(attr(n, "detected"))) {
+        attr(n, "detected") <- attr(n, "detected") | as.logical(detected)
+      } else {
+        attr(n, "detected") <- as.logical(detected)
+      }
+      attr(n, "undetected") <- as.logical(undetected)
+    } else {
+      if (!is.null(attr(n, "detected"))) {
+        attr(n, "detected") <- attr(n, "detected") + detected
+      } else {
+        attr(n, "detected") <- detected
+      }
+      attr(n, "undetected") <- undetected
     }
 
     return(n)

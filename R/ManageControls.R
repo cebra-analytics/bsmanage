@@ -71,6 +71,9 @@
 #'     \item{\code{include_cost()}}{Logical indication of a cost parameter
 #'       having a value (named as per population attachment).}
 #'     \item{\code{get_cost_unit()}}{Get the unit of control cost.}
+#'     \item{\code{clear_attributes(n)}}{Clear attached attributes associated
+#'       with this action from a simulated population vector or matrix
+#'       \code{n}, and return \code{n} without the attached attributes.}
 #'     \item{\code{apply(n, tm)}}{Apply management controls to a simulated
 #'       population vector or matrix \code{n}, potentially with attached
 #'       attributes relating to previously applied actions, providing the time
@@ -195,6 +198,11 @@ ManageControls.Region <- function(region, population_model,
   # Get the unit of control cost
   self$get_cost_unit <- function() {
     return(attr(control_cost, "unit"))
+  }
+
+  # Clear attached attributes
+  self$clear_attributes <- function(n) { # overridden in inherited classes
+    return(n)
   }
 
   # Control apply method
