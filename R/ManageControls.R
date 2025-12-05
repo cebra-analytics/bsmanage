@@ -201,7 +201,9 @@ ManageControls.Region <- function(region, population_model,
   }
 
   # Clear attached attributes
-  self$clear_attributes <- function(n) { # overridden in inherited classes
+  self$clear_attributes <- function(n) {
+    attr(n, self$get_label()) <- NULL
+    attr(n, paste0(self$get_label(), "_cost")) <- NULL
     return(n)
   }
 
@@ -211,15 +213,28 @@ ManageControls.Region <- function(region, population_model,
     # Search and destroy (combined detect and remove)
     if (control_type == "search_destroy") {
 
-      # Initial zero controls
-      controlled <- as.numeric(n)*0
+      # Initial zero removals
+      controlled <- list(detected = as.numeric(n*0),
+                         undetected = as.numeric(n*0))
       if (population_model$get_type() == "stage_structured") {
-        controlled <- array(controlled, dim(n))
-        colnames(controlled) <- attr(population_model$get_growth(), "labels")
+        controlled <- lapply(controlled, function(controlled_i) {
+          controlled_i <- array(controlled_i, dim(n))
+          colnames(controlled_i) <- attr(population_model$get_growth(), "labels")
+          return(controlled_i)
+        })
       }
 
       # Scheduled time step?
       if (is.null(schedule) || tm %in% schedule) {
+
+        # Partition n into detected and undetected
+        if (all(c("detected", "undetected") %in% names(attributes(n)))) {
+          n_apply <- list(detected = as.numeric(n - attr(n, "undetected")),
+                          undetected = as.numeric(attr(n, "undetected")))
+        } else {
+          n_apply <- list(detected = as.numeric(n*0),
+                          undetected = as.numeric(n))
+        }
 
         # Occupied locations
         idx <- which(rowSums(
@@ -231,36 +246,119 @@ ManageControls.Region <- function(region, population_model,
 
           # Sample number controlled and remove when search & destroy
           if (population_model$get_type() == "stage_structured") {
-            for (i in self$get_stages()) {
-              controlled[idx,i] <- stats::rbinom(length(idx), size = n[idx,i],
-                                                 prob = control_pr)
-              n[idx,i] <- n[idx,i] - controlled[idx,i]
+            n_apply <- lapply(n_apply, function(a) array(a, dim(n)))
+            for (i in c("detected", "undetected")) {
+              for (j in self$get_stages()) {
+                controlled[[i]][idx, j] <-
+                  stats::rbinom(length(idx), size = n_apply[[i]][idx, j],
+                                prob = control_pr)
+              }
             }
+            if (all(c("detected", "undetected") %in% names(attributes(n)))) {
+              attr(n, "detected")[idx,] <-
+                attr(n, "detected")[idx,] + controlled$undetected[idx,]
+              attr(n, "undetected")[idx,] <-
+                attr(n, "undetected")[idx,] - controlled$undetected[idx,]
+            } else {
+              attr(n, "detected") <- controlled$undetected
+              attr(n, "undetected") <- n[,] - controlled$undetected
+            }
+            controlled <- controlled$detected + controlled$undetected
+            n[idx,] <- n[idx,] - controlled[idx,]
           } else {
-            controlled[idx] <- stats::rbinom(length(idx), size = n[idx],
-                                             prob = control_pr)
+            for (i in c("detected", "undetected")) {
+              controlled[[i]][idx] <-
+                stats::rbinom(length(idx), size = n_apply[[i]][idx],
+                              prob = control_pr)
+            }
             if (population_model$get_type() == "presence_only") {
+              controlled <- lapply(controlled, as.logical)
+              if (all(c("detected", "undetected") %in% names(attributes(n)))) {
+                attr(n, "detected")[idx] <-
+                  attr(n, "detected")[idx] | controlled$undetected[idx]
+                attr(n, "undetected")[idx] <-
+                  attr(n, "undetected")[idx] & !controlled$undetected[idx]
+              } else {
+                attr(n, "detected") <- controlled$undetected
+                attr(n, "undetected") <- n[] & !controlled$undetected
+              }
+              controlled <- controlled$detected | controlled$undetected
               n[idx] <- n[idx] & !controlled[idx]
             } else {
+              if (all(c("detected", "undetected") %in% names(attributes(n)))) {
+                attr(n, "detected")[idx] <-
+                  attr(n, "detected")[idx] + controlled$undetected[idx]
+                attr(n, "undetected")[idx] <-
+                  attr(n, "undetected")[idx] - controlled$undetected[idx]
+              } else {
+                attr(n, "detected") <- controlled$undetected
+                attr(n, "undetected") <- n[] - controlled$undetected
+              }
+              controlled <- controlled$detected + controlled$undetected
               n[idx] <- n[idx] - controlled[idx]
             }
+          }
+        } else {
+          controlled <- controlled[[1]] # zeros
+        }
+      } else {
+        controlled <- controlled[[1]] # zeros
+      }
+
+      # Attach detected/undetected when zero controlled
+      if (!all(c("detected", "undetected") %in% names(attributes(n)))) {
+        if (population_model$get_type() == "presence_only") {
+          attr(n, "detected") <- as.logical(controlled*0)
+          attr(n, "undetected") <- n[]
+        } else {
+          attr(n, "detected") <- controlled*0
+          if (population_model$get_type() == "stage_structured") {
+            attr(n, "undetected") <- n[,]
+          } else {
+            attr(n, "undetected") <- n[]
           }
         }
       }
 
-      # Attach controlled as an attribute via label
+      # Attach or update both removed and controlled (via attribute label)
       if (population_model$get_type() == "presence_only") {
-        attr(n, self$get_label()) <- as.logical(controlled)
+        if (is.null(attr(n, "removed"))) {
+          attr(n, "removed") <- as.logical(controlled)
+        } else {
+          attr(n, "removed") <- attr(n, "removed") | as.logical(controlled)
+        }
+        if (is.null(attr(n, self$get_label()))) {
+          attr(n, self$get_label()) <- as.logical(controlled)
+        } else {
+          attr(n, self$get_label()) <-
+            attr(n, self$get_label()) | as.logical(controlled)
+        }
       } else {
-        attr(n, self$get_label()) <- controlled
+        if (is.null(attr(n, "removed"))) {
+          attr(n, "removed") <- controlled
+        } else {
+          attr(n, "removed") <- attr(n, "removed") + controlled
+        }
+        if (is.null(attr(n, self$get_label()))) {
+          attr(n, self$get_label()) <- controlled
+        } else {
+          attr(n, self$get_label()) <- attr(n, self$get_label()) + controlled
+        }
       }
 
-      # Attach control costs as an attribute via label
+      # Attach (additional) control costs as an attribute via label
       if (!is.null(control_cost)) {
         if (is.null(schedule) || tm %in% schedule) {
-          attr(n, paste0(self$get_label(), "_cost")) <- control_cost
+          if (is.null(attr(n, paste0(self$get_label(), "_cost")))) {
+            attr(n, paste0(self$get_label(), "_cost")) <- control_cost
+          } else {
+            attr(n, paste0(self$get_label(), "_cost")) <-
+              attr(n, paste0(self$get_label(), "_cost")) + control_cost
+          }
         } else {
-          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
+          if (is.null(attr(n, paste0(self$get_label(), "_cost")))) {
+            attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
+          }
         }
       }
     }
