@@ -280,7 +280,7 @@ ManageControls.Region <- function(region, population_model,
                   attr(n, "undetected")[idx] & !controlled$undetected[idx]
               } else {
                 attr(n, "detected") <- controlled$undetected
-                attr(n, "undetected") <- n[] & !controlled$undetected
+                attr(n, "undetected") <- as.logical(n) & !controlled$undetected
               }
               controlled <- controlled$detected | controlled$undetected
               n[idx] <- n[idx] & !controlled[idx]
@@ -292,7 +292,7 @@ ManageControls.Region <- function(region, population_model,
                   attr(n, "undetected")[idx] - controlled$undetected[idx]
               } else {
                 attr(n, "detected") <- controlled$undetected
-                attr(n, "undetected") <- n[] - controlled$undetected
+                attr(n, "undetected") <- as.numeric(n) - controlled$undetected
               }
               controlled <- controlled$detected + controlled$undetected
               n[idx] <- n[idx] - controlled[idx]
@@ -309,29 +309,23 @@ ManageControls.Region <- function(region, population_model,
       if (!all(c("detected", "undetected") %in% names(attributes(n)))) {
         if (population_model$get_type() == "presence_only") {
           attr(n, "detected") <- as.logical(controlled*0)
-          attr(n, "undetected") <- n[]
+          attr(n, "undetected") <- as.logical(n)
         } else {
           attr(n, "detected") <- controlled*0
           if (population_model$get_type() == "stage_structured") {
             attr(n, "undetected") <- n[,]
           } else {
-            attr(n, "undetected") <- n[]
+            attr(n, "undetected") <- as.numeric(n)
           }
         }
       }
 
-      # Attach or update both removed and controlled (via attribute label)
+      # Attach or update removed
       if (population_model$get_type() == "presence_only") {
         if (is.null(attr(n, "removed"))) {
           attr(n, "removed") <- as.logical(controlled)
         } else {
           attr(n, "removed") <- attr(n, "removed") | as.logical(controlled)
-        }
-        if (is.null(attr(n, self$get_label()))) {
-          attr(n, self$get_label()) <- as.logical(controlled)
-        } else {
-          attr(n, self$get_label()) <-
-            attr(n, self$get_label()) | as.logical(controlled)
         }
       } else {
         if (is.null(attr(n, "removed"))) {
@@ -339,11 +333,14 @@ ManageControls.Region <- function(region, population_model,
         } else {
           attr(n, "removed") <- attr(n, "removed") + controlled
         }
-        if (is.null(attr(n, self$get_label()))) {
-          attr(n, self$get_label()) <- controlled
-        } else {
-          attr(n, self$get_label()) <- attr(n, self$get_label()) + controlled
-        }
+      }
+
+      # Attach or update control application indicator (via attribute label)
+      if (is.null(attr(n, self$get_label()))) {
+        attr(n, self$get_label()) <- (rowSums(as.matrix(controlled)) > 0)
+      } else {
+        attr(n, self$get_label()) <-
+          attr(n, self$get_label()) | (rowSums(as.matrix(controlled)) > 0)
       }
 
       # Attach (additional) control costs as an attribute via label

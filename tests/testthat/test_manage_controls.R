@@ -112,7 +112,7 @@ test_that("applies stochastic controls to invasive population", {
                          nrow = 3, ncol = 3, byrow = TRUE)
   population_model <- bsspread::StagedPopulation(region, stage_matrix)
   initial_n <- rep(0, region$get_locations())
-  initial_n[101:150] <- (11:60)*10
+  initial_n[101:150] <- 11:60
   initializer <- bsspread::Initializer(initial_n, region = region,
                                        population_model = population_model)
   set.seed(1234)
@@ -127,6 +127,7 @@ test_that("applies stochastic controls to invasive population", {
     optimal = "none",
     exist_manage_pr = exist_manage_pr)
   # search and destroy
+  idx <- 1:region$get_locations()
   set.seed(1234)
   expected_controls <- array(0, dim(n))
   colnames(expected_controls) <- colnames(n)
@@ -147,12 +148,177 @@ test_that("applies stochastic controls to invasive population", {
                                       schedule = 4:6))
   set.seed(1234)
   expect_silent(new_n <- manage_controls$apply(n, 4))
-  expect_equal(new_n, expected_n)
-  expect_equal(attr(new_n, "control_search_destroy"), expected_controls)
-  expect_equal(attr(new_n, "control_search_destroy_cost"), expected_costs)
+  expect_equal(new_n[idx,], expected_n[idx,])
+  expect_equal(attr(new_n, "detected")[idx,], expected_controls[idx,])
+  expect_equal(attr(new_n, "undetected")[idx,],
+               n[idx,] - expected_controls[idx,])
+  expect_equal(attr(new_n, "removed")[idx,], expected_controls[idx,])
+  expect_equal(attr(new_n, "control_search_destroy"),
+               rowSums(expected_controls) > 0)
+  expect_equal(attr(new_n, "control_search_destroy_cost")[idx],
+               expected_costs[idx])
   expect_equal(attr(new_n, "attachment"), "extra")
   attr(n, "attachment") <- NULL
+  # duplicate with extra detections and removals
+  attr(new_n, "detected")[101:110, 2:3] <-
+    attr(new_n, "detected")[101:110, 2:3] + new_n[101:110, 2:3]
+  attr(new_n, "undetected")[101:110, 2:3] <- 0
+  rm_idx <- which(new_n[101:110,] > 1)
+  new_n[101:110,][rm_idx] <- new_n[101:110,][rm_idx] - 1
+  attr(new_n, "undetected")[101:110, 1] <- new_n[101:110, 1]
+  attr(new_n, "removed")[101:110,][rm_idx] <-
+    attr(new_n, "removed")[101:110,][rm_idx] + 1
+  n_undetected <- attr(new_n, "undetected")[,]
+  n_apply <- list(detected = new_n[,] - n_undetected,
+                  undetected = n_undetected)
+  idx1 <- which(rowSums(new_n[,2:3]) > 0)
+  set.seed(1234)
+  expected_controls2 <- lapply(n_apply, function(a) {
+    controlled <- expected_controls*0
+    controlled[idx1, 2:3] <- stats::rbinom(length(idx1)*2, size = a[idx1, 2:3],
+                                           exist_manage_pr[idx1])
+    return(controlled)
+  })
+  expected_controls_plus <-
+    expected_controls2$detected + expected_controls2$undetected
+  set.seed(1234)
+  expect_silent(new_n2 <- manage_controls$apply(new_n, 4))
+  expect_equal(new_n2[idx,], new_n[idx,] - expected_controls_plus[idx,])
+  expect_equal(attr(new_n2, "detected")[idx,],
+               (attr(new_n, "detected")[idx,] +
+                  expected_controls2$undetected[idx,]))
+  expect_equal(attr(new_n2, "undetected")[idx,],
+               (attr(new_n, "undetected")[idx,] -
+                  expected_controls2$undetected[idx,]))
+  expect_equal(attr(new_n2, "removed")[idx,],
+               attr(new_n, "removed")[idx,] + expected_controls_plus[idx,])
+  expect_equal(attr(new_n2, "control_search_destroy"),
+               (attr(new_n, "control_search_destroy") |
+                  rowSums(expected_controls_plus) > 0))
+  expect_equal(attr(new_n2, "control_search_destroy_cost")[idx],
+               expected_costs[idx]*2)
+  # unstructured
+  population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
+  n <- rowSums(n)
+  set.seed(1234)
+  expected_controls <- n*0
+  expected_controls[101:150] <- stats::rbinom(50, size = n[101:150],
+                                              exist_manage_pr[101:150])
+  expected_n <- n - expected_controls
+  expected_costs <- 2*(exist_manage_pr > 0)
+  attr(expected_costs, "unit") <- "$"
+  expect_silent(
+    manage_controls <- ManageControls(region, population_model,
+                                      control_type = "search_destroy",
+                                      control_design = control_design,
+                                      control_cost = 2,
+                                      schedule = 4:6))
+  set.seed(1234)
+  expect_silent(new_n <- manage_controls$apply(n, 4))
+  expect_equal(as.numeric(new_n), expected_n)
+  expect_equal(attr(new_n, "detected"), expected_controls)
+  expect_equal(attr(new_n, "undetected"), n - expected_controls)
+  expect_equal(attr(new_n, "removed"), expected_controls)
+  expect_equal(attr(new_n, "control_search_destroy"), expected_controls > 0)
+  expect_equal(attr(new_n, "control_search_destroy_cost"), expected_costs)
+  # duplicate with extra detections and removals
+  attr(new_n, "detected")[101:110] <-
+    attr(new_n, "detected")[101:110] + new_n[101:110]
+  attr(new_n, "undetected")[101:110] <- 0
+  rm_idx <- which(new_n[101:110] > 1)
+  new_n[101:110][rm_idx] <- new_n[101:110][rm_idx] - 1
+  attr(new_n, "removed")[101:110][rm_idx] <-
+    attr(new_n, "removed")[101:110][rm_idx] + 1
+  n_undetected <- as.numeric(attr(new_n, "undetected"))
+  n_apply <- list(detected = as.numeric(new_n) - n_undetected,
+                  undetected = n_undetected)
+  set.seed(1234)
+  idx1 <- which(new_n > 0)
+  expected_controls2 <- lapply(n_apply, function(a) {
+    controlled <- expected_controls*0
+    controlled[idx1] <- stats::rbinom(length(idx1), size = a[idx1],
+                                      exist_manage_pr[idx1])
+    return(controlled)
+  })
+  expected_controls_plus <-
+    expected_controls2$detected + expected_controls2$undetected
+  set.seed(1234)
+  expect_silent(new_n2 <- manage_controls$apply(new_n, 4))
+  expect_equal(as.numeric(new_n2), as.numeric(new_n) - expected_controls_plus)
+  expect_equal(attr(new_n2, "detected"),
+               attr(new_n, "detected") + expected_controls2$undetected)
+  expect_equal(attr(new_n2, "undetected"),
+               attr(new_n, "undetected") - expected_controls2$undetected)
+  expect_equal(attr(new_n2, "removed"),
+               attr(new_n, "removed") + expected_controls_plus)
+  expect_equal(attr(new_n2, "control_search_destroy"),
+               (attr(new_n, "control_search_destroy") |
+                  expected_controls_plus > 0))
+  expect_equal(attr(new_n2, "control_search_destroy_cost")[idx],
+               expected_costs[idx]*2)
+  # presence-only
+  population_model <- bsspread::PresencePopulation(region)
+  n <- n > 0
+  set.seed(1234)
+  expected_controls <- n*0
+  expected_controls[101:150] <- stats::rbinom(50, size = n[101:150],
+                                              exist_manage_pr[101:150])
+  expected_n <- n - expected_controls
+  expected_costs <- 2*(exist_manage_pr > 0)
+  attr(expected_costs, "unit") <- "$"
+  expect_silent(
+    manage_controls <- ManageControls(region, population_model,
+                                      control_type = "search_destroy",
+                                      control_design = control_design,
+                                      control_cost = 2,
+                                      schedule = 4:6))
+  set.seed(1234)
+  expect_silent(new_n <- manage_controls$apply(n, 4))
+  expect_equal(as.numeric(new_n), expected_n)
+  expect_equal(attr(new_n, "detected"), as.logical(expected_controls))
+  expect_equal(attr(new_n, "undetected"), as.logical(n - expected_controls))
+  expect_equal(attr(new_n, "removed"), as.logical(expected_controls))
+  expect_equal(attr(new_n, "control_search_destroy"),
+               as.logical(expected_controls))
+  expect_equal(attr(new_n, "control_search_destroy_cost"), expected_costs)
+  # duplicate with extra detections and removals
+  attr(new_n, "detected")[101:110] <-
+    attr(new_n, "detected")[101:110] | new_n[101:110]
+  attr(new_n, "undetected")[101:110] <- FALSE
+  new_n[101] <- FALSE
+  attr(new_n, "removed")[101] <- TRUE
+  n_undetected <- as.numeric(attr(new_n, "undetected"))
+  n_apply <- list(detected = as.numeric(new_n) - n_undetected,
+                  undetected = n_undetected)
+  set.seed(1234)
+  idx1 <- which(new_n > 0)
+  expected_controls2 <- lapply(n_apply, function(a) {
+    controlled <- expected_controls*0
+    controlled[idx1] <- stats::rbinom(length(idx1), size = a[idx1],
+                                      exist_manage_pr[idx1])
+    return(controlled)
+  })
+  expected_controls_plus <-
+    expected_controls2$detected + expected_controls2$undetected
+  set.seed(1234)
+  expect_silent(new_n2 <- manage_controls$apply(new_n, 4))
+  expect_equal(as.numeric(new_n2), as.numeric(new_n) - expected_controls_plus)
+  expect_equal(attr(new_n2, "detected"),
+               attr(new_n, "detected") | expected_controls2$undetected)
+  expect_equal(attr(new_n2, "undetected"),
+               attr(new_n, "undetected") & !expected_controls2$undetected)
+  expect_equal(attr(new_n2, "removed"),
+               attr(new_n, "removed") | expected_controls_plus)
+  expect_equal(attr(new_n2, "control_search_destroy"),
+               (attr(new_n, "control_search_destroy") |
+                  expected_controls_plus > 0))
+  expect_equal(attr(new_n2, "control_search_destroy_cost")[idx],
+               expected_costs[idx]*2)
+
   # growth, spread, or establishment
+  population_model <- bsspread::StagedPopulation(region, stage_matrix)
+  set.seed(1234)
+  n <- initializer$initialize()
   control_design <- ManageDesign(
     context = ManageContext("test"),
     divisions = divisions,
