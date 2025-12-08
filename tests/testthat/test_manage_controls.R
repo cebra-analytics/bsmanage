@@ -326,7 +326,7 @@ test_that("applies stochastic controls to invasive population", {
     exist_alloc = +(exist_manage_pr > 0.95))
   exist_mask <- rowSums(n[,2:3])*control_design$get_allocation() > 0
   detected <- n*0
-  detected[,2:3] <- round((n[,2:3] > 80)*n[,2:3]*0.7)
+  detected[,2:3] <- round((n[,2:3] > 8)*n[,2:3]*0.7)
   attr(n, "detected") <- detected
   detected_mask <- +(rowSums(detected) > 0 | NA)
   detected_mask <- rowSums(n[,2:3])*terra::buffer(
@@ -342,8 +342,7 @@ test_that("applies stochastic controls to invasive population", {
                                       apply_to = "survival",
                                       schedule = 4:6))
   expect_silent(new_n <- manage_controls$apply(n, 4))
-  expect_equal(as.numeric(new_n), as.numeric(n))
-  expect_equal(dim(new_n), dim(n))
+  expect_equal(new_n[idx,], n[idx,])
   expect_equal(attr(new_n, "detected"), detected)
   expect_equal(as.numeric(attr(new_n, "control_growth")),
                ((exist_mask | detected_mask)*0.7 +
@@ -373,4 +372,23 @@ test_that("applies stochastic controls to invasive population", {
   expect_equal(attr(new_n, "control_establishment_cost"),
                (expected_costs*(control_design$get_allocation() > 0 |
                                   establish_mask)))
+  # additional detection and removals
+  detected[,2:3] <- round((n[,2:3] > 6)*n[,2:3]*0.7)
+  new_n[which(rowSums(detected) >= 8),] <- 0
+  attr(new_n, "detected") <- detected
+  exist_mask <- rowSums(new_n[,2:3])*control_design$get_allocation() > 0
+  detected_mask <- +(rowSums(detected) > 0 | NA)
+  detected_mask <- terra::buffer(region$get_rast(detected_mask),
+                                 width = 3000)[region$get_indices()][,1] > 0
+  expect_silent(new_n2 <- manage_controls$apply(new_n, 4))
+  expected_mult <- rep(1, region$get_locations())
+  expected_mult[which(exist_mask | establish_mask)] <-
+    expected_mult[which(exist_mask | establish_mask)]*0.7
+  expected_mult[which(exist_mask | detected_mask)] <-
+    expected_mult[which(exist_mask | detected_mask)]*0.7
+  expect_equal(attr(new_n2, "control_establishment"), expected_mult)
+  expect_equal(
+    attr(new_n2, "control_establishment_cost"),
+    expected_costs*((control_design$get_allocation() > 0 | establish_mask) +
+                      (control_design$get_allocation() > 0 | detected_mask)))
 })

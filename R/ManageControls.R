@@ -421,21 +421,35 @@ ManageControls.Region <- function(region, population_model,
         }
       }
 
-      # Add control as attributes to process in growth or spread models
-      attr(n, self$get_label()) <- n_apply*control_mult + !n_apply
-      if (population_model$get_type() == "stage_structured") {
-        if (control_type == "growth") {
-          attr(attr(n, self$get_label()), "stages") <- self$get_stages()
-          attr(attr(n, self$get_label()), "apply_to") <- apply_to
+      # Attach/update control as attributes to process in growth or spread models
+      if (!is.null(attr(n, self$get_label()))) { # update via product
+        attr(n, self$get_label()) <-
+          attr(n, self$get_label())*(n_apply*control_mult + !n_apply)
+      } else { # attach
+        attr(n, self$get_label()) <- n_apply*control_mult + !n_apply
+        if (population_model$get_type() == "stage_structured") {
+          if (control_type == "growth") {
+            attr(attr(n, self$get_label()), "stages") <- self$get_stages()
+            attr(attr(n, self$get_label()), "apply_to") <- apply_to
+          }
         }
       }
 
-      # Attach control costs as an attribute via label
+      # Attach/update control costs as an attribute via label
       if (!is.null(control_cost)) {
-        if (is.null(schedule) || tm %in% schedule) {
-          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*cost_apply
-        } else {
-          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
+        if (!is.null(attr(n, paste0(self$get_label(), "_cost")))) { # update
+          if (is.null(schedule) || tm %in% schedule) {
+            attr(n, paste0(self$get_label(), "_cost")) <-
+              (attr(n, paste0(self$get_label(), "_cost")) +
+                 control_cost*cost_apply)
+          }
+        } else { # attach
+          if (is.null(schedule) || tm %in% schedule) {
+            attr(n, paste0(self$get_label(), "_cost")) <-
+              control_cost*cost_apply
+          } else {
+            attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
+          }
         }
       }
     }
