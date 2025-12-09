@@ -120,7 +120,7 @@ test_that("applies stochastic removals to invasive population", {
   expect_equal(attr(new_n2, "removed")[idx,],
                expected_removals1 + expected_removals2)
   expected_removal_cost <-
-    expected_removal_cost + (rowSums(new_n2[,2:3]) > 0)*2
+    expected_removal_cost + (rowSums(new_n[,2:3]) > 0)*2
   expect_equal(attr(new_n2, "removal_cost"), expected_removal_cost)
   set.seed(1234)
   expect_silent(new_n <- manage_removals$clear_attributes(new_n))
@@ -129,7 +129,7 @@ test_that("applies stochastic removals to invasive population", {
   expect_silent(new_n2 <- manage_removals$apply(new_n, 5))
   expect_equal(attr(new_n2, "removed")[idx,], expected_removals2)
   expected_removal_cost <-
-    expected_removal_cost*0 + (rowSums(new_n2[,2:3]) > 0)*2
+    expected_removal_cost*0 + (rowSums(new_n[,2:3]) > 0)*2
   expect_equal(attr(new_n2, "removal_cost"), expected_removal_cost)
   # single value removal_pr
   set.seed(1234)
@@ -276,4 +276,67 @@ test_that("applies stochastic removals to invasive population", {
   expected_removal_cost[] <- 0
   expected_removal_cost[rowSums(attr(new_n, "removed")) > 0] <- 2
   expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
+  # unstructured population
+  population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
+  set.seed(1234)
+  n <- rowSums(initializer$initialize())
+  set.seed(1234)
+  expected_removals1 <- stats::rbinom(3, size = n[idx], c(0.5, 0.75, 1))
+  new_n <- n[idx] - expected_removals1
+  set.seed(1234)
+  expected_removals2 <- stats::rbinom(3, size = new_n, c(0.5, 0.75, 1))
+  removal_cost <- 2
+  attr(removal_cost, "unit") <- "$"
+  expect_silent(
+    manage_removals <- ManageRemovals(region, population_model,
+                                      removal_pr = template_vect,
+                                      detected_only = FALSE,
+                                      removal_cost = removal_cost,
+                                      radius = NULL,
+                                      schedule = 4:6))
+  expected_removal_cost <- rep(0, region$get_locations())
+  attr(expected_removal_cost, "unit") <- "$"
+  set.seed(1234)
+  expect_silent(new_n <- manage_removals$apply(n, 4))
+  expect_equal(attr(new_n, "removed")[idx], expected_removals1)
+  expect_equal(new_n[idx], n[idx] - expected_removals1)
+  expected_removal_cost[idx] <- 2
+  expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
+  set.seed(1234)
+  expect_silent(new_n2 <- manage_removals$apply(new_n, 4))
+  expect_equal(attr(new_n2, "removed")[idx],
+               expected_removals1 + expected_removals2)
+  expected_removal_cost <- expected_removal_cost + (new_n > 0)*2
+  expect_equal(attr(new_n2, "removal_cost"), expected_removal_cost)
+  # presence-only population
+  population_model <- bsspread::PresencePopulation(region)
+  n <- n > 0
+  set.seed(121)
+  expected_removals1 <- stats::rbinom(3, size = n[idx], c(0.5, 0.75, 1))
+  new_n <- n[idx] & !expected_removals1
+  set.seed(1234)
+  expected_removals2 <- stats::rbinom(3, size = new_n, c(0.5, 0.75, 1))
+  removal_cost <- 2
+  attr(removal_cost, "unit") <- "$"
+  expect_silent(
+    manage_removals <- ManageRemovals(region, population_model,
+                                      removal_pr = template_vect,
+                                      detected_only = FALSE,
+                                      removal_cost = removal_cost,
+                                      radius = NULL,
+                                      schedule = 4:6))
+  expected_removal_cost <- rep(0, region$get_locations())
+  attr(expected_removal_cost, "unit") <- "$"
+  set.seed(121)
+  expect_silent(new_n <- manage_removals$apply(n, 4))
+  expect_equal(attr(new_n, "removed")[idx], as.logical(expected_removals1))
+  expect_equal(new_n[idx], n[idx] & !expected_removals1)
+  expected_removal_cost[idx] <- 2
+  expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
+  set.seed(1234)
+  expect_silent(new_n2 <- manage_removals$apply(new_n, 4))
+  expect_equal(attr(new_n2, "removed")[idx],
+               expected_removals1 | expected_removals2)
+  expected_removal_cost <- expected_removal_cost + (new_n > 0)*2
+  expect_equal(attr(new_n2, "removal_cost"), expected_removal_cost)
 })
