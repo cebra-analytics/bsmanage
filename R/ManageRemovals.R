@@ -179,15 +179,7 @@ ManageRemovals.Region <- function(region, population_model,
     if (is.null(schedule) || tm %in% schedule) {
 
       # Detection-based removal
-      if (!remove_always &&
-          all(c("detected", "undetected") %in% names(attributes(n)))) {
-
-        # Removal locations
-        if (population_model$get_type() == "stage_structured") {
-          idx <- which(rowSums(attr(n, "detected")[,self$get_stages()]) > 0)
-        } else {
-          idx <- which(attr(n, "detected") > 0)
-        }
+      if (!remove_always && "undetected" %in% names(attributes(n))) {
 
         # Individuals to which to apply removal
         if (detected_only) {
@@ -198,7 +190,24 @@ ManageRemovals.Region <- function(region, population_model,
                           undetected = as.numeric(attr(n, "undetected")))
         }
 
+        # Removal locations
+        if (population_model$get_type() == "stage_structured") {
+          idx <-
+            which(rowSums((n - attr(n, "undetected"))[,self$get_stages()]) > 0)
+        } else {
+          idx <- which(n_apply$detected > 0)
+        }
+
       } else {
+
+        # Apply to all individuals
+        if ("undetected" %in% names(attributes(n))) {
+          n_apply <- list(detected = as.numeric(n - attr(n, "undetected")),
+                          undetected = as.numeric(attr(n, "undetected")))
+        } else {
+          n_apply <- list(detected = as.numeric(n*0),
+                          undetected = as.numeric(n))
+        }
 
         # Removal locations
         if (!remove_always && detected_only) {
@@ -210,19 +219,10 @@ ManageRemovals.Region <- function(region, population_model,
             idx <- which(n > 0)
           }
         }
-
-        # Apply to all individuals
-        if (all(c("detected", "undetected") %in% names(attributes(n)))) {
-          n_apply <- list(detected = as.numeric(n - attr(n, "undetected")),
-                          undetected = as.numeric(attr(n, "undetected")))
-        } else {
-          n_apply <- list(detected = as.numeric(n*0),
-                          undetected = as.numeric(n))
-        }
       }
 
       # Expand removal locations via radius
-      if ("detected" %in% names(attributes(n)) && is.numeric(radius) &&
+      if ("undetected" %in% names(attributes(n)) && is.numeric(radius) &&
           length(idx) > 0 && region$get_type() %in% c("grid", "patch")) {
         idx <- region$get_nearby(idx, radius)
         idx <- idx[which(rowSums(
@@ -283,29 +283,16 @@ ManageRemovals.Region <- function(region, population_model,
       removed <- removed[[1]] # zeros
     }
 
-    # Attach or update removed as an attribute
+    # Attach removed as an attribute
     if (population_model$get_type() == "presence_only") {
-      if (is.null(attr(n, "removed"))) {
-        attr(n, "removed") <- as.logical(removed)
-      } else {
-        attr(n, "removed") <- attr(n, "removed") | as.logical(removed)
-      }
+      attr(n, "removed") <- as.logical(removed)
     } else {
-      if (is.null(attr(n, "removed"))) {
-        attr(n, "removed") <- removed
-      } else {
-        attr(n, "removed") <- removed + attr(n, "removed")
-      }
+      attr(n, "removed") <- removed
     }
 
-    # Attach (additional) removal costs as an attribute
+    # Attach removal costs as an attribute
     if (!is.null(removal_cost)) {
-      if (is.null(attr(n, "removal_cost"))) {
-        attr(n, "removal_cost") <- removal_cost*cost_apply
-      } else {
-        attr(n, "removal_cost") <-
-          attr(n, "removal_cost") + removal_cost*cost_apply
-      }
+      attr(n, "removal_cost") <- removal_cost*cost_apply
     }
 
     return(n)

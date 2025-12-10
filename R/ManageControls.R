@@ -228,7 +228,7 @@ ManageControls.Region <- function(region, population_model,
       if (is.null(schedule) || tm %in% schedule) {
 
         # Partition n into detected and undetected
-        if (all(c("detected", "undetected") %in% names(attributes(n)))) {
+        if ("undetected" %in% names(attributes(n))) {
           n_apply <- list(detected = as.numeric(n - attr(n, "undetected")),
                           undetected = as.numeric(attr(n, "undetected")))
         } else {
@@ -254,13 +254,10 @@ ManageControls.Region <- function(region, population_model,
                                 prob = control_pr)
               }
             }
-            if (all(c("detected", "undetected") %in% names(attributes(n)))) {
-              attr(n, "detected")[idx,] <-
-                attr(n, "detected")[idx,] + controlled$undetected[idx,]
+            if ("undetected" %in% names(attributes(n))) {
               attr(n, "undetected")[idx,] <-
                 attr(n, "undetected")[idx,] - controlled$undetected[idx,]
             } else {
-              attr(n, "detected") <- controlled$undetected
               attr(n, "undetected") <- n[,] - controlled$undetected
             }
             controlled <- controlled$detected + controlled$undetected
@@ -273,25 +270,19 @@ ManageControls.Region <- function(region, population_model,
             }
             if (population_model$get_type() == "presence_only") {
               controlled <- lapply(controlled, as.logical)
-              if (all(c("detected", "undetected") %in% names(attributes(n)))) {
-                attr(n, "detected")[idx] <-
-                  attr(n, "detected")[idx] | controlled$undetected[idx]
+              if ("undetected" %in% names(attributes(n))) {
                 attr(n, "undetected")[idx] <-
                   attr(n, "undetected")[idx] & !controlled$undetected[idx]
               } else {
-                attr(n, "detected") <- controlled$undetected
                 attr(n, "undetected") <- as.logical(n) & !controlled$undetected
               }
               controlled <- controlled$detected | controlled$undetected
               n[idx] <- n[idx] & !controlled[idx]
             } else {
-              if (all(c("detected", "undetected") %in% names(attributes(n)))) {
-                attr(n, "detected")[idx] <-
-                  attr(n, "detected")[idx] + controlled$undetected[idx]
+              if ("undetected" %in% names(attributes(n))) {
                 attr(n, "undetected")[idx] <-
                   attr(n, "undetected")[idx] - controlled$undetected[idx]
               } else {
-                attr(n, "detected") <- controlled$undetected
                 attr(n, "undetected") <- as.numeric(n) - controlled$undetected
               }
               controlled <- controlled$detected + controlled$undetected
@@ -305,57 +296,26 @@ ManageControls.Region <- function(region, population_model,
         controlled <- controlled[[1]] # zeros
       }
 
-      # Attach detected/undetected when zero controlled
-      if (!all(c("detected", "undetected") %in% names(attributes(n)))) {
-        if (population_model$get_type() == "presence_only") {
-          attr(n, "detected") <- as.logical(controlled*0)
+      # Attach all undetected when zero controlled
+      if (!"undetected" %in% names(attributes(n))) {
+        if (population_model$get_type() == "stage_structured") {
+          attr(n, "undetected") <- n[,]
+        } else if (population_model$get_type() == "presence_only") {
           attr(n, "undetected") <- as.logical(n)
         } else {
-          attr(n, "detected") <- controlled*0
-          if (population_model$get_type() == "stage_structured") {
-            attr(n, "undetected") <- n[,]
-          } else {
-            attr(n, "undetected") <- as.numeric(n)
-          }
+          attr(n, "undetected") <- as.numeric(n)
         }
       }
 
-      # Attach or update removed
-      if (population_model$get_type() == "presence_only") {
-        if (is.null(attr(n, "removed"))) {
-          attr(n, "removed") <- as.logical(controlled)
-        } else {
-          attr(n, "removed") <- attr(n, "removed") | as.logical(controlled)
-        }
-      } else {
-        if (is.null(attr(n, "removed"))) {
-          attr(n, "removed") <- controlled
-        } else {
-          attr(n, "removed") <- attr(n, "removed") + controlled
-        }
-      }
+      # Attach control
+      attr(n, self$get_label()) <- controlled
 
-      # Attach or update control application indicator (via attribute label)
-      if (is.null(attr(n, self$get_label()))) {
-        attr(n, self$get_label()) <- (rowSums(as.matrix(controlled)) > 0)
-      } else {
-        attr(n, self$get_label()) <-
-          attr(n, self$get_label()) | (rowSums(as.matrix(controlled)) > 0)
-      }
-
-      # Attach (additional) control costs as an attribute via label
+      # Attach control costs as an attribute via label
       if (!is.null(control_cost)) {
         if (is.null(schedule) || tm %in% schedule) {
-          if (is.null(attr(n, paste0(self$get_label(), "_cost")))) {
-            attr(n, paste0(self$get_label(), "_cost")) <- control_cost
-          } else {
-            attr(n, paste0(self$get_label(), "_cost")) <-
-              attr(n, paste0(self$get_label(), "_cost")) + control_cost
-          }
+          attr(n, paste0(self$get_label(), "_cost")) <- control_cost
         } else {
-          if (is.null(attr(n, paste0(self$get_label(), "_cost")))) {
-            attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
-          }
+          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
         }
       }
     }
@@ -394,10 +354,10 @@ ManageControls.Region <- function(region, population_model,
         }
 
         # Detection-based control
-        if ("detected" %in% names(attributes(n))) {
+        if ("undetected" %in% names(attributes(n))) {
 
           # Detected locations
-          idx <- which(rowSums(as.matrix(attr(n, "detected"))) > 0)
+          idx <- which(rowSums(as.matrix(n - attr(n, "undetected"))) > 0)
 
           # Expand control locations via radius
           if (is.numeric(radius) && length(idx) > 0 &&
@@ -421,35 +381,21 @@ ManageControls.Region <- function(region, population_model,
         }
       }
 
-      # Attach/update control as attributes to process in growth or spread models
-      if (!is.null(attr(n, self$get_label()))) { # update via product
-        attr(n, self$get_label()) <-
-          attr(n, self$get_label())*(n_apply*control_mult + !n_apply)
-      } else { # attach
-        attr(n, self$get_label()) <- n_apply*control_mult + !n_apply
-        if (population_model$get_type() == "stage_structured") {
-          if (control_type == "growth") {
-            attr(attr(n, self$get_label()), "stages") <- self$get_stages()
-            attr(attr(n, self$get_label()), "apply_to") <- apply_to
-          }
+      # Attach control as attributes to process in growth or spread models
+      attr(n, self$get_label()) <- n_apply*control_mult + !n_apply
+      if (population_model$get_type() == "stage_structured") {
+        if (control_type == "growth") {
+          attr(attr(n, self$get_label()), "stages") <- self$get_stages()
+          attr(attr(n, self$get_label()), "apply_to") <- apply_to
         }
       }
 
-      # Attach/update control costs as an attribute via label
+      # Attach control costs as an attribute via label
       if (!is.null(control_cost)) {
-        if (!is.null(attr(n, paste0(self$get_label(), "_cost")))) { # update
-          if (is.null(schedule) || tm %in% schedule) {
-            attr(n, paste0(self$get_label(), "_cost")) <-
-              (attr(n, paste0(self$get_label(), "_cost")) +
-                 control_cost*cost_apply)
-          }
-        } else { # attach
-          if (is.null(schedule) || tm %in% schedule) {
-            attr(n, paste0(self$get_label(), "_cost")) <-
-              control_cost*cost_apply
-          } else {
-            attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
-          }
+        if (is.null(schedule) || tm %in% schedule) {
+          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*cost_apply
+        } else {
+          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
         }
       }
     }

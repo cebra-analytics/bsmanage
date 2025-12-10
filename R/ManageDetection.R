@@ -154,7 +154,7 @@ ManageDetection.Region <- function(region,
     if (!is.null(attr(n, "undetected"))) {
       undetected <- attr(n, "undetected")
     } else {
-      undetected <- detected
+      undetected <- detected # zeros
       undetected[] <- n[]
     }
 
@@ -184,37 +184,25 @@ ManageDetection.Region <- function(region,
         }
       }
 
-      # Attach/update surveillance costs as an attribute
+      # Attach surveillance costs as an attribute
       if (!is.null(surv_cost)) {
-        if (!is.null(attr(n, "surv_cost"))) {
-            attr(n, "surv_cost") <- attr(n, "surv_cost") + surv_cost
-        } else {
-            attr(n, "surv_cost") <- surv_cost
-        }
+        attr(n, "surv_cost") <- surv_cost
       }
 
     } else {
 
-      # Attach/update surveillance costs as an attribute
-      if (!is.null(surv_cost) && is.null(attr(n, "surv_cost"))) {
+      # Attach zero surveillance costs as an attribute
+      if (!is.null(surv_cost)) {
         attr(n, "surv_cost") <- surv_cost*0
       }
     }
 
-    # Attach/update detected and undetected as attributes
+    # Attach detected and undetected as attributes
     if (population_model$get_type() == "presence_only") {
-      if (!is.null(attr(n, "detected"))) {
-        attr(n, "detected") <- attr(n, "detected") | as.logical(detected)
-      } else {
-        attr(n, "detected") <- as.logical(detected)
-      }
+      attr(n, "detected") <- as.logical(detected)
       attr(n, "undetected") <- as.logical(undetected)
     } else {
-      if (!is.null(attr(n, "detected"))) {
-        attr(n, "detected") <- attr(n, "detected") + detected
-      } else {
-        attr(n, "detected") <- detected
-      }
+      attr(n, "detected") <- detected
       attr(n, "undetected") <- undetected
     }
 

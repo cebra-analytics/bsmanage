@@ -101,11 +101,12 @@ test_that("applies stochastic detection to invasive population", {
   expect_equal(attr(attr(new_n, "surv_cost"), "unit"), "$")
   set.seed(1234)
   expect_silent(new_n2 <- manage_detection$apply(new_n, 4))
-  expect_true(all(attr(new_n2, "detected") >= attr(new_n, "detected")))
-  expect_true(all(attr(new_n2, "undetected") <= attr(new_n, "undetected")))
-  expect_equal(attr(new_n2, "detected") + attr(new_n2, "undetected"), n)
+
+  expect_true(all(attr(new_n2, "detected") <= attr(new_n, "undetected")))
+  expect_equal(attr(new_n2, "undetected"),
+               n - attr(new_n, "detected") - attr(new_n2, "detected"))
   expect_equal(as.numeric(attr(new_n2, "surv_cost")),
-               4*(surveillance$get_sensitivity() > 0))
+               2*(surveillance$get_sensitivity() > 0))
   expect_equal(attr(attr(new_n2, "surv_cost"), "unit"), "$")
   expect_silent(new_n2 <- manage_detection$clear_attributes(new_n2))
   expect_null(attr(new_n2, "detected"))
@@ -129,11 +130,11 @@ test_that("applies stochastic detection to invasive population", {
   expect_equal(attr(attr(new_n, "surv_cost"), "unit"), "$")
   set.seed(1234)
   expect_silent(new_n2 <- manage_detection$apply(new_n, 4))
-  expect_true(all(attr(new_n2, "detected") >= attr(new_n, "detected")))
-  expect_true(all(attr(new_n2, "undetected") <= attr(new_n, "undetected")))
-  expect_equal(attr(new_n2, "detected") + attr(new_n2, "undetected"), n)
+  expect_true(all(attr(new_n2, "detected") <= attr(new_n, "undetected")))
+  expect_equal(attr(new_n2, "undetected"),
+               n - attr(new_n, "detected") - attr(new_n2, "detected"))
   expect_equal(as.numeric(attr(new_n2, "surv_cost")),
-               4*(surveillance$get_sensitivity() > 0))
+               2*(surveillance$get_sensitivity() > 0))
   expect_equal(attr(attr(new_n2, "surv_cost"), "unit"), "$")
   # presence-only population
   population_model <- bsspread::PresencePopulation(region)
@@ -152,11 +153,10 @@ test_that("applies stochastic detection to invasive population", {
   expect_equal(attr(attr(new_n, "surv_cost"), "unit"), "$")
   set.seed(1234)
   expect_silent(new_n2 <- manage_detection$apply(new_n, 4))
-  expect_true(sum(attr(new_n2, "detected")) >= sum(attr(new_n, "detected")))
-  expect_true(
-    sum(attr(new_n2, "undetected")) <= sum(attr(new_n, "undetected")))
-  expect_equal(attr(new_n2, "detected") | attr(new_n2, "undetected"), n)
+  expect_true(sum(attr(new_n2, "detected")) <= sum(attr(new_n, "undetected")))
+  expect_equal((attr(new_n, "detected") | attr(new_n2, "detected") |
+                  attr(new_n2, "undetected")), n)
   expect_equal(as.numeric(attr(new_n2, "surv_cost")),
-               4*(surveillance$get_sensitivity() > 0))
+               2*(surveillance$get_sensitivity() > 0))
   expect_equal(attr(attr(new_n2, "surv_cost"), "unit"), "$")
 })

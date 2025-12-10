@@ -101,7 +101,7 @@ test_that("initializes with region, population, and other parameters", {
   expect_equal(manage_controls$get_cost_unit(), "$")
 })
 
-test_that("applies stochastic controls to invasive population", {
+test_that("applies stochastic search and destroy controls to population", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
   divisions <- bsdesign::Divisions(template)
@@ -126,7 +126,6 @@ test_that("applies stochastic controls to invasive population", {
     lambda = 1,
     optimal = "none",
     exist_manage_pr = exist_manage_pr)
-  # search and destroy
   idx <- 1:region$get_locations()
   set.seed(1234)
   expected_controls <- array(0, dim(n))
@@ -149,25 +148,19 @@ test_that("applies stochastic controls to invasive population", {
   set.seed(1234)
   expect_silent(new_n <- manage_controls$apply(n, 4))
   expect_equal(new_n[idx,], expected_n[idx,])
-  expect_equal(attr(new_n, "detected")[idx,], expected_controls[idx,])
   expect_equal(attr(new_n, "undetected")[idx,],
                n[idx,] - expected_controls[idx,])
-  expect_equal(attr(new_n, "removed")[idx,], expected_controls[idx,])
-  expect_equal(attr(new_n, "control_search_destroy"),
-               rowSums(expected_controls) > 0)
+  expect_equal(attr(new_n, "control_search_destroy")[idx,],
+               expected_controls[idx,])
   expect_equal(attr(new_n, "control_search_destroy_cost")[idx],
                expected_costs[idx])
   expect_equal(attr(new_n, "attachment"), "extra")
   attr(n, "attachment") <- NULL
   # duplicate with extra detections and removals
-  attr(new_n, "detected")[101:110, 2:3] <-
-    attr(new_n, "detected")[101:110, 2:3] + new_n[101:110, 2:3]
   attr(new_n, "undetected")[101:110, 2:3] <- 0
   rm_idx <- which(new_n[101:110,] > 1)
   new_n[101:110,][rm_idx] <- new_n[101:110,][rm_idx] - 1
   attr(new_n, "undetected")[101:110, 1] <- new_n[101:110, 1]
-  attr(new_n, "removed")[101:110,][rm_idx] <-
-    attr(new_n, "removed")[101:110,][rm_idx] + 1
   n_undetected <- attr(new_n, "undetected")[,]
   n_apply <- list(detected = new_n[,] - n_undetected,
                   undetected = n_undetected)
@@ -184,19 +177,13 @@ test_that("applies stochastic controls to invasive population", {
   set.seed(1234)
   expect_silent(new_n2 <- manage_controls$apply(new_n, 4))
   expect_equal(new_n2[idx,], new_n[idx,] - expected_controls_plus[idx,])
-  expect_equal(attr(new_n2, "detected")[idx,],
-               (attr(new_n, "detected")[idx,] +
-                  expected_controls2$undetected[idx,]))
   expect_equal(attr(new_n2, "undetected")[idx,],
                (attr(new_n, "undetected")[idx,] -
                   expected_controls2$undetected[idx,]))
-  expect_equal(attr(new_n2, "removed")[idx,],
-               attr(new_n, "removed")[idx,] + expected_controls_plus[idx,])
-  expect_equal(attr(new_n2, "control_search_destroy"),
-               (attr(new_n, "control_search_destroy") |
-                  rowSums(expected_controls_plus) > 0))
+  expect_equal(attr(new_n2, "control_search_destroy")[idx,],
+               expected_controls_plus[idx,])
   expect_equal(attr(new_n2, "control_search_destroy_cost")[idx],
-               expected_costs[idx]*2)
+               expected_costs[idx])
   # unstructured
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   n <- rowSums(n)
@@ -216,19 +203,13 @@ test_that("applies stochastic controls to invasive population", {
   set.seed(1234)
   expect_silent(new_n <- manage_controls$apply(n, 4))
   expect_equal(as.numeric(new_n), expected_n)
-  expect_equal(attr(new_n, "detected"), expected_controls)
   expect_equal(attr(new_n, "undetected"), n - expected_controls)
-  expect_equal(attr(new_n, "removed"), expected_controls)
-  expect_equal(attr(new_n, "control_search_destroy"), expected_controls > 0)
+  expect_equal(attr(new_n, "control_search_destroy"), expected_controls)
   expect_equal(attr(new_n, "control_search_destroy_cost"), expected_costs)
   # duplicate with extra detections and removals
-  attr(new_n, "detected")[101:110] <-
-    attr(new_n, "detected")[101:110] + new_n[101:110]
   attr(new_n, "undetected")[101:110] <- 0
   rm_idx <- which(new_n[101:110] > 1)
   new_n[101:110][rm_idx] <- new_n[101:110][rm_idx] - 1
-  attr(new_n, "removed")[101:110][rm_idx] <-
-    attr(new_n, "removed")[101:110][rm_idx] + 1
   n_undetected <- as.numeric(attr(new_n, "undetected"))
   n_apply <- list(detected = as.numeric(new_n) - n_undetected,
                   undetected = n_undetected)
@@ -245,17 +226,11 @@ test_that("applies stochastic controls to invasive population", {
   set.seed(1234)
   expect_silent(new_n2 <- manage_controls$apply(new_n, 4))
   expect_equal(as.numeric(new_n2), as.numeric(new_n) - expected_controls_plus)
-  expect_equal(attr(new_n2, "detected"),
-               attr(new_n, "detected") + expected_controls2$undetected)
   expect_equal(attr(new_n2, "undetected"),
                attr(new_n, "undetected") - expected_controls2$undetected)
-  expect_equal(attr(new_n2, "removed"),
-               attr(new_n, "removed") + expected_controls_plus)
-  expect_equal(attr(new_n2, "control_search_destroy"),
-               (attr(new_n, "control_search_destroy") |
-                  expected_controls_plus > 0))
+  expect_equal(attr(new_n2, "control_search_destroy"), expected_controls_plus)
   expect_equal(attr(new_n2, "control_search_destroy_cost")[idx],
-               expected_costs[idx]*2)
+               expected_costs[idx])
   # presence-only
   population_model <- bsspread::PresencePopulation(region)
   n <- n > 0
@@ -275,18 +250,13 @@ test_that("applies stochastic controls to invasive population", {
   set.seed(1234)
   expect_silent(new_n <- manage_controls$apply(n, 4))
   expect_equal(as.numeric(new_n), expected_n)
-  expect_equal(attr(new_n, "detected"), as.logical(expected_controls))
   expect_equal(attr(new_n, "undetected"), as.logical(n - expected_controls))
-  expect_equal(attr(new_n, "removed"), as.logical(expected_controls))
   expect_equal(attr(new_n, "control_search_destroy"),
                as.logical(expected_controls))
   expect_equal(attr(new_n, "control_search_destroy_cost"), expected_costs)
   # duplicate with extra detections and removals
-  attr(new_n, "detected")[101:110] <-
-    attr(new_n, "detected")[101:110] | new_n[101:110]
   attr(new_n, "undetected")[101:110] <- FALSE
   new_n[101] <- FALSE
-  attr(new_n, "removed")[101] <- TRUE
   n_undetected <- as.numeric(attr(new_n, "undetected"))
   n_apply <- list(detected = as.numeric(new_n) - n_undetected,
                   undetected = n_undetected)
@@ -303,22 +273,35 @@ test_that("applies stochastic controls to invasive population", {
   set.seed(1234)
   expect_silent(new_n2 <- manage_controls$apply(new_n, 4))
   expect_equal(as.numeric(new_n2), as.numeric(new_n) - expected_controls_plus)
-  expect_equal(attr(new_n2, "detected"),
-               attr(new_n, "detected") | expected_controls2$undetected)
   expect_equal(attr(new_n2, "undetected"),
                attr(new_n, "undetected") & !expected_controls2$undetected)
-  expect_equal(attr(new_n2, "removed"),
-               attr(new_n, "removed") | expected_controls_plus)
   expect_equal(attr(new_n2, "control_search_destroy"),
-               (attr(new_n, "control_search_destroy") |
-                  expected_controls_plus > 0))
+               as.logical(expected_controls_plus))
   expect_equal(attr(new_n2, "control_search_destroy_cost")[idx],
-               expected_costs[idx]*2)
+               expected_costs[idx])
+})
 
-  # growth, spread, or establishment
+test_that("applies stochastic growth/spread/establishment controls", {
+  TEST_DIRECTORY <- test_path("test_inputs")
+  template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
+  divisions <- bsdesign::Divisions(template)
+  region <- bsspread::Region(template)
+  stage_matrix <- matrix(c(0.0, 2.0, 5.0,
+                           0.3, 0.0, 0.0,
+                           0.0, 0.6, 0.8),
+                         nrow = 3, ncol = 3, byrow = TRUE)
   population_model <- bsspread::StagedPopulation(region, stage_matrix)
+  initial_n <- rep(0, region$get_locations())
+  initial_n[101:150] <- 11:60
+  initializer <- bsspread::Initializer(initial_n, region = region,
+                                       population_model = population_model)
   set.seed(1234)
   n <- initializer$initialize()
+  set.seed(1234)
+  exist_manage_pr <- runif(divisions$get_parts())
+  expected_costs <- rep(2, region$get_locations())
+  attr(expected_costs, "unit") <- "$"
+  idx <- 1:region$get_locations() # idx <- 101:120; idx <- 101:150
   control_design <- ManageDesign(
     context = ManageContext("test"),
     divisions = divisions,
@@ -327,7 +310,7 @@ test_that("applies stochastic controls to invasive population", {
   exist_mask <- rowSums(n[,2:3])*control_design$get_allocation() > 0
   detected <- n*0
   detected[,2:3] <- round((n[,2:3] > 8)*n[,2:3]*0.7)
-  attr(n, "detected") <- detected
+  attr(n, "undetected") <- n - detected
   detected_mask <- +(rowSums(detected) > 0 | NA)
   detected_mask <- rowSums(n[,2:3])*terra::buffer(
     region$get_rast(detected_mask), width = 1500)[region$get_indices()][,1] > 0
@@ -343,7 +326,7 @@ test_that("applies stochastic controls to invasive population", {
                                       schedule = 4:6))
   expect_silent(new_n <- manage_controls$apply(n, 4))
   expect_equal(new_n[idx,], n[idx,])
-  expect_equal(attr(new_n, "detected"), detected)
+  expect_equal(attr(new_n, "undetected")[idx,], (n - detected)[idx,])
   expect_equal(as.numeric(attr(new_n, "control_growth")),
                ((exist_mask | detected_mask)*0.7 +
                   !(exist_mask | detected_mask)))
@@ -375,20 +358,17 @@ test_that("applies stochastic controls to invasive population", {
   # additional detection and removals
   detected[,2:3] <- round((n[,2:3] > 6)*n[,2:3]*0.7)
   new_n[which(rowSums(detected) >= 8),] <- 0
-  attr(new_n, "detected") <- detected
+  attr(new_n, "undetected") <- new_n[,] - detected
   exist_mask <- rowSums(new_n[,2:3])*control_design$get_allocation() > 0
   detected_mask <- +(rowSums(detected) > 0 | NA)
   detected_mask <- terra::buffer(region$get_rast(detected_mask),
                                  width = 3000)[region$get_indices()][,1] > 0
   expect_silent(new_n2 <- manage_controls$apply(new_n, 4))
   expected_mult <- rep(1, region$get_locations())
-  expected_mult[which(exist_mask | establish_mask)] <-
-    expected_mult[which(exist_mask | establish_mask)]*0.7
   expected_mult[which(exist_mask | detected_mask)] <-
     expected_mult[which(exist_mask | detected_mask)]*0.7
   expect_equal(attr(new_n2, "control_establishment"), expected_mult)
   expect_equal(
     attr(new_n2, "control_establishment_cost"),
-    expected_costs*((control_design$get_allocation() > 0 | establish_mask) +
-                      (control_design$get_allocation() > 0 | detected_mask)))
+    expected_costs*(control_design$get_allocation() > 0 | detected_mask))
 })
