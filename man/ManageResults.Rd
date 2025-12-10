@@ -83,7 +83,7 @@ current vector or array \code{n} representing the population at each
 location, as well as calculated impacts (list).}
 \item{\code{finalize()}}{Finalize the results collation (summary
 calculations).}
-\item{\code{as_list()}}{Return the results as a list (collated
+\item{\code{get_list()}}{Return the results as a list (collated
 populations and/or occupancy, totals, area occupied, impacts, and
 actions).}
 \item{\code{get_params()}}{Get the simulation parameters used.}
