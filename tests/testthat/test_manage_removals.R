@@ -43,9 +43,9 @@ test_that("initializes with region, population, and other parameters", {
   expect_is(manage_removals, "ManageRemovals")
   expect_s3_class(manage_removals, "ManageActions")
   expect_named(manage_removals,
-               c(c("get_type", "get_label", "get_stages", "get_schedule",
-                   "include_cost", "get_cost_unit", "clear_attributes",
-                   "apply")))
+               c(c("get_type", "get_id", "set_id", "get_label", "get_stages",
+                   "get_schedule", "include_cost", "get_cost_unit",
+                   "clear_attributes", "apply")))
   expect_equal(manage_removals$get_type(), "removal")
   expect_equal(manage_removals$get_label(), "removed")
   expect_equal(manage_removals$get_stages(), 2:3)
@@ -59,6 +59,10 @@ test_that("initializes with region, population, and other parameters", {
                                     removal_pr = template_vect,
                                     removal_cost = removal_cost) # silent
   expect_equal(manage_removals$get_cost_unit(), "beans")
+  expect_silent(manage_removals$set_id("a1"))
+  expect_equal(manage_removals$get_id(), "a1")
+  expect_equal(manage_removals$get_label(), "a1_removed")
+  expect_named(manage_removals$include_cost(), "a1_removal_cost")
 })
 
 test_that("applies stochastic removals to invasive population", {
@@ -196,6 +200,17 @@ test_that("applies stochastic removals to invasive population", {
   expect_equal(attr(new_n, "undetected")[idx,],
                attr(n, "undetected")[idx,] - expected_removals$undetected)
   expect_equal(attr(new_n, "removal_cost"),
+               expected_removal_cost*(rowSums(detected) > 0))
+  expect_silent(manage_removals$set_id(4))
+  set.seed(1234)
+  expect_silent(new_n <- manage_removals$apply(n, 4))
+  expect_equal(attr(new_n, "4_removed")[idx,],
+               expected_removals$detected + expected_removals$undetected)
+  expect_equal(new_n[idx,], n[idx,] - (expected_removals$detected +
+                                         expected_removals$undetected))
+  expect_equal(attr(new_n, "undetected")[idx,],
+             attr(n, "undetected")[idx,] - expected_removals$undetected)
+  expect_equal(attr(new_n, "4_removal_cost"),
                expected_removal_cost*(rowSums(detected) > 0))
   # remove always (as per without detected)
   expect_silent(manage_removals <-

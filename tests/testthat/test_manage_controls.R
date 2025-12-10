@@ -45,9 +45,9 @@ test_that("initializes with region, population, and other parameters", {
   expect_is(manage_controls, "ManageControls")
   expect_s3_class(manage_controls, "ManageActions")
   expect_named(manage_controls,
-               c(c("get_type", "get_label", "get_stages", "get_schedule",
-                   "include_cost", "get_cost_unit", "clear_attributes",
-                   "apply")))
+               c(c("get_type", "get_id", "set_id", "get_label", "get_stages",
+                   "get_schedule", "include_cost", "get_cost_unit",
+                   "clear_attributes", "apply")))
   expect_equal(manage_controls$get_type(), "control")
   expect_equal(manage_controls$get_label(), "control_search_destroy")
   expect_equal(manage_controls$get_stages(), 2:3)
@@ -55,6 +55,10 @@ test_that("initializes with region, population, and other parameters", {
   expect_true(manage_controls$include_cost())
   expect_named(manage_controls$include_cost(), "control_search_destroy_cost")
   expect_equal(manage_controls$get_cost_unit(), "$")
+  expect_silent(manage_controls$set_id("a1"))
+  expect_equal(manage_controls$get_id(), "a1")
+  expect_equal(manage_controls$get_label(), "a1_control_search_destroy")
+  expect_named(manage_controls$include_cost(), "a1_control_search_destroy_cost")
   expect_error(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "growth"),
@@ -99,6 +103,10 @@ test_that("initializes with region, population, and other parameters", {
   expect_true(manage_controls$include_cost())
   expect_named(manage_controls$include_cost(), "control_growth_cost")
   expect_equal(manage_controls$get_cost_unit(), "$")
+  expect_silent(manage_controls$set_id("a2"))
+  expect_equal(manage_controls$get_id(), "a2")
+  expect_equal(manage_controls$get_label(), "a2_control_growth")
+  expect_named(manage_controls$include_cost(), "a2_control_growth_cost")
 })
 
 test_that("applies stochastic search and destroy controls to population", {
@@ -184,6 +192,18 @@ test_that("applies stochastic search and destroy controls to population", {
                expected_controls_plus[idx,])
   expect_equal(attr(new_n2, "control_search_destroy_cost")[idx],
                expected_costs[idx])
+
+  expect_silent(manage_controls$set_id("a2"))
+  set.seed(1234)
+  expect_silent(new_n <- manage_controls$apply(n, 4))
+  new_n[idx,] ; expected_n[idx,]
+  expect_equal(attr(new_n, "undetected")[idx,],
+               n[idx,] - expected_controls[idx,])
+  expect_equal(attr(new_n, "a2_control_search_destroy")[idx,],
+               expected_controls[idx,])
+  expect_equal(attr(new_n, "a2_control_search_destroy_cost")[idx],
+               expected_costs[idx])
+
   # unstructured
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   n <- rowSums(n)
@@ -371,4 +391,14 @@ test_that("applies stochastic growth/spread/establishment controls", {
   expect_equal(
     attr(new_n2, "control_establishment_cost"),
     expected_costs*(control_design$get_allocation() > 0 | detected_mask))
+  expect_silent(manage_controls$set_id("a3"))
+  expect_silent(new_n <- manage_controls$apply(n, 4))
+  detected[,2:3] <- round((n[,2:3] > 8)*n[,2:3]*0.7)
+  expect_equal(attr(new_n, "undetected")[idx,], (n - detected)[idx,])
+  expect_equal(attr(new_n, "a3_control_establishment"),
+               ((exist_mask | establish_mask)*0.7 +
+                  !(exist_mask | establish_mask)))
+  expect_equal(attr(new_n, "a3_control_establishment_cost"),
+               expected_costs*(control_design$get_allocation() > 0 |
+                                 establish_mask))
 })

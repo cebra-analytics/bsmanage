@@ -34,6 +34,8 @@
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action
 #'       ("detection").}
+#'     \item{\code{get_id()}}{Get the actions numeric identifier.}
+#'     \item{\code{set_id(id)}}{Set the actions numeric identifier.}
 #'     \item{\code{get_label()}}{Get the management actions label used in
 #'       simulation results (i.e. "detected").}
 #'     \item{\code{get_surveillance()}}{Get the surveillance design class
@@ -112,7 +114,11 @@ ManageDetection.Region <- function(region,
 
   # Get results label
   self$get_label <- function() {
-    return("detected")
+    prefix <- ""
+    if (!is.null(self$get_id())) {
+      prefix <- paste0(self$get_id(), "_")
+    }
+    return(paste0(prefix, "detected"))
   }
 
   # Get the surveillance object
@@ -123,7 +129,11 @@ ManageDetection.Region <- function(region,
   # Does cost parameter (named) having a value?
   self$include_cost <- function() {
     include_cost <- is.numeric(surv_cost)
-    names(include_cost) <- "surv_cost"
+    prefix <- ""
+    if (!is.null(self$get_id())) {
+      prefix <- paste0(self$get_id(), "_")
+    }
+    names(include_cost) <- paste0(prefix, "surv_cost")
     return(include_cost)
   }
 
@@ -134,9 +144,9 @@ ManageDetection.Region <- function(region,
 
   # Clear attached attributes
   self$clear_attributes <- function(n) {
-    attr(n, "detected") <- NULL
+    attr(n, self$get_label()) <- NULL
     attr(n, "undetected") <- NULL
-    attr(n, "surv_cost") <- NULL
+    attr(n, names(self$include_cost())) <- NULL
     return(n)
   }
 
@@ -186,23 +196,23 @@ ManageDetection.Region <- function(region,
 
       # Attach surveillance costs as an attribute
       if (!is.null(surv_cost)) {
-        attr(n, "surv_cost") <- surv_cost
+        attr(n, names(self$include_cost())) <- surv_cost
       }
 
     } else {
 
       # Attach zero surveillance costs as an attribute
       if (!is.null(surv_cost)) {
-        attr(n, "surv_cost") <- surv_cost*0
+        attr(n, names(self$include_cost())) <- surv_cost*0
       }
     }
 
     # Attach detected and undetected as attributes
     if (population_model$get_type() == "presence_only") {
-      attr(n, "detected") <- as.logical(detected)
+      attr(n, self$get_label()) <- as.logical(detected)
       attr(n, "undetected") <- as.logical(undetected)
     } else {
-      attr(n, "detected") <- detected
+      attr(n, self$get_label()) <- detected
       attr(n, "undetected") <- undetected
     }
 

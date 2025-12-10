@@ -39,9 +39,9 @@ test_that("initializes with region, population, and surveillance", {
   expect_is(manage_detection, "ManageDetection")
   expect_s3_class(manage_detection, "ManageActions")
   expect_named(manage_detection,
-               c(c("get_type", "get_label", "get_stages", "get_schedule",
-                   "include_cost", "get_cost_unit", "clear_attributes",
-                   "apply", "get_surveillance")))
+               c(c("get_type", "get_id", "set_id", "get_label", "get_stages",
+                   "get_schedule", "include_cost", "get_cost_unit",
+                   "clear_attributes", "apply", "get_surveillance")))
   expect_equal(manage_detection$get_type(), "detection")
   expect_equal(manage_detection$get_label(), "detected")
   expect_is(manage_detection$get_surveillance(), "SpatialSurvDesign")
@@ -50,6 +50,10 @@ test_that("initializes with region, population, and surveillance", {
   expect_true(manage_detection$include_cost())
   expect_named(manage_detection$include_cost(), "surv_cost")
   expect_equal(manage_detection$get_cost_unit(), "$")
+  expect_silent(manage_detection$set_id("a1"))
+  expect_equal(manage_detection$get_id(), "a1")
+  expect_equal(manage_detection$get_label(), "a1_detected")
+  expect_named(manage_detection$include_cost(), "a1_surv_cost")
 })
 
 test_that("applies stochastic detection to invasive population", {
@@ -113,6 +117,14 @@ test_that("applies stochastic detection to invasive population", {
   expect_null(attr(new_n2, "undetected"))
   expect_null(attr(new_n2, "surv_cost"))
   expect_equal(new_n2, n)
+  expect_silent(manage_detection$set_id("a1"))
+  set.seed(1234)
+  expect_silent(new_n <- manage_detection$apply(n, 4))
+  expect_equal(attr(new_n, "a1_detected")[idx,], expected_detected)
+  expect_equal(attr(new_n, "undetected"), n - attr(new_n, "a1_detected"))
+  expect_equal(as.numeric(attr(new_n, "a1_surv_cost")),
+               2*(surveillance$get_sensitivity() > 0))
+  expect_equal(attr(attr(new_n, "a1_surv_cost"), "unit"), "$")
   # unstructured population
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   n <- rowSums(n)

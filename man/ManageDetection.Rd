@@ -65,6 +65,8 @@ for accessing attributes and applying simulated management detection:
 \describe{
 \item{\code{get_type()}}{Get the type of management action
 ("detection").}
+\item{\code{get_id()}}{Get the actions numeric identifier.}
+\item{\code{set_id(id)}}{Set the actions numeric identifier.}
 \item{\code{get_label()}}{Get the management actions label used in
 simulation results (i.e. "detected").}
 \item{\code{get_surveillance()}}{Get the surveillance design class

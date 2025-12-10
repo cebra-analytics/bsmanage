@@ -22,6 +22,8 @@
 #'   applying simulated management actions:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the management actions type.}
+#'     \item{\code{get_id()}}{Get the actions numeric identifier.}
+#'     \item{\code{set_id(id)}}{Set the actions numeric identifier.}
 #'     \item{\code{get_label()}}{Get the management actions label used in
 #'       simulation results.}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
@@ -100,9 +102,26 @@ ManageActions.Region <- function(region, population_model,
     return(type)
   }
 
+  # Id for tracking multiple actions
+  id <- NULL
+
+  # Get the actions id
+  self$get_id <- function() {
+    return(id)
+  }
+
+  # Set the actions id
+  self$set_id <- function(id) {
+    id <<- id
+  }
+
   # Get results label (overridden in inherited classes)
   self$get_label <- function() {
-    return("action")
+    prefix <- ""
+    if (!is.null(id)) {
+      prefix <- paste0(id, "_")
+    }
+    return(paste0(prefix, "action"))
   }
 
   # Get stages

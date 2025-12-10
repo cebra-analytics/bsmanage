@@ -31,9 +31,9 @@ test_that("initializes with region, population model, stages & schedule", {
                                                 stages = 2:3, schedule = 4:6))
   expect_is(manage_actions, "ManageActions")
   expect_named(manage_actions,
-               c(c("get_type", "get_label", "get_stages", "get_schedule",
-                   "include_cost", "get_cost_unit", "clear_attributes",
-                   "apply")))
+               c(c("get_type", "get_id", "set_id", "get_label", "get_stages",
+                   "get_schedule", "include_cost", "get_cost_unit",
+                   "clear_attributes", "apply")))
   expect_equal(manage_actions$get_type(), "detection")
   expect_equal(manage_actions$get_label(), "action")
   expect_equal(manage_actions$get_stages(), 2:3)
@@ -42,4 +42,7 @@ test_that("initializes with region, population model, stages & schedule", {
   expect_null(manage_actions$get_cost_unit())
   expect_equal(manage_actions$clear_attributes(1:10), 1:10) # returns n
   expect_equal(manage_actions$apply(1:10, 4), 1:10) # returns n
+  expect_silent(manage_actions$set_id("a1"))
+  expect_equal(manage_actions$get_id(), "a1")
+  expect_equal(manage_actions$get_label(), "a1_action")
 })

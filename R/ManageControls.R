@@ -62,6 +62,8 @@
 #'   for accessing attributes and applying simulated management controls:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action ("control").}
+#'     \item{\code{get_id()}}{Get the actions numeric identifier.}
+#'     \item{\code{set_id(id)}}{Set the actions numeric identifier.}
 #'     \item{\code{get_label()}}{Get the management actions label used in
 #'       simulation results (e.g. "control_growth").}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
@@ -185,7 +187,11 @@ ManageControls.Region <- function(region, population_model,
 
   # Get results label
   self$get_label <- function() {
-    return(paste0("control_", control_type))
+    prefix <- ""
+    if (!is.null(self$get_id())) {
+      prefix <- paste0(self$get_id(), "_")
+    }
+    return(paste0(prefix, "control_", control_type))
   }
 
   # Does cost parameter (named) having a value?
@@ -203,7 +209,7 @@ ManageControls.Region <- function(region, population_model,
   # Clear attached attributes
   self$clear_attributes <- function(n) {
     attr(n, self$get_label()) <- NULL
-    attr(n, paste0(self$get_label(), "_cost")) <- NULL
+    attr(n, names(self$include_cost())) <- NULL
     return(n)
   }
 
@@ -219,7 +225,8 @@ ManageControls.Region <- function(region, population_model,
       if (population_model$get_type() == "stage_structured") {
         controlled <- lapply(controlled, function(controlled_i) {
           controlled_i <- array(controlled_i, dim(n))
-          colnames(controlled_i) <- attr(population_model$get_growth(), "labels")
+          colnames(controlled_i) <-
+            attr(population_model$get_growth(), "labels")
           return(controlled_i)
         })
       }
@@ -313,9 +320,9 @@ ManageControls.Region <- function(region, population_model,
       # Attach control costs as an attribute via label
       if (!is.null(control_cost)) {
         if (is.null(schedule) || tm %in% schedule) {
-          attr(n, paste0(self$get_label(), "_cost")) <- control_cost
+          attr(n, names(self$include_cost())) <- control_cost
         } else {
-          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
+          attr(n, names(self$include_cost())) <- control_cost*0
         }
       }
     }
@@ -393,9 +400,9 @@ ManageControls.Region <- function(region, population_model,
       # Attach control costs as an attribute via label
       if (!is.null(control_cost)) {
         if (is.null(schedule) || tm %in% schedule) {
-          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*cost_apply
+          attr(n, names(self$include_cost())) <- control_cost*cost_apply
         } else {
-          attr(n, paste0(self$get_label(), "_cost")) <- control_cost*0
+          attr(n, names(self$include_cost())) <- control_cost*0
         }
       }
     }

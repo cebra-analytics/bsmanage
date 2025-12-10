@@ -50,6 +50,8 @@
 #'   for accessing attributes and applying simulated management removals:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action ("removal").}
+#'     \item{\code{get_id()}}{Get the actions numeric identifier.}
+#'     \item{\code{set_id(id)}}{Set the actions numeric identifier.}
 #'     \item{\code{get_label()}}{Get the management actions label used in
 #'       simulation results (i.e. "removed").}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
@@ -135,13 +137,21 @@ ManageRemovals.Region <- function(region, population_model,
 
   # Get results label
   self$get_label <- function() {
-    return("removed")
+    prefix <- ""
+    if (!is.null(self$get_id())) {
+      prefix <- paste0(self$get_id(), "_")
+    }
+    return(paste0(prefix, "removed"))
   }
 
   # Does cost parameter (named) having a value?
   self$include_cost <- function() {
     include_cost <- is.numeric(removal_cost)
-    names(include_cost) <- "removal_cost"
+    prefix <- ""
+    if (!is.null(self$get_id())) {
+      prefix <- paste0(self$get_id(), "_")
+    }
+    names(include_cost) <- paste0(prefix, "removal_cost")
     return(include_cost)
   }
 
@@ -152,8 +162,8 @@ ManageRemovals.Region <- function(region, population_model,
 
   # Clear attached attributes
   self$clear_attributes <- function(n) {
-    attr(n, "removed") <- NULL
-    attr(n, "removal_cost") <- NULL
+    attr(n, self$get_label()) <- NULL
+    attr(n, names(self$include_cost())) <- NULL
     return(n)
   }
 
@@ -285,14 +295,14 @@ ManageRemovals.Region <- function(region, population_model,
 
     # Attach removed as an attribute
     if (population_model$get_type() == "presence_only") {
-      attr(n, "removed") <- as.logical(removed)
+      attr(n, self$get_label()) <- as.logical(removed)
     } else {
-      attr(n, "removed") <- removed
+      attr(n, self$get_label()) <- removed
     }
 
     # Attach removal costs as an attribute
     if (!is.null(removal_cost)) {
-      attr(n, "removal_cost") <- removal_cost*cost_apply
+      attr(n, names(self$include_cost())) <- removal_cost*cost_apply
     }
 
     return(n)

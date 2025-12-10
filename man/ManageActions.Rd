@@ -52,6 +52,8 @@ A \code{ManageActions} class object (list) containing a function for
 applying simulated management actions:
 \describe{
 \item{\code{get_type()}}{Get the management actions type.}
+\item{\code{get_id()}}{Get the actions numeric identifier.}
+\item{\code{set_id(id)}}{Set the actions numeric identifier.}
 \item{\code{get_label()}}{Get the management actions label used in
 simulation results.}
 \item{\code{get_stages()}}{Get the population stages to which management
