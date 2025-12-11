@@ -52,14 +52,20 @@
 #'     \item{\code{get_type()}}{Get the type of management action ("removal").}
 #'     \item{\code{get_id()}}{Get the actions numeric identifier.}
 #'     \item{\code{set_id(id)}}{Set the actions numeric identifier.}
-#'     \item{\code{get_label()}}{Get the management actions label used in
-#'       simulation results (i.e. "removed").}
+#'     \item{\code{get_label(include_id = TRUE)}}{Get the management actions
+#'       label used in simulation results ("<id>_removed" or "removed").
+#'       Set \code{include_id} to include the action \code{id} as a label
+#'       prefix (default is \code{TRUE}).}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       removals are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 #'       which management removals are applied.}
 #'     \item{\code{include_cost()}}{Logical indication of a cost parameter
-#'       having a value (named as per population attachment).}
+#'       having a value.}
+#'     \item{\code{get_cost_label(include_id = TRUE)}}{Get the surveillance
+#'       cost label used in simulation results ("<id>_removal_cost" or
+#'       "removal_cost"). Set \code{include_id} to include the action \code{id}
+#'       as a label prefix (default is \code{TRUE}).}
 #'     \item{\code{get_cost_unit()}}{Get the unit of removal cost.}
 #'     \item{\code{clear_attributes(n)}}{Clear attached attributes associated
 #'       with this action from a simulated population vector or matrix
@@ -136,23 +142,26 @@ ManageRemovals.Region <- function(region, population_model,
   }
 
   # Get results label
-  self$get_label <- function() {
-    prefix <- ""
-    if (!is.null(self$get_id())) {
-      prefix <- paste0(self$get_id(), "_")
+  self$get_label <- function(include_id = TRUE) {
+    if (!is.null(self$get_id()) && include_id) {
+      return(paste0(self$get_id(), "_", "removed"))
+    } else {
+      return("removed")
     }
-    return(paste0(prefix, "removed"))
   }
 
-  # Does cost parameter (named) having a value?
+  # Does the removal cost parameter have a value?
   self$include_cost <- function() {
-    include_cost <- is.numeric(removal_cost)
-    prefix <- ""
-    if (!is.null(self$get_id())) {
-      prefix <- paste0(self$get_id(), "_")
+    return(is.numeric(removal_cost))
+  }
+
+  # Get removal cost results label
+  self$get_cost_label <- function(include_id = TRUE) {
+    if (!is.null(self$get_id()) && include_id) {
+      return(paste0(self$get_id(), "_", "removal_cost"))
+    } else {
+      return("removal_cost")
     }
-    names(include_cost) <- paste0(prefix, "removal_cost")
-    return(include_cost)
   }
 
   # Get the unit of removal cost
@@ -163,7 +172,7 @@ ManageRemovals.Region <- function(region, population_model,
   # Clear attached attributes
   self$clear_attributes <- function(n) {
     attr(n, self$get_label()) <- NULL
-    attr(n, names(self$include_cost())) <- NULL
+    attr(n, self$get_cost_label()) <- NULL
     return(n)
   }
 
@@ -203,7 +212,8 @@ ManageRemovals.Region <- function(region, population_model,
         # Removal locations
         if (population_model$get_type() == "stage_structured") {
           idx <-
-            which(rowSums((n - attr(n, "undetected"))[,self$get_stages()]) > 0)
+            which(rowSums((n - attr(n, "undetected"))[,self$get_stages(),
+                                                      drop = FALSE]) > 0)
         } else {
           idx <- which(n_apply$detected > 0)
         }
@@ -224,7 +234,7 @@ ManageRemovals.Region <- function(region, population_model,
           idx <- c() # none detected
         } else {
           if (population_model$get_type() == "stage_structured") {
-            idx <- which(rowSums(n[,self$get_stages()]) > 0)
+            idx <- which(rowSums(n[,self$get_stages(), drop = FALSE]) > 0)
           } else {
             idx <- which(n > 0)
           }
@@ -302,7 +312,7 @@ ManageRemovals.Region <- function(region, population_model,
 
     # Attach removal costs as an attribute
     if (!is.null(removal_cost)) {
-      attr(n, names(self$include_cost())) <- removal_cost*cost_apply
+      attr(n, self$get_cost_label()) <- removal_cost*cost_apply
     }
 
     return(n)

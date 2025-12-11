@@ -46,19 +46,24 @@ test_that("initializes with region, population, and other parameters", {
   expect_s3_class(manage_controls, "ManageActions")
   expect_named(manage_controls,
                c(c("get_type", "get_id", "set_id", "get_label", "get_stages",
-                   "get_schedule", "include_cost", "get_cost_unit",
-                   "clear_attributes", "apply")))
+                   "get_schedule", "include_cost", "get_cost_label",
+                   "get_cost_unit", "clear_attributes", "apply")))
   expect_equal(manage_controls$get_type(), "control")
   expect_equal(manage_controls$get_label(), "control_search_destroy")
   expect_equal(manage_controls$get_stages(), 2:3)
   expect_equal(manage_controls$get_schedule(), 4:6)
   expect_true(manage_controls$include_cost())
-  expect_named(manage_controls$include_cost(), "control_search_destroy_cost")
+  expect_equal(manage_controls$get_cost_label(), "control_search_destroy_cost")
   expect_equal(manage_controls$get_cost_unit(), "$")
   expect_silent(manage_controls$set_id("a1"))
   expect_equal(manage_controls$get_id(), "a1")
   expect_equal(manage_controls$get_label(), "a1_control_search_destroy")
-  expect_named(manage_controls$include_cost(), "a1_control_search_destroy_cost")
+  expect_equal(manage_controls$get_label(include_id = FALSE),
+               "control_search_destroy")
+  expect_equal(manage_controls$get_cost_label(),
+               "a1_control_search_destroy_cost")
+  expect_equal(manage_controls$get_cost_label(include_id = FALSE),
+               "control_search_destroy_cost")
   expect_error(
     manage_controls <- ManageControls(region, population_model,
                                       control_type = "growth"),
@@ -101,12 +106,15 @@ test_that("initializes with region, population, and other parameters", {
                                       schedule = 4:6))
   expect_equal(manage_controls$get_label(), "control_growth")
   expect_true(manage_controls$include_cost())
-  expect_named(manage_controls$include_cost(), "control_growth_cost")
+  expect_equal(manage_controls$get_cost_label(), "control_growth_cost")
   expect_equal(manage_controls$get_cost_unit(), "$")
   expect_silent(manage_controls$set_id("a2"))
   expect_equal(manage_controls$get_id(), "a2")
   expect_equal(manage_controls$get_label(), "a2_control_growth")
-  expect_named(manage_controls$include_cost(), "a2_control_growth_cost")
+  expect_equal(manage_controls$get_label(include_id = FALSE), "control_growth")
+  expect_equal(manage_controls$get_cost_label(), "a2_control_growth_cost")
+  expect_equal(manage_controls$get_cost_label(include_id = FALSE),
+               "control_growth_cost")
 })
 
 test_that("applies stochastic search and destroy controls to population", {

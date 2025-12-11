@@ -36,8 +36,10 @@
 #'       ("detection").}
 #'     \item{\code{get_id()}}{Get the actions numeric identifier.}
 #'     \item{\code{set_id(id)}}{Set the actions numeric identifier.}
-#'     \item{\code{get_label()}}{Get the management actions label used in
-#'       simulation results (i.e. "detected").}
+#'     \item{\code{get_label(include_id = TRUE)}}{Get the management actions
+#'       label used in simulation results ("<id>_detected" or "detected").
+#'       Set \code{include_id} to include the action \code{id} as a label
+#'       prefix (default is \code{TRUE}).}
 #'     \item{\code{get_surveillance()}}{Get the surveillance design class
 #'       object.}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
@@ -45,7 +47,11 @@
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 #'       which management detection are applied.}
 #'     \item{\code{include_cost()}}{Logical indication of a cost parameter
-#'       having a value (named as per population attachment).}
+#'       having a value.}
+#'     \item{\code{get_cost_label(include_id = TRUE)}}{Get the surveillance
+#'       cost label used in simulation results ("<id>_surv_cost" or
+#'       "surv_cost"). Set \code{include_id} to include the action \code{id}
+#'       as a label prefix (default is \code{TRUE}).}
 #'     \item{\code{get_cost_unit()}}{Get the unit of surveillance cost.}
 #'     \item{\code{clear_attributes(n)}}{Clear attached attributes associated
 #'       with this action from a simulated population vector or matrix
@@ -113,12 +119,12 @@ ManageDetection.Region <- function(region,
   }
 
   # Get results label
-  self$get_label <- function() {
-    prefix <- ""
-    if (!is.null(self$get_id())) {
-      prefix <- paste0(self$get_id(), "_")
+  self$get_label <- function(include_id = TRUE) {
+    if (!is.null(self$get_id()) && include_id) {
+      return(paste0(self$get_id(), "_", "detected"))
+    } else {
+      return("detected")
     }
-    return(paste0(prefix, "detected"))
   }
 
   # Get the surveillance object
@@ -126,15 +132,18 @@ ManageDetection.Region <- function(region,
     return(surveillance)
   }
 
-  # Does cost parameter (named) having a value?
+  # Does the surveillance cost parameter have a value?
   self$include_cost <- function() {
-    include_cost <- is.numeric(surv_cost)
-    prefix <- ""
-    if (!is.null(self$get_id())) {
-      prefix <- paste0(self$get_id(), "_")
+    return(is.numeric(surv_cost))
+  }
+
+  # Get surveillance cost results label
+  self$get_cost_label <- function(include_id = TRUE) {
+    if (!is.null(self$get_id()) && include_id) {
+      return(paste0(self$get_id(), "_", "surv_cost"))
+    } else {
+      return("surv_cost")
     }
-    names(include_cost) <- paste0(prefix, "surv_cost")
-    return(include_cost)
   }
 
   # Get the unit of surveillance cost
@@ -146,7 +155,7 @@ ManageDetection.Region <- function(region,
   self$clear_attributes <- function(n) {
     attr(n, self$get_label()) <- NULL
     attr(n, "undetected") <- NULL
-    attr(n, names(self$include_cost())) <- NULL
+    attr(n, self$get_cost_label()) <- NULL
     return(n)
   }
 
@@ -196,14 +205,14 @@ ManageDetection.Region <- function(region,
 
       # Attach surveillance costs as an attribute
       if (!is.null(surv_cost)) {
-        attr(n, names(self$include_cost())) <- surv_cost
+        attr(n, self$get_cost_label()) <- surv_cost
       }
 
     } else {
 
       # Attach zero surveillance costs as an attribute
       if (!is.null(surv_cost)) {
-        attr(n, names(self$include_cost())) <- surv_cost*0
+        attr(n, self$get_cost_label()) <- surv_cost*0
       }
     }
 

@@ -66,12 +66,20 @@
 #'     \item{\code{set_id(id)}}{Set the actions numeric identifier.}
 #'     \item{\code{get_label()}}{Get the management actions label used in
 #'       simulation results (e.g. "control_growth").}
+#'     \item{\code{get_label(include_id = TRUE)}}{Get the management actions
+#'       label used in simulation results (e.g."<id>_control_growth" or
+#'       "control_growth"). Set \code{include_id} to include the action
+#'       \code{id} as a label prefix (default is \code{TRUE}).}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       controls are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 #'       which management controls are applied.}
 #'     \item{\code{include_cost()}}{Logical indication of a cost parameter
-#'       having a value (named as per population attachment).}
+#'       having a value.}
+#'     \item{\code{get_cost_label(include_id = TRUE)}}{Get the surveillance
+#'       cost label used in simulation results ("<id>_control_growth_cost" or
+#'       "control_growth_cost"). Set \code{include_id} to include the action
+#'       \code{id} as a label prefix (default is \code{TRUE}).}
 #'     \item{\code{get_cost_unit()}}{Get the unit of control cost.}
 #'     \item{\code{clear_attributes(n)}}{Clear attached attributes associated
 #'       with this action from a simulated population vector or matrix
@@ -186,19 +194,22 @@ ManageControls.Region <- function(region, population_model,
   }
 
   # Get results label
-  self$get_label <- function() {
-    prefix <- ""
-    if (!is.null(self$get_id())) {
-      prefix <- paste0(self$get_id(), "_")
+  self$get_label <- function(include_id = TRUE) {
+    if (!is.null(self$get_id()) && include_id) {
+      return(paste0(self$get_id(), "_", "control_", control_type))
+    } else {
+      return(paste0("control_", control_type))
     }
-    return(paste0(prefix, "control_", control_type))
   }
 
-  # Does cost parameter (named) having a value?
+  # Does the control cost parameter have a value?
   self$include_cost <- function() {
-    include_cost <- is.numeric(control_cost)
-    names(include_cost) <- paste0(self$get_label(), "_cost")
-    return(include_cost)
+    return(is.numeric(control_cost))
+  }
+
+  # Get control cost results label
+  self$get_cost_label <- function(include_id = TRUE) {
+    return(paste0(self$get_label(include_id = include_id), "_cost"))
   }
 
   # Get the unit of control cost
@@ -209,7 +220,8 @@ ManageControls.Region <- function(region, population_model,
   # Clear attached attributes
   self$clear_attributes <- function(n) {
     attr(n, self$get_label()) <- NULL
-    attr(n, names(self$include_cost())) <- NULL
+    attr(n, "undetected") <- NULL
+    attr(n, self$get_cost_label()) <- NULL
     return(n)
   }
 
@@ -320,9 +332,9 @@ ManageControls.Region <- function(region, population_model,
       # Attach control costs as an attribute via label
       if (!is.null(control_cost)) {
         if (is.null(schedule) || tm %in% schedule) {
-          attr(n, names(self$include_cost())) <- control_cost
+          attr(n, self$get_cost_label()) <- control_cost
         } else {
-          attr(n, names(self$include_cost())) <- control_cost*0
+          attr(n, self$get_cost_label()) <- control_cost*0
         }
       }
     }
@@ -400,9 +412,9 @@ ManageControls.Region <- function(region, population_model,
       # Attach control costs as an attribute via label
       if (!is.null(control_cost)) {
         if (is.null(schedule) || tm %in% schedule) {
-          attr(n, names(self$include_cost())) <- control_cost*cost_apply
+          attr(n, self$get_cost_label()) <- control_cost*cost_apply
         } else {
-          attr(n, names(self$include_cost())) <- control_cost*0
+          attr(n, self$get_cost_label()) <- control_cost*0
         }
       }
     }

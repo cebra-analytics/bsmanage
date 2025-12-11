@@ -197,6 +197,8 @@ ManageResults.Region <- function(region, population_model,
 
   # Initialize additional incursion management result lists
   results <- list()
+
+  # Impact results
   if (length(impacts) > 0) {
     results$impacts <- lapply(impacts, function(impacts_i) {
       zeros <- list()
@@ -244,10 +246,22 @@ ManageResults.Region <- function(region, population_model,
       impact_aspects
     })
   }
+
+  # Action results
   if (length(actions) > 0) {
+    if (!is.null(names(actions)) || length(actions) > 1) { # set ids
+      if (!is.null(names(actions))) {
+        action_i <- names(actions)    # named actions
+      } else {
+        action_i <- 1:length(actions) # indices
+      }
+      for (i in action_i) {
+        actions[[i]]$set_id(i)
+      }
+    }
     results$actions <- lapply(actions, function(actions_i) {
       zeros <- list()
-      direct_action <- (actions_i$get_label() %in%
+      direct_action <- (actions_i$get_label(include_id = FALSE) %in%
                           c("detected", "control_search_destroy", "removed"))
       if (is.numeric(stages) && direct_action) {
         if (is.numeric(combine_stages)) {
@@ -293,11 +307,12 @@ ManageResults.Region <- function(region, population_model,
         }
       }
       actions_list <- list()
-      actions_list[[actions_i$get_label()]] <- list()
+      actions_list[[actions_i$get_label(include_id = FALSE)]] <- list()
       if (include_collated) {
         for (tm in as.character(c(0, seq(collation_steps, time_steps,
                                          by = collation_steps)))) {
-          actions_list[[actions_i$get_label()]][[tm]] <- zeros$action
+          actions_list[[actions_i$get_label(include_id = FALSE)]][[tm]] <-
+            zeros$action
         }
         actions_list$total <- list()
         for (tm in as.character(0:time_steps)) {
@@ -305,17 +320,18 @@ ManageResults.Region <- function(region, population_model,
         }
       } else {
         for (tm in as.character(0:time_steps)) {
-          actions_list[[actions_i$get_label()]][[tm]] <- zeros$action
+          actions_list[[actions_i$get_label(include_id = FALSE)]][[tm]] <-
+            zeros$action
         }
       }
       if (actions_i$include_cost()) {
         actions_list$cost <- list()
-        actions_list$cost[[actions_i$get_label()]] <- list()
+        actions_list$cost[[actions_i$get_label(include_id = FALSE)]] <- list()
         if (include_collated) {
           for (tm in as.character(c(0, seq(collation_steps, time_steps,
                                            by = collation_steps)))) {
-            actions_list$cost[[actions_i$get_label()]][[tm]] <-
-              zeros$action_cost
+            actions_list$cost[[actions_i$get_label(include_id = FALSE)
+                               ]][[tm]] <- zeros$action_cost
           }
           actions_list$cost$total <- list()
           for (tm in as.character(0:time_steps)) {
@@ -323,8 +339,8 @@ ManageResults.Region <- function(region, population_model,
           }
         } else {
           for (tm in as.character(0:time_steps)) {
-            actions_list$cost[[actions_i$get_label()]][[tm]] <-
-              zeros$action_cost
+            actions_list$cost[[actions_i$get_label(include_id = FALSE)
+                               ]][[tm]] <- zeros$action_cost
           }
         }
         actions_list$cost$cumulative <- actions_list$cost
@@ -368,10 +384,7 @@ ManageResults.Region <- function(region, population_model,
     attr(n_no_attr, "recovery_delay") <- NULL
     attr(n_no_attr, "dynamic_mult") <- NULL
     for (a in actions) {
-      attr(n_no_attr, a$get_label()) <- NULL
-      if (a$include_cost()) {
-        attr(n_no_attr, names(a$include_cost())) <- NULL
-      }
+      n_no_attr <- a$clear_attributes(n_no_attr)
     }
     super$collate(r, tm, n_no_attr)
 
@@ -576,8 +589,8 @@ ManageResults.Region <- function(region, population_model,
       for (i in 1:length(actions)) {
 
         # Get attribute from n
-        a <- actions[[i]]$get_label()
-        n_a <- attr(n, a)*1
+        a <- actions[[i]]$get_label(include_id = FALSE)
+        n_a <- attr(n, actions[[i]]$get_label())*1
         direct_action <-
           (a %in% c("detected", "control_search_destroy", "removed"))
 
@@ -604,7 +617,7 @@ ManageResults.Region <- function(region, population_model,
 
         # Get attached action cost
         if (actions[[i]]$include_cost()) {
-          a_cost <- as.numeric(attr(n, names(actions[[i]]$include_cost())))
+          a_cost <- as.numeric(attr(n, actions[[i]]$get_cost_label()))
 
           # Add to current cumulative
           if (tm == 0) {
@@ -992,7 +1005,7 @@ ManageResults.Region <- function(region, population_model,
             }
           }
           if ("cost" %in% names(results$actions[[i]])) {
-            a <- actions[[i]]$get_label()
+            a <- actions[[i]]$get_label(include_id = FALSE)
             for (tmc in names(results$actions[[i]]$cost[[a]])) {
               results$actions[[i]]$cost[[a]][[tmc]]$sd <<-
                 sqrt(results$actions[[i]]$cost[[a]][[tmc]]$sd/(replicates - 1))
@@ -1289,7 +1302,7 @@ ManageResults.Region <- function(region, population_model,
           }
 
           # Action key/name. Direct action?
-          a <- actions[[i]]$get_label()
+          a <- actions[[i]]$get_label(include_id = FALSE)
           direct_action <-
             (a %in%  c("detected", "control_search_destroy", "removed"))
           a_name <- a_key <- sub("control_", "", a, fixed = TRUE)
@@ -1947,7 +1960,7 @@ ManageResults.Region <- function(region, population_model,
           }
 
           # Action key/name. Direct action?
-          a <- actions[[i]]$get_label()
+          a <- actions[[i]]$get_label(include_id = FALSE)
           direct_action <-
             (a %in%  c("detected", "control_search_destroy", "removed"))
           a_name <- a_key <- sub("control_", "", a, fixed = TRUE)
@@ -2300,7 +2313,7 @@ ManageResults.Region <- function(region, population_model,
         for (i in action_i) {
 
           # Action key/name. Direct action?
-          a <- actions[[i]]$get_label()
+          a <- actions[[i]]$get_label(include_id = FALSE)
           direct_action <-
             (a %in%  c("detected", "control_search_destroy", "removed"))
           a_name <- a_key <- sub("control_", "", a, fixed = TRUE)
@@ -2691,7 +2704,7 @@ ManageResults.Region <- function(region, population_model,
         }
 
         # Action label/key/name. Direct action?
-        a_lab <- actions[[i]]$get_label()
+        a_lab <- actions[[i]]$get_label(include_id = FALSE)
         direct_action <-
           (a_lab %in%  c("detected", "control_search_destroy", "removed"))
         a_name <- a_key <- sub("control_", "", a_lab, fixed = TRUE)

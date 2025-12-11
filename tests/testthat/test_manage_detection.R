@@ -40,20 +40,24 @@ test_that("initializes with region, population, and surveillance", {
   expect_s3_class(manage_detection, "ManageActions")
   expect_named(manage_detection,
                c(c("get_type", "get_id", "set_id", "get_label", "get_stages",
-                   "get_schedule", "include_cost", "get_cost_unit",
-                   "clear_attributes", "apply", "get_surveillance")))
+                   "get_schedule", "include_cost", "get_cost_label",
+                   "get_cost_unit", "clear_attributes", "apply",
+                   "get_surveillance")))
   expect_equal(manage_detection$get_type(), "detection")
   expect_equal(manage_detection$get_label(), "detected")
   expect_is(manage_detection$get_surveillance(), "SpatialSurvDesign")
   expect_equal(manage_detection$get_stages(), 2:3)
   expect_equal(manage_detection$get_schedule(), 4:6)
   expect_true(manage_detection$include_cost())
-  expect_named(manage_detection$include_cost(), "surv_cost")
+  expect_equal(manage_detection$get_cost_label(), "surv_cost")
   expect_equal(manage_detection$get_cost_unit(), "$")
   expect_silent(manage_detection$set_id("a1"))
   expect_equal(manage_detection$get_id(), "a1")
   expect_equal(manage_detection$get_label(), "a1_detected")
-  expect_named(manage_detection$include_cost(), "a1_surv_cost")
+  expect_equal(manage_detection$get_label(include_id = FALSE), "detected")
+  expect_equal(manage_detection$get_cost_label(), "a1_surv_cost")
+  expect_equal(manage_detection$get_cost_label(include_id = FALSE),
+               "surv_cost")
 })
 
 test_that("applies stochastic detection to invasive population", {

@@ -24,14 +24,18 @@
 #'     \item{\code{get_type()}}{Get the management actions type.}
 #'     \item{\code{get_id()}}{Get the actions numeric identifier.}
 #'     \item{\code{set_id(id)}}{Set the actions numeric identifier.}
-#'     \item{\code{get_label()}}{Get the management actions label used in
-#'       simulation results.}
+#'     \item{\code{get_label(include_id = TRUE)}}{Get the management actions
+#'       label used in simulation results. Set \code{include_id} to include
+#'       the action \code{id} as a label prefix (default is \code{TRUE}).}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       actions are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 #'       which management actions are applied.}
 #'     \item{\code{include_cost()}}{Logical indication of a cost parameter
-#'       having a value (named as per population attachment).}
+#'       having a value.}
+#'     \item{\code{get_cost_label(include_id = TRUE)}}{Get the action cost
+#'       label used in simulation results. Set \code{include_id} to include
+#'       the action \code{id} as a label prefix (default is \code{TRUE}).}
 #'     \item{\code{get_cost_unit()}}{Get the unit of action cost.}
 #'     \item{\code{clear_attributes(n)}}{Clear attached attributes associated
 #'       with this action from a simulated population vector or matrix
@@ -116,12 +120,12 @@ ManageActions.Region <- function(region, population_model,
   }
 
   # Get results label (overridden in inherited classes)
-  self$get_label <- function() {
-    prefix <- ""
-    if (!is.null(id)) {
-      prefix <- paste0(id, "_")
+  self$get_label <- function(include_id = TRUE) {
+    if (!is.null(id) && include_id) {
+      return(paste0(id, "_", "action"))
+    } else {
+      return("action")
     }
-    return(paste0(prefix, "action"))
   }
 
   # Get stages
@@ -135,8 +139,18 @@ ManageActions.Region <- function(region, population_model,
   }
 
   # Does cost parameter (named) having a value?
-  self$include_cost <- function() { # overridden in inherited classes
+  self$include_cost <- function() {
+    # overridden in inherited classes
     return(FALSE)
+  }
+
+  # Get cost results label (overridden in inherited classes)
+  self$get_cost_label <- function(include_id = TRUE) {
+    if (!is.null(id) && include_id) {
+      return(paste0(id, "_", "action_cost"))
+    } else {
+      return("action_cost")
+    }
   }
 
   # Get the unit of action cost

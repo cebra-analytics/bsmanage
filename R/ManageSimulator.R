@@ -322,7 +322,7 @@ ManageSimulator.Region <- function(region,
 
           # Clear attributes
           for (i in 1:length(actions)) {
-            attr(n, actions[[i]]$get_label()) <- NULL
+            n <- actions[[i]]$clear_attributes(n)
           }
 
           # Apply sequentially

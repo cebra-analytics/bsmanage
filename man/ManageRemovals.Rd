@@ -92,14 +92,20 @@ for accessing attributes and applying simulated management removals:
 \item{\code{get_type()}}{Get the type of management action ("removal").}
 \item{\code{get_id()}}{Get the actions numeric identifier.}
 \item{\code{set_id(id)}}{Set the actions numeric identifier.}
-\item{\code{get_label()}}{Get the management actions label used in
-simulation results (i.e. "removed").}
+\item{\code{get_label(include_id = TRUE)}}{Get the management actions
+label used in simulation results ("\if{html}{\out{<id>}}_removed" or "removed").
+Set \code{include_id} to include the action \code{id} as a label
+prefix (default is \code{TRUE}).}
 \item{\code{get_stages()}}{Get the population stages to which management
 removals are applied.}
 \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
 which management removals are applied.}
 \item{\code{include_cost()}}{Logical indication of a cost parameter
-having a value (named as per population attachment).}
+having a value.}
+\item{\code{get_cost_label(include_id = TRUE)}}{Get the surveillance
+cost label used in simulation results ("\if{html}{\out{<id>}}_removal_cost" or
+"removal_cost"). Set \code{include_id} to include the action \code{id}
+as a label prefix (default is \code{TRUE}).}
 \item{\code{get_cost_unit()}}{Get the unit of removal cost.}
 \item{\code{clear_attributes(n)}}{Clear attached attributes associated
 with this action from a simulated population vector or matrix

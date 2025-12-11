@@ -44,14 +44,14 @@ test_that("initializes with region, population, and other parameters", {
   expect_s3_class(manage_removals, "ManageActions")
   expect_named(manage_removals,
                c(c("get_type", "get_id", "set_id", "get_label", "get_stages",
-                   "get_schedule", "include_cost", "get_cost_unit",
-                   "clear_attributes", "apply")))
+                   "get_schedule", "include_cost", "get_cost_label",
+                   "get_cost_unit", "clear_attributes", "apply")))
   expect_equal(manage_removals$get_type(), "removal")
   expect_equal(manage_removals$get_label(), "removed")
   expect_equal(manage_removals$get_stages(), 2:3)
   expect_equal(manage_removals$get_schedule(), 4:6)
   expect_true(manage_removals$include_cost())
-  expect_named(manage_removals$include_cost(), "removal_cost")
+  expect_equal(manage_removals$get_cost_label(), "removal_cost")
   expect_null(manage_removals$get_cost_unit())
   removal_cost <- 2
   attr(removal_cost, "unit") <- "beans"
@@ -62,7 +62,10 @@ test_that("initializes with region, population, and other parameters", {
   expect_silent(manage_removals$set_id("a1"))
   expect_equal(manage_removals$get_id(), "a1")
   expect_equal(manage_removals$get_label(), "a1_removed")
-  expect_named(manage_removals$include_cost(), "a1_removal_cost")
+  expect_equal(manage_removals$get_label(include_id = FALSE), "removed")
+  expect_equal(manage_removals$get_cost_label(), "a1_removal_cost")
+  expect_equal(manage_removals$get_cost_label(include_id = FALSE),
+               "removal_cost")
 })
 
 test_that("applies stochastic removals to invasive population", {
