@@ -90,8 +90,13 @@ actions).}
 \item{\code{save_rasters(...)}}{Save the collated results as raster TIF
 files when the region is grid-based. \code{Terra} raster write options
 may be passed to the function. Returns a list of saved \code{Terra}
-raster layers with attached attributes indicating if each layer
-contains non-zero values.}
+raster layers with attached \code{"metadata"} attribute list, which
+includes: plot category; impact or action type & name; impact
+incursion type; population stage (when applicable); an indication of
+whether or not layers represent costs and/or are cumulative outputs;
+multi-replicate summary (when applicable); a descriptive label; units;
+scale type; and an indication of whether or not each layer contains
+non-zero values.}
 \item{\code{save_csv()}}{Save the collated results as comma-separated
 values (CSV) files when the region is patch-based. Also saves the
 population totals, area occupied, as well as impact and action totals
