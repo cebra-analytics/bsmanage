@@ -1101,10 +1101,15 @@ ManageResults.Region <- function(region, population_model,
     return(c(super$get_list(), results))
   }
 
-  # Convert first letter of title to upper-case
-  title_first <- function(title_str) {
-    return(paste0(toupper(substr(title_str, 1, 1)),
-                  substr(title_str, 2, nchar(title_str))))
+  # Convert first letter of each word of string to upper-case
+  title_case <- function(title_str, all = TRUE) {
+    title_str <- as.character(title_str)
+    if (all) {
+      title_str <- unlist(strsplit(title_str, " ", fixed = TRUE))
+    }
+    return(paste(paste0(toupper(substr(title_str, 1, 1)),
+                        substr(title_str, 2, nchar(title_str))),
+                 collapse = " "))
   }
 
   # Save collated results as raster files
@@ -1252,21 +1257,25 @@ ManageResults.Region <- function(region, population_model,
                   terra::writeRaster(output_rast, filename, ...)
               }
 
-              # Add list of metadata as an attribute
+              # Add list of impacts metadata as an attribute
               if (impacts[[i]]$get_impacts()$get_is_dynamic()) {
                 impact_type <- "dynamic"
               } else {
                 impact_type <- impacts[[i]]$get_context()$get_valuation_type()
               }
-              incursion_type <-
-                impacts[[i]]$get_impacts()$get_incursion()$get_type()
               if (a %in% names(cum_aspects)) {
                 aspect <- unname(cum_aspects[a])
                 cumulative <- TRUE
+                cumulative_label <- "cumulative "
               } else {
                 aspect <- a
                 cumulative <- FALSE
+                cumulative_label <- ""
               }
+              label <- paste0(cumulative_label, impact_type, " ", aspect,
+                              " impacts")
+              incursion_type <-
+                impacts[[i]]$get_impacts()$get_incursion()$get_type()
               attr(output_list[[output_key]], "metadata") <- list(
                 category = "impact",
                 type = impact_type,
@@ -1275,7 +1284,9 @@ ManageResults.Region <- function(region, population_model,
                 cost = FALSE,
                 cumulative = cumulative,
                 summary = s,
-                unit = unname(unit_map[a]),
+                label = title_case(label),
+                units = unname(unit_map[a]),
+                scale_type = "continuous",
                 nonzero = nonzero_list[[output_key]]
               )
             }
@@ -1418,24 +1429,46 @@ ManageResults.Region <- function(region, population_model,
                   terra::writeRaster(output_rast, filename, ...)
               }
 
-              # Add list of metadata as an attribute
-              if (is.null(stages)) {
-                stage_attr <- NULL
-              } else {
-                stage_attr <- j
+              # Add list of actions metadata as an attribute
+              label <- a_name
+              if (population_model$get_type() == "unstructured") {
+                stage <- NULL
+              } else if (population_model$get_type() == "stage_structured") {
+                if (is.null(combine_stages)) {
+                  stage <- stage_labels[j]
+                  label <- paste("stage", as.character(stage), label)
+                } else if (is.numeric(combine_stages)) {
+                  stage <- "combined"
+                  label <- paste("combined stage", label)
+                }
               }
-              attr_list <- list(
+              if (s == "mean") {
+                label <- paste0("mean ", label, "s")
+              } else if (s == "sd") {
+                label <- paste(label, "standard deviation")
+              } else {
+                label <- paste0(label, "s")
+              }
+              if (direct_action ||
+                  population_model$get_type() %in% c("unstructured",
+                                                     "stage_structured")) {
+                scale_type <- "continuous"
+              } else {
+                scale_type <- "discrete"
+              }
+              attr(output_list[[output_key]], "metadata") <- list(
                 category = "action",
                 type = actions[[i]]$get_type(),
                 name = a_name,
-                stage = stage_attr,
+                stage = stage,
                 cost = FALSE,
                 cumulative = FALSE,
                 summary = s,
-                unit = "",
+                label = title_case(label),
+                units = "",
+                scale_type = scale_type,
                 nonzero = nonzero_list[[output_key]]
               )
-              attr(output_list[[output_key]], "metadata") <- attr_list
             }
           }
 
@@ -1515,7 +1548,13 @@ ManageResults.Region <- function(region, population_model,
                 }
               }
 
-              # Add list of metadata as an attribute
+              # Add list of action costs metadata as an attribute
+              label <- paste(cost_name, "costs")
+              if (s == "mean") {
+                label <- paste("mean", label)
+              } else if (s == "sd") {
+                label <- paste(label, "standard deviation")
+              }
               cost_unit <- attr(results$actions[[i]]$cost, "unit")
               attr_list <- list(
                 category = "action",
@@ -1525,12 +1564,15 @@ ManageResults.Region <- function(region, population_model,
                 cost = TRUE,
                 cumulative = FALSE,
                 summary = s,
-                unit = cost_unit,
+                label = title_case(label),
+                units = cost_unit,
+                scale_type = "continuous",
                 nonzero = nonzero_list[[output_cost_key]]
               )
               attr(output_list[[output_cost_key]], "metadata") <- attr_list
               if ("cumulative" %in% names(results$actions[[i]]$cost)) {
                 attr_list$cumulative <- TRUE
+                attr_list$label <- title_case(paste("cumulative", label))
                 attr(output_list[[output_cum_cost_key]], "metadata") <-
                   attr_list
               }
@@ -1617,7 +1659,13 @@ ManageResults.Region <- function(region, population_model,
                 }
               }
 
-              # Add list of metadata as an attribute
+              # Add list of combined action costs metadata as an attribute
+              label <- "combined action costs"
+              if (s == "mean") {
+                label <- paste("mean", label)
+              } else if (s == "sd") {
+                label <- paste(label, "standard deviation")
+              }
               cost_unit <- attr(results$actions$cost, "unit")
               attr_list <- list(
                 category = "action",
@@ -1626,12 +1674,15 @@ ManageResults.Region <- function(region, population_model,
                 cost = TRUE,
                 cumulative = FALSE,
                 summary = s,
-                unit = cost_unit,
+                label = title_case(label),
+                units = cost_unit,
+                scale_type = "continuous",
                 nonzero = nonzero_list[[output_cost_key]]
               )
               attr(output_list[[output_cost_key]], "metadata") <- attr_list
               if ("cumulative" %in% names(results$actions$cost)) {
                 attr_list$cumulative <- TRUE
+                attr_list$label <- title_case(paste("cumulative", label))
                 attr(output_list[[output_cum_cost_key]], "metadata") <-
                   attr_list
               }
@@ -1695,7 +1746,13 @@ ManageResults.Region <- function(region, population_model,
                 }
               }
 
-              # Add list of metadata as an attribute
+              # Add list of combined costs metadata as an attribute
+              label <- "combined impacts & action costs"
+              if (s == "mean") {
+                label <- paste("mean", label)
+              } else if (s == "sd") {
+                label <- paste(label, "standard deviation")
+              }
               cost_unit <- attr(results$cost, "unit")
               attr_list <- list(
                 category = "combined",
@@ -1704,12 +1761,15 @@ ManageResults.Region <- function(region, population_model,
                 cost = TRUE,
                 cumulative = FALSE,
                 summary = s,
-                unit = cost_unit,
+                label = title_case(label),
+                units = cost_unit,
+                scale_type = "continuous",
                 nonzero = nonzero_list[[output_cost_key]]
               )
               attr(output_list[[output_cost_key]], "metadata") <- attr_list
               if ("cumulative" %in% names(results$cost)) {
                 attr_list$cumulative <- TRUE
+                attr_list$label <- title_case(paste("cumulative", label))
                 attr(output_list[[output_cum_cost_key]], "metadata") <-
                   attr_list
               }
