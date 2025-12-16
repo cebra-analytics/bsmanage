@@ -1107,7 +1107,7 @@ ManageResults.Region <- function(region, population_model,
   }
 
   # Convert first letter of each word of string to upper-case
-  title_case <- function(title_str, all = TRUE) {
+  title_case <- function(title_str, all = FALSE) {
     title_str <- as.character(title_str)
     if (all) {
       title_str <- unlist(strsplit(title_str, " ", fixed = TRUE))
@@ -1146,11 +1146,15 @@ ManageResults.Region <- function(region, population_model,
         }
         for (i in impact_i) {
 
-          # Impacts post-fix
+          # Impacts post-fix and metadata label
           if (length(impact_i) == 1 && is.numeric(i)) {
-            ic <- ""
+            ic <- i_label <- ""
           } else {
             ic <- paste0("_", i)
+            i_label <- paste0(i, " ")
+            if (is.character(i)) {
+              i_label <- sub("_", " ", i_label, fixed = TRUE)
+            }
           }
 
           # Impact aspects and their cumulative when present
@@ -1277,8 +1281,7 @@ ManageResults.Region <- function(region, population_model,
                 cumulative <- FALSE
                 cumulative_label <- ""
               }
-              label <- paste0(cumulative_label, impact_type, " ", aspect,
-                              " impacts")
+              label <- paste0(cumulative_label, i_label, aspect, " impacts")
               incursion_type <-
                 impacts[[i]]$get_impacts()$get_incursion()$get_type()
               attr(output_list[[output_key]], "metadata") <- list(
@@ -1315,6 +1318,14 @@ ManageResults.Region <- function(region, population_model,
             ic <- ""
           } else {
             ic <- paste0("_", i)
+          }
+
+          # Duplicate action type prefix?
+          dupl_i <- ""
+          if (sum(sapply(actions, function(a) {
+            (a$get_label(include_id = FALSE) ==
+              actions[[i]]$get_label(include_id = FALSE))})) > 1) {
+            dupl_i <- paste0("action ", i, " ")
           }
 
           # Action key/name. Direct action?
@@ -1435,8 +1446,24 @@ ManageResults.Region <- function(region, population_model,
               }
 
               # Add list of actions metadata as an attribute
-              label <- a_name
-              if (population_model$get_type() == "unstructured") {
+              if (a == "control_search_destroy") {
+                label <- "found & destroyed"
+              } else {
+                label <- a_name
+              }
+              if (direct_action) {
+                if (population_model$get_type() == "presence_only") {
+                  label <- paste("presence", label)
+                } else {
+                  label <- paste("number", label)
+                }
+              } else {
+                label <- paste(label, "applied")
+              }
+              if (population_model$get_type() == "presence_only") {
+                stage <- NULL
+                label <- paste("occupancies", label)
+              } else if (population_model$get_type() == "unstructured") {
                 stage <- NULL
               } else if (population_model$get_type() == "stage_structured") {
                 if (is.null(combine_stages)) {
@@ -1448,12 +1475,11 @@ ManageResults.Region <- function(region, population_model,
                 }
               }
               if (s == "mean") {
-                label <- paste0("mean ", label, "s")
+                label <- paste("mean ", label)
               } else if (s == "sd") {
                 label <- paste(label, "standard deviation")
-              } else {
-                label <- paste0(label, "s")
               }
+              label <- paste0(dupl_i, label)
               if (direct_action ||
                   population_model$get_type() %in% c("unstructured",
                                                      "stage_structured")) {
@@ -2592,7 +2618,7 @@ ManageResults.Region <- function(region, population_model,
           if (length(impact_i) == 1 && is.numeric(i)) {
             ic <- c("", "")
           } else {
-            ic <- c(paste0("_", i), paste0(" : ", i))
+            ic <- c(paste0("_", i), paste0(i, " "))
           }
           units <- impacts[[i]]$get_context()$get_impact_measures()
           if (include_collated) {
@@ -2612,7 +2638,7 @@ ManageResults.Region <- function(region, population_model,
           for (a in 1:length(values_list)) {
             values <- values_list[[a]]
             if (length(values_list) > 1) {
-              ac <- c(paste0("_", a), paste0(" : ", names(values_list)[a]))
+              ac <- c(paste0("_", a), paste0(names(values_list)[a], " "))
             } else {
               ac <- c("", "")
             }
@@ -2621,17 +2647,17 @@ ManageResults.Region <- function(region, population_model,
                              sd = as.numeric(values["sd",,drop = FALSE]))
               if (include_collated) {
                 filename <- sprintf("total_impacts%s%s.png", ic[1], ac[1])
-                main_title <- sprintf("Total impacts%s%s (mean +/- 2 SD)",
+                main_title <- sprintf("total %s%simpacts (mean +/- 2 SD)",
                                       ic[2], ac[2])
               } else {
                 filename <- sprintf("impacts%s%s.png", ic[1], ac[1])
-                main_title <- sprintf("Impacts%s%s (mean +/- 2 SD)", ic[2],
+                main_title <- sprintf("%s%s impacts (mean +/- 2 SD)", ic[2],
                                       ac[2])
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
               graphics::plot(0:time_steps, values$mean, type = "l",
-                             main = main_title,
+                             main = title_case(main_title),
                              xlab = plot_x_label,
                              ylab = sprintf("Impact (%s)", units),
                              ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
@@ -2644,15 +2670,15 @@ ManageResults.Region <- function(region, population_model,
             } else {
               if (include_collated) {
                 filename <- sprintf("total_impacts%s%s.png", ic[1], ac[1])
-                main_title <- sprintf("Total impacts%s%s", ic[2], ac[2])
+                main_title <- sprintf("total %s%simpacts", ic[2], ac[2])
               } else {
                 filename <- sprintf("impacts%s%s.png", ic[1], ac[1])
-                main_title <- sprintf("Impacts%s%s", ic[2], ac[2])
+                main_title <- sprintf("%s%simpacts", ic[2], ac[2])
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
               graphics::plot(0:time_steps, values, type = "l",
-                             main = main_title,
+                             main = title_case(main_title),
                              xlab = plot_x_label,
                              ylab = sprintf("Impact (%s)", units),
                              ylim = c(0, 1.1*max(values)))
@@ -2677,7 +2703,7 @@ ManageResults.Region <- function(region, population_model,
           if (length(impact_i) == 1 && is.numeric(i)) {
             ic <- c("", "")
           } else {
-            ic <- c(paste0("_", i), paste0(" : ", i))
+            ic <- c(paste0("_", i), paste0(i, " "))
           }
           units <- impacts[[i]]$get_context()$get_impact_measures()
           if (include_collated) {
@@ -2697,7 +2723,7 @@ ManageResults.Region <- function(region, population_model,
           for (a in 1:length(values_list)) {
             values <- values_list[[a]]
             if (length(values_list) > 1) {
-              ac <- c(paste0("_", a), paste0(" : ", names(values_list)[a]))
+              ac <- c(paste0("_", a), paste0(names(values_list)[a], " "))
             } else {
               ac <- c("", "")
             }
@@ -2708,17 +2734,17 @@ ManageResults.Region <- function(region, population_model,
                 filename <- sprintf("total_cumulative_impacts%s%s.png",
                                     ic[1], ac[1])
                 main_title <-
-                  sprintf("Total cumulative impacts%s%s (mean +/- 2 SD)",
+                  sprintf("total cumulative %s%simpacts (mean +/- 2 SD)",
                           ic[2], ac[2])
               } else {
                 filename <- sprintf("cumulative_impacts%s%s.png", ic[1], ac[1])
-                main_title <- sprintf("Cumulative impacts%s%s (mean +/- 2 SD)",
+                main_title <- sprintf("cumulative %s%simpacts (mean +/- 2 SD)",
                                       ic[2], ac[2])
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
               graphics::plot(0:time_steps, values$mean, type = "l",
-                             main = main_title,
+                             main = title_case(main_title),
                              xlab = plot_x_label,
                              ylab = sprintf("Cumulative impact (%s)", units),
                              ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
@@ -2732,16 +2758,16 @@ ManageResults.Region <- function(region, population_model,
               if (include_collated) {
                 filename <- sprintf("total_cumulative_impacts%s%s.png",
                                     ic[1], ac[1])
-                main_title <- sprintf("Total cumulative impacts%s%s",
+                main_title <- sprintf("total cumulative %s%simpacts",
                                       ic[2], ac[2])
               } else {
                 filename <- sprintf("cumulative_impacts%s%s.png", ic[1], ac[1])
-                main_title <- sprintf("Cumulative impacts%s%s", ic[2], ac[2])
+                main_title <- sprintf("cumulative %s%simpacts", ic[2], ac[2])
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
               graphics::plot(0:time_steps, values, type = "l",
-                             main = main_title,
+                             main = title_case(main_title),
                              xlab = plot_x_label,
                              ylab = sprintf("Cumulative impact (%s)", units),
                              ylim = c(0, 1.1*max(values)))
@@ -2765,7 +2791,7 @@ ManageResults.Region <- function(region, population_model,
         if (length(action_i) == 1 && is.numeric(i)) {
           ic <- c("", "")
         } else {
-          ic <- c(paste0("_", i), paste0(" : ", i))
+          ic <- c(paste0("_", i), paste0(i, " "))
         }
 
         # Action label/key/name. Direct action?
@@ -2775,11 +2801,16 @@ ManageResults.Region <- function(region, population_model,
         a_name <- a_key <- sub("control_", "", a_lab, fixed = TRUE)
         if (actions[[i]]$get_type() == "control") {
           a_key <- paste0(a_key, "_control")
-          if (a_key == "search_destroy") {
+          if (a_key == "search_destroy_control") {
             a_name <- "found & destroyed"
           } else {
             a_name <- paste(a_name, "control")
           }
+        }
+        if (population_model$get_type() == "presence") {
+          a_name <- paste("occupancies", a_name)
+        } else {
+          a_name <- paste("number", a_name)
         }
         if (direct_action) {
           plot_y_label <- sprintf("Number %s", a_name)
@@ -2795,7 +2826,7 @@ ManageResults.Region <- function(region, population_model,
             cost_name <- cost_key <- "removal"
           } else {
             cost_key <- a_key
-            if (a_key == "search_destroy") {
+            if (a_key == "search_destroy_control") {
               cost_name <- "search & destroy control"
             } else {
               cost_name <- a_name
@@ -2863,16 +2894,16 @@ ManageResults.Region <- function(region, population_model,
             if (include_collated) {
               filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
-              main_title <- sprintf("Total actions%s %s%s (mean +/- 2 SD)",
+              main_title <- sprintf("total %s%s%s (mean +/- 2 SD)",
                                     ic[2], stage_label[s], a_name)
             } else {
               filename <- sprintf("actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
               if (direct_action) {
-                main_title <- sprintf("Actions%s %s%s (mean +/- 2 SD)", ic[2],
+                main_title <- sprintf("%s%s%s (mean +/- 2 SD)", ic[2],
                                       stage_label[s], a_name)
               } else {
-                main_title <- sprintf("Actions%s %s%s (mean)", ic[2],
+                main_title <- sprintf("%s%s%s (mean)", ic[2],
                                       stage_label[s], a_name)
               }
             }
@@ -2883,7 +2914,7 @@ ManageResults.Region <- function(region, population_model,
             }
             grDevices::png(filename = filename, width = width, height = height)
             graphics::plot(0:time_steps, values$mean, type = "l",
-                           main = main_title,
+                           main = title_case(main_title),
                            xlab = plot_x_label,
                            ylab = plot_y_label,
                            ylim = ylim)
@@ -2899,18 +2930,17 @@ ManageResults.Region <- function(region, population_model,
             if (include_collated) {
               filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
-              main_title <- sprintf("Total actions%s %s%s", ic[2],
+              main_title <- sprintf("total %s%s%s", ic[2],
                                     stage_label[s], a_key)
             } else {
               filename <- sprintf("actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
-              main_title <- sprintf("Actions%s %s%s", ic[2], stage_label[s],
-                                    a_key)
+              main_title <- sprintf("%s%s%s", ic[2], stage_label[s], a_key)
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
             graphics::plot(0:time_steps, values, type = "l",
-                           main = main_title,
+                           main = title_case(main_title),
                            xlab = plot_x_label,
                            ylab = plot_y_label,
                            ylim = c(0, 1.1*max(values)))
@@ -2947,16 +2977,16 @@ ManageResults.Region <- function(region, population_model,
             if (include_collated) {
               filename <- sprintf("total_action_costs%s_%s.png", ic[1],
                                   cost_key)
-              main_title <- sprintf("Total action costs%s %s (mean +/- 2 SD)",
-                                    ic[2], cost_name)
+              main_title <- sprintf("total %s%s costs (mean +/- 2 SD)", ic[2],
+                                    cost_name)
             } else {
               filename <- sprintf("action_costs%s_%s.png", ic[1], cost_key)
-              main_title <- sprintf("Action costs%s %s (mean +/- 2 SD)",
-                                    ic[2], cost_name)
+              main_title <- sprintf("%s%s costs (mean +/- 2 SD)", ic[2],
+                                    cost_name)
             }
             grDevices::png(filename = filename, width = width, height = height)
             graphics::plot(0:time_steps, values$mean, type = "l",
-                           main = main_title,
+                           main = title_case(main_title),
                            xlab = plot_x_label,
                            ylab = sprintf("Cost%s", unit_lab),
                            ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
@@ -2970,16 +3000,16 @@ ManageResults.Region <- function(region, population_model,
             if (include_collated) {
               filename <- sprintf("total_action_costs%s_%s.png", ic[1],
                                   cost_key)
-              main_title <- sprintf("Total action costs%s %s", ic[2],
+              main_title <- sprintf("total %s%s costs", ic[2],
                                     cost_name)
             } else {
               filename <- sprintf("action_costs%s_%s.png", ic[1], cost_key)
-              main_title <- sprintf("Action costs%s %s", ic[2], cost_name)
+              main_title <- sprintf("%s%s costs", ic[2], cost_name)
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
             graphics::plot(0:time_steps, values, type = "l",
-                           main = main_title,
+                           main = title_case(main_title),
                            xlab = plot_x_label,
                            ylab = sprintf("Cost%s", unit_lab),
                            ylim = c(0, 1.1*max(values)))
@@ -2999,19 +3029,19 @@ ManageResults.Region <- function(region, population_model,
                 filename <- sprintf("total_cumulative_action_costs%s_%s.png",
                                     ic[1], cost_key)
                 main_title <-
-                  sprintf("Total cumulative action costs%s %s (mean +/- 2 SD)",
+                  sprintf("total cumulative %s%s costs (mean +/- 2 SD)",
                           ic[2], cost_name)
               } else {
                 filename <- sprintf("cumulative_action_costs%s_%s.png",
                                     ic[1], cost_key)
                 main_title <-
-                  sprintf("Cumulative action costs%s %s (mean +/- 2 SD)",
+                  sprintf("cumulative %s%s costs (mean +/- 2 SD)",
                           ic[2], cost_name)
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
               graphics::plot(0:time_steps, values$mean, type = "l",
-                             main = main_title,
+                             main = title_case(main_title),
                              xlab = plot_x_label,
                              ylab = sprintf("Cumulative cost%s", unit_lab),
                              ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
@@ -3025,18 +3055,18 @@ ManageResults.Region <- function(region, population_model,
               if (include_collated) {
                 filename <- sprintf("total_cumulative_action_costs%s_%s.png",
                                     ic[1], cost_key)
-                main_title <- sprintf("Total cumulative action costs%s %s",
+                main_title <- sprintf("total cumulative %s%s costs",
                                       ic[2], cost_name)
               } else {
                 filename <- sprintf("cumulative_action_costs%s_%s.png",
                                     ic[1], cost_key)
-                main_title <- sprintf("Cumulative action costs%s %s",
+                main_title <- sprintf("cumulative %s%s costs",
                                       ic[2], cost_name)
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
               graphics::plot(0:time_steps, values, type = "l",
-                             main = main_title,
+                             main = title_case(main_title),
                              xlab = plot_x_label,
                              ylab = sprintf("Cumulative cost%s", unit_lab),
                              ylim = c(0, 1.1*max(values)))
@@ -3077,14 +3107,14 @@ ManageResults.Region <- function(region, population_model,
                            sd = as.numeric(values["sd",,drop = FALSE]))
             if (include_collated) {
               filename <- "total_action_costs_combined.png"
-              main_title <- "Total action costs : combined (mean +/- 2 SD)"
+              main_title <- "total combined action costs (mean +/- 2 SD)"
             } else {
               filename <- "action_costs_combined.png"
-              main_title <- "Action costs : combined (mean +/- 2 SD)"
+              main_title <- "combined action costs (mean +/- 2 SD)"
             }
             grDevices::png(filename = filename, width = width, height = height)
             graphics::plot(0:time_steps, values$mean, type = "l",
-                           main = main_title,
+                           main = title_case(main_title),
                            xlab = plot_x_label,
                            ylab = sprintf("Cost%s", unit_lab),
                            ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
@@ -3097,15 +3127,15 @@ ManageResults.Region <- function(region, population_model,
           } else {
             if (include_collated) {
               filename <- "total_action_costs_combined.png"
-              main_title <- "Total action costs : combined"
+              main_title <- "total combined action costs"
             } else {
               filename <- "action_costs_combined.png"
-              main_title <- "Action costs : combined "
+              main_title <- "combined action costs"
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
             graphics::plot(0:time_steps, values, type = "l",
-                           main = main_title,
+                           main = title_case(main_title),
                            xlab = plot_x_label,
                            ylab = sprintf("Cost%s", unit_lab),
                            ylim = c(0, 1.1*max(values)))
@@ -3124,15 +3154,15 @@ ManageResults.Region <- function(region, population_model,
               if (include_collated) {
                 filename <- "total_cumulative_action_costs_combined.png"
                 main_title <-
-                  "Total cumulative action costs : combined (mean +/- 2 SD)"
+                  "total cumulative combined action costs (mean +/- 2 SD)"
               } else {
                 filename <- "cumulative_action_costs_combined.png"
                 main_title <-
-                  "Cumulative action costs : combined (mean +/- 2 SD)"
+                  "cumulative combined action costs (mean +/- 2 SD)"
               }
               grDevices::png(filename = filename, width = width, height = height)
               graphics::plot(0:time_steps, values$mean, type = "l",
-                             main = main_title,
+                             main = title_case(main_title),
                              xlab = plot_x_label,
                              ylab = sprintf("Cumulative cost%s", unit_lab),
                              ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
@@ -3145,15 +3175,15 @@ ManageResults.Region <- function(region, population_model,
             } else {
               if (include_collated) {
                 filename <- "total_cumulative_action_costs_combined.png"
-                main_title <- "Total cumulative action costs : combined"
+                main_title <- "total cumulative combined action costs"
               } else {
                 filename <- "cumulative_action_costs_combined.png"
-                main_title <- "Cumulative action costs : combined"
+                main_title <- "cumulative combined action costs"
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
               graphics::plot(0:time_steps, values, type = "l",
-                             main = main_title,
+                             main = title_case(main_title),
                              xlab = plot_x_label,
                              ylab = sprintf("Cumulative cost%s", unit_lab),
                              ylim = c(0, 1.1*max(values)))
@@ -3191,14 +3221,14 @@ ManageResults.Region <- function(region, population_model,
             if (include_collated) {
               filename <- "total_combined_costs.png"
               main_title <-
-                "Total combined impact and action costs (mean +/- 2 SD)"
+                "total combined impact & action costs (mean +/- 2 SD)"
             } else {
               filename <- "combined_costs.png"
-              main_title <- "Combined impact and action costs (mean +/- 2 SD)"
+              main_title <- "combined impact & action costs (mean +/- 2 SD)"
             }
             grDevices::png(filename = filename, width = width, height = height)
             graphics::plot(0:time_steps, values$mean, type = "l",
-                           main = main_title,
+                           main = title_case(main_title),
                            xlab = plot_x_label,
                            ylab = sprintf("Cost%s", unit_lab),
                            ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
@@ -3211,15 +3241,15 @@ ManageResults.Region <- function(region, population_model,
           } else {
             if (include_collated) {
               filename <- "total_combined_costs.png"
-              main_title <- "Total combined impact and action costs"
+              main_title <- "total combined impact and action costs"
             } else {
               filename <- "combined_costs.png"
-              main_title <- "Combined impact and action costs"
+              main_title <- "combined impact and action costs"
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
             graphics::plot(0:time_steps, values, type = "l",
-                           main = main_title,
+                           main = title_case(main_title),
                            xlab = plot_x_label,
                            ylab = sprintf("Cost%s", unit_lab),
                            ylim = c(0, 1.1*max(values)))
@@ -3238,16 +3268,16 @@ ManageResults.Region <- function(region, population_model,
               if (include_collated) {
                 filename <- "total_cumulative_combined_costs.png"
                 main_title <-
-                  "Total cumulative impact and action costs (mean +/- 2 SD)"
+                  "total cumulative impact and action costs (mean +/- 2 SD)"
               } else {
                 filename <- "cumulative_combined_costs.png"
                 main_title <-
-                  "Cumulative impact and action costs (mean +/- 2 SD)"
+                  "cumulative impact and action costs (mean +/- 2 SD)"
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
               graphics::plot(0:time_steps, values$mean, type = "l",
-                             main = main_title,
+                             main = title_case(main_title),
                              xlab = plot_x_label,
                              ylab = sprintf("Cumulative cost%s", unit_lab),
                              ylim = c(0, 1.1*max(values$mean + 2*values$sd)))
@@ -3260,15 +3290,15 @@ ManageResults.Region <- function(region, population_model,
             } else {
               if (include_collated) {
                 filename <- "total_cumulative_combined_costs.png"
-                main_title <- "Total cumulative impact and action costs"
+                main_title <- "total cumulative impact and action costs"
               } else {
                 filename <- "cumulative_combined_costs.png"
-                main_title <- "Cumulative impact and action costs"
+                main_title <- "cumulative impact and action costs"
               }
               grDevices::png(filename = filename, width = width,
                              height = height)
               graphics::plot(0:time_steps, values, type = "l",
-                             main = main_title,
+                             main = title_case(main_title),
                              xlab = plot_x_label,
                              ylab = sprintf("Cumulative cost%s", unit_lab),
                              ylim = c(0, 1.1*max(values)))

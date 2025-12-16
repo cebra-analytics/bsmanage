@@ -22,8 +22,8 @@
 #'   applying simulated management actions:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the management actions type.}
-#'     \item{\code{get_id()}}{Get the actions numeric identifier.}
-#'     \item{\code{set_id(id)}}{Set the actions numeric identifier.}
+#'     \item{\code{get_id()}}{Get the actions identifier.}
+#'     \item{\code{set_id(id)}}{Set the actions identifier.}
 #'     \item{\code{get_label(include_id = TRUE)}}{Get the management actions
 #'       label used in simulation results. Set \code{include_id} to include
 #'       the action \code{id} as a label prefix (default is \code{TRUE}).}

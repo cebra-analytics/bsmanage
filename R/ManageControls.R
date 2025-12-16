@@ -62,10 +62,8 @@
 #'   for accessing attributes and applying simulated management controls:
 #'   \describe{
 #'     \item{\code{get_type()}}{Get the type of management action ("control").}
-#'     \item{\code{get_id()}}{Get the actions numeric identifier.}
-#'     \item{\code{set_id(id)}}{Set the actions numeric identifier.}
-#'     \item{\code{get_label()}}{Get the management actions label used in
-#'       simulation results (e.g. "control_growth").}
+#'     \item{\code{get_id()}}{Get the actions identifier.}
+#'     \item{\code{set_id(id)}}{Set the actions identifier.}
 #'     \item{\code{get_label(include_id = TRUE)}}{Get the management actions
 #'       label used in simulation results (e.g."<id>_control_growth" or
 #'       "control_growth"). Set \code{include_id} to include the action
