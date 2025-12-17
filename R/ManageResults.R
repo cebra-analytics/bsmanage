@@ -1282,6 +1282,11 @@ ManageResults.Region <- function(region, population_model,
                 cumulative_label <- ""
               }
               label <- paste0(cumulative_label, i_label, aspect, " impacts")
+              if (s == "mean") {
+                label <- paste("mean", label)
+              } else if (s == "sd") {
+                label <- paste(label, "standard deviation")
+              }
               incursion_type <-
                 impacts[[i]]$get_impacts()$get_incursion()$get_type()
               attr(output_list[[output_key]], "metadata") <- list(
@@ -1315,17 +1320,9 @@ ManageResults.Region <- function(region, population_model,
 
           # Actions post-fix
           if (length(action_i) == 1 && is.numeric(i)) {
-            ic <- ""
+            ic <- c("", "")
           } else {
-            ic <- paste0("_", i)
-          }
-
-          # Duplicate action type prefix?
-          dupl_i <- ""
-          if (sum(sapply(actions, function(a) {
-            (a$get_label(include_id = FALSE) ==
-              actions[[i]]$get_label(include_id = FALSE))})) > 1) {
-            dupl_i <- paste0("action ", i, " ")
+            ic <- c(paste0("_", i), paste0(" ", i))
           }
 
           # Action key/name. Direct action?
@@ -1390,7 +1387,7 @@ ManageResults.Region <- function(region, population_model,
               }
 
               # Add nested list to output list
-              output_key <- paste0("actions", ic, "_", a_key, jc, sc)
+              output_key <- paste0("actions", ic[1], "_", a_key, jc, sc)
               output_list[[output_key]] <- list()
 
               # Initialise non-zero indicator
@@ -1440,7 +1437,7 @@ ManageResults.Region <- function(region, population_model,
                 filename <- sprintf(
                   paste0("actions%s_%s%s_t%0",
                          nchar(as.character(time_steps)), "d%s.tif"),
-                  ic, a_key, jc, as.integer(tmc), sc)
+                  ic[1], a_key, jc, as.integer(tmc), sc)
                 output_list[[output_key]][[tmc]] <-
                   terra::writeRaster(output_rast, filename, ...)
               }
@@ -1462,24 +1459,27 @@ ManageResults.Region <- function(region, population_model,
               }
               if (population_model$get_type() == "presence_only") {
                 stage <- NULL
-                label <- paste("occupancies", label)
               } else if (population_model$get_type() == "unstructured") {
                 stage <- NULL
               } else if (population_model$get_type() == "stage_structured") {
-                if (is.null(combine_stages)) {
-                  stage <- stage_labels[j]
-                  label <- paste("stage", as.character(stage), label)
-                } else if (is.numeric(combine_stages)) {
-                  stage <- "combined"
-                  label <- paste("combined stage", label)
+                if (direct_action) {
+                  if (is.null(combine_stages)) {
+                    stage <- stage_labels[j]
+                    label <- paste(stage_labels[j], label)
+                  } else if (is.numeric(combine_stages)) {
+                    stage <- "combined"
+                    label <- paste("combined stage", label)
+                  }
+                } else {
+                  stage <- NULL
                 }
               }
+              label <- paste0("action", ic[2], " ", label)
               if (s == "mean") {
-                label <- paste("mean ", label)
+                label <- paste("mean", label)
               } else if (s == "sd") {
                 label <- paste(label, "standard deviation")
               }
-              label <- paste0(dupl_i, label)
               if (direct_action ||
                   population_model$get_type() %in% c("unstructured",
                                                      "stage_structured")) {
@@ -1522,11 +1522,11 @@ ManageResults.Region <- function(region, population_model,
               }
 
               # Add nested list to output list
-              output_cost_key <- paste0("action_costs", ic, "_", cost_key, sc)
+              output_cost_key <- paste0("action_costs", ic[1], "_", cost_key, sc)
               output_list[[output_cost_key]] <- list()
               nonzero_list[[output_cost_key]] <- FALSE
               if ("cumulative" %in% names(results$actions[[i]]$cost)) {
-                output_cum_cost_key <- paste0("cumulative_action_costs", ic,
+                output_cum_cost_key <- paste0("cumulative_action_costs", ic[1],
                                               "_", cost_key, sc)
                 output_list[[output_cum_cost_key]] <- list()
                 nonzero_list[[output_cum_cost_key]] <- FALSE
@@ -1550,7 +1550,7 @@ ManageResults.Region <- function(region, population_model,
                 filename <- sprintf(
                   paste0("action_costs%s_%s_t%0",
                          nchar(as.character(time_steps)), "d%s.tif"),
-                  ic, cost_key, as.integer(tmc), sc)
+                  ic[1], cost_key, as.integer(tmc), sc)
                 output_list[[output_cost_key]][[tmc]] <-
                   terra::writeRaster(output_rast, filename, ...)
                 if ("cumulative" %in% names(results$actions[[i]]$cost)) {
@@ -1573,14 +1573,14 @@ ManageResults.Region <- function(region, population_model,
                   filename <- sprintf(
                     paste0("cumulative_action_costs%s_%s_t%0",
                            nchar(as.character(time_steps)), "d%s.tif"),
-                    ic, cost_key, as.integer(tmc), sc)
+                    ic[1], cost_key, as.integer(tmc), sc)
                   output_list[[output_cum_cost_key]][[tmc]] <-
                     terra::writeRaster(output_rast, filename, ...)
                 }
               }
 
               # Add list of action costs metadata as an attribute
-              label <- paste(cost_name, "costs")
+              label <- paste0("action", ic[2], " ", cost_name, " costs")
               if (s == "mean") {
                 label <- paste("mean", label)
               } else if (s == "sd") {
@@ -1603,7 +1603,14 @@ ManageResults.Region <- function(region, population_model,
               attr(output_list[[output_cost_key]], "metadata") <- attr_list
               if ("cumulative" %in% names(results$actions[[i]]$cost)) {
                 attr_list$cumulative <- TRUE
-                attr_list$label <- title_case(paste("cumulative", label))
+                label <-
+                  paste0("cumulative action", ic[2], " ", cost_name, " costs")
+                if (s == "mean") {
+                  label <- paste("mean", label)
+                } else if (s == "sd") {
+                  label <- paste(label, "standard deviation")
+                }
+                attr_list$label <- title_case(label)
                 attr(output_list[[output_cum_cost_key]], "metadata") <-
                   attr_list
               }
@@ -1713,7 +1720,13 @@ ManageResults.Region <- function(region, population_model,
               attr(output_list[[output_cost_key]], "metadata") <- attr_list
               if ("cumulative" %in% names(results$actions$cost)) {
                 attr_list$cumulative <- TRUE
-                attr_list$label <- title_case(paste("cumulative", label))
+                label <- "cumulative combined action costs"
+                if (s == "mean") {
+                  label <- paste("mean", label)
+                } else if (s == "sd") {
+                  label <- paste(label, "standard deviation")
+                }
+                attr_list$label <- title_case(label)
                 attr(output_list[[output_cum_cost_key]], "metadata") <-
                   attr_list
               }
@@ -1800,7 +1813,13 @@ ManageResults.Region <- function(region, population_model,
               attr(output_list[[output_cost_key]], "metadata") <- attr_list
               if ("cumulative" %in% names(results$cost)) {
                 attr_list$cumulative <- TRUE
-                attr_list$label <- title_case(paste("cumulative", label))
+                label <- "cumulative combined impacts & action costs"
+                if (s == "mean") {
+                  label <- paste("mean", label)
+                } else if (s == "sd") {
+                  label <- paste(label, "standard deviation")
+                }
+                attr_list$label <- title_case(label)
                 attr(output_list[[output_cum_cost_key]], "metadata") <-
                   attr_list
               }
@@ -2619,6 +2638,7 @@ ManageResults.Region <- function(region, population_model,
             ic <- c("", "")
           } else {
             ic <- c(paste0("_", i), paste0(i, " "))
+            ic[2] <- sub("_", " ", ic[2], fixed = TRUE)
           }
           units <- impacts[[i]]$get_context()$get_impact_measures()
           if (include_collated) {
@@ -2791,7 +2811,7 @@ ManageResults.Region <- function(region, population_model,
         if (length(action_i) == 1 && is.numeric(i)) {
           ic <- c("", "")
         } else {
-          ic <- c(paste0("_", i), paste0(i, " "))
+          ic <- c(paste0("_", i), paste0(" ", i))
         }
 
         # Action label/key/name. Direct action?
@@ -2806,11 +2826,6 @@ ManageResults.Region <- function(region, population_model,
           } else {
             a_name <- paste(a_name, "control")
           }
-        }
-        if (population_model$get_type() == "presence") {
-          a_name <- paste("occupancies", a_name)
-        } else {
-          a_name <- paste("number", a_name)
         }
         if (direct_action) {
           plot_y_label <- sprintf("Number %s", a_name)
@@ -2832,6 +2847,17 @@ ManageResults.Region <- function(region, population_model,
               cost_name <- a_name
             }
           }
+        }
+
+        # Pre/post-fix action name
+        if (direct_action) {
+          if (population_model$get_type() == "presence_only") {
+            a_name <- paste("presence", a_name)
+          } else {
+            a_name <- paste("number", a_name)
+          }
+        } else {
+          a_name <- paste(a_name, "applied")
         }
 
         # Resolve the number of (combined) stages used in the results
@@ -2894,16 +2920,16 @@ ManageResults.Region <- function(region, population_model,
             if (include_collated) {
               filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
-              main_title <- sprintf("total %s%s%s (mean +/- 2 SD)",
+              main_title <- sprintf("total action%s %s%s (mean +/- 2 SD)",
                                     ic[2], stage_label[s], a_name)
             } else {
               filename <- sprintf("actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
               if (direct_action) {
-                main_title <- sprintf("%s%s%s (mean +/- 2 SD)", ic[2],
+                main_title <- sprintf("action%s %s%s (mean +/- 2 SD)", ic[2],
                                       stage_label[s], a_name)
               } else {
-                main_title <- sprintf("%s%s%s (mean)", ic[2],
+                main_title <- sprintf("action%s %s%s (mean)", ic[2],
                                       stage_label[s], a_name)
               }
             }
@@ -2930,12 +2956,13 @@ ManageResults.Region <- function(region, population_model,
             if (include_collated) {
               filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
-              main_title <- sprintf("total %s%s%s", ic[2],
-                                    stage_label[s], a_key)
+              main_title <- sprintf("total action%s %s%s", ic[2],
+                                    stage_label[s], a_name)
             } else {
               filename <- sprintf("actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
-              main_title <- sprintf("%s%s%s", ic[2], stage_label[s], a_key)
+              main_title <- sprintf("action%s %s%s", ic[2], stage_label[s],
+                                    a_name)
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
@@ -2977,11 +3004,11 @@ ManageResults.Region <- function(region, population_model,
             if (include_collated) {
               filename <- sprintf("total_action_costs%s_%s.png", ic[1],
                                   cost_key)
-              main_title <- sprintf("total %s%s costs (mean +/- 2 SD)", ic[2],
-                                    cost_name)
+              main_title <- sprintf("total action%s %s costs (mean +/- 2 SD)",
+                                    ic[2], cost_name)
             } else {
               filename <- sprintf("action_costs%s_%s.png", ic[1], cost_key)
-              main_title <- sprintf("%s%s costs (mean +/- 2 SD)", ic[2],
+              main_title <- sprintf("action%s %s costs (mean +/- 2 SD)", ic[2],
                                     cost_name)
             }
             grDevices::png(filename = filename, width = width, height = height)
@@ -3000,11 +3027,11 @@ ManageResults.Region <- function(region, population_model,
             if (include_collated) {
               filename <- sprintf("total_action_costs%s_%s.png", ic[1],
                                   cost_key)
-              main_title <- sprintf("total %s%s costs", ic[2],
+              main_title <- sprintf("total action%s %s costs", ic[2],
                                     cost_name)
             } else {
               filename <- sprintf("action_costs%s_%s.png", ic[1], cost_key)
-              main_title <- sprintf("%s%s costs", ic[2], cost_name)
+              main_title <- sprintf("action%s %s costs", ic[2], cost_name)
             }
             grDevices::png(filename = filename, width = width,
                            height = height)
@@ -3029,13 +3056,13 @@ ManageResults.Region <- function(region, population_model,
                 filename <- sprintf("total_cumulative_action_costs%s_%s.png",
                                     ic[1], cost_key)
                 main_title <-
-                  sprintf("total cumulative %s%s costs (mean +/- 2 SD)",
+                  sprintf("total cumulative action%s %s costs (mean +/- 2 SD)",
                           ic[2], cost_name)
               } else {
                 filename <- sprintf("cumulative_action_costs%s_%s.png",
                                     ic[1], cost_key)
                 main_title <-
-                  sprintf("cumulative %s%s costs (mean +/- 2 SD)",
+                  sprintf("cumulative action%s %s costs (mean +/- 2 SD)",
                           ic[2], cost_name)
               }
               grDevices::png(filename = filename, width = width,
@@ -3055,12 +3082,12 @@ ManageResults.Region <- function(region, population_model,
               if (include_collated) {
                 filename <- sprintf("total_cumulative_action_costs%s_%s.png",
                                     ic[1], cost_key)
-                main_title <- sprintf("total cumulative %s%s costs",
+                main_title <- sprintf("total cumulative action%s %s costs",
                                       ic[2], cost_name)
               } else {
                 filename <- sprintf("cumulative_action_costs%s_%s.png",
                                     ic[1], cost_key)
-                main_title <- sprintf("cumulative %s%s costs",
+                main_title <- sprintf("cumulative action%s %s costs",
                                       ic[2], cost_name)
               }
               grDevices::png(filename = filename, width = width,
