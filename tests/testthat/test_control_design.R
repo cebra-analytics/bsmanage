@@ -129,6 +129,21 @@ test_that("facilitates existing allocations and management probabilities", {
     exist_manage_pr = exist_manage_pr))
   expect_equal(control_design$get_manage_pr(),
                c(expected_manage_pr[1:198], rep(0, 199)))
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "saving",
+    benefit = test_ref$cost_undetected - test_ref$cost_detected,
+    budget = NULL,
+    exist_manage_pr = exist_manage_pr))
+  expect_silent(half_alloc <- control_design$get_allocation())
+  expect_equal(round(half_alloc, 8),
+               round(c(rep(0, 198), test_ref$surv_effort$no_budget[199:397]),
+                     8))
+  expect_silent(manage_pr <- control_design$get_manage_pr())
+  expect_equal(manage_pr, expected_manage_pr)
 })
 
 test_that("allocates for optimal number of successes via constraints", {

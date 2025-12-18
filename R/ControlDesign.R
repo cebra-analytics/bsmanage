@@ -124,15 +124,19 @@
 #'     \item{\code{save_design(...)}}{Save the management design as a
 #'       collection of raster TIF and/or comma-separated value (CSV) files,
 #'       appropriate for the \code{divisions} type, including the management
-#'       resource \code{allocation}, the probability of management success (or
-#'       effectiveness) values (\code{manage_pr}), \code{control_cost}
-#'       (combined control allocation and fixed costs), and a \code{summary}
-#'       (CSV) of the total allocation, costs (when applicable), the weighted
-#'       average probability of success (\code{average_pr}), and (when
-#'       available) the overall system-wide probability of success (or
-#'       effectiveness) of the management design (\code{overall_pr}).
-#'       \code{Terra} raster write options may be passed to the function for
-#'       saving grid-based designs.}
+#'       resource \code{allocation}, the corresponding probability of
+#'       management success (or effectiveness) values (\code{alloc_manage_pr})
+#'       when existing sensitivity is included, the overall probability of
+#'       management success values (\code{manage_pr}), \code{manage_cost}
+#'       (combined allocation and fixed costs), and a \code{summary} (CSV) of
+#'       the total allocation, costs (when applicable), the weighted average
+#'       probability of success (\code{average_pr}), and (when available) the
+#'       overall system-wide probability of success (or effectiveness) of the
+#'       management design (\code{overall_pr}), as well as the component of
+#'       each (\code{alloc_average_pr} and \code{alloc_overall_pr}
+#'       respectively) corresponding to the allocation when existing
+#'       sensitivity is included. \code{Terra} raster write options may be
+#'       passed to the function for saving grid-based designs.}
 #'   }
 #' @references
 #'   Cannon, R. M. (2009). Inspecting and monitoring on a restricted budget -
@@ -377,8 +381,10 @@ ControlDesign.ManageContext <- function(context,
   }
   if (is.null(exist_manage_pr)) {
     exist_manage_pr <- rep(0, parts)
+    exist_manage_pr_present <- FALSE
   } else {
     exist_manage_pr <- super$get_manage_pr() # combine via base class
+    exist_manage_pr_present <- TRUE
   }
 
   # Uniform benefit when optimal saving or benefit not specified
@@ -515,7 +521,13 @@ ControlDesign.ManageContext <- function(context,
   set_lagrange_params()
 
   # Function for calculating management probabilities or effectiveness
-  calculate_manage_pr <- function(n_alloc) {
+  calculate_manage_pr <- function(n_alloc, incl_exist = TRUE) {
+
+    # Include existing management probabilities?
+    if (!incl_exist) {
+      exist_manage_pr <- 0
+    }
+
     return(1 - (1 - exist_manage_pr)*exp(-1*lambda*n_alloc))
   }
 
@@ -688,8 +700,16 @@ ControlDesign.ManageContext <- function(context,
       }
     }
     if (divisions$get_type() == "grid") {
-      terra::writeRaster(divisions$get_rast(self$get_allocation()),
-                         "allocation.tif", ...)
+      if (optimal != "none") {
+        terra::writeRaster(divisions$get_rast(self$get_allocation()),
+                           "allocation.tif", ...)
+        if (exist_manage_pr_present) {
+          terra::writeRaster(
+            divisions$get_rast(calculate_manage_pr(self$get_allocation(),
+                                                   incl_exist = FALSE)),
+            "alloc_manage_pr.tif", ...)
+        }
+      }
       terra::writeRaster(divisions$get_rast(self$get_manage_pr()),
                          "manage_pr.tif", ...)
       if (!is.null(previous_control)) {
@@ -700,32 +720,43 @@ ControlDesign.ManageContext <- function(context,
         terra::writeRaster(divisions$get_rast(cost), "control_cost.tif", ...)
       }
     } else if (divisions$get_type() == "patch") {
+      design_df <- divisions$get_coords(extra_cols = TRUE)
       if (!is.null(previous_control)) {
-        design_df <- cbind(divisions$get_coords(extra_cols = TRUE),
-                           mod_establish_pr = self$get_mod_establish_pr(),
-                           allocation = self$get_allocation(),
-                           manage_pr = self$get_manage_pr())
-        write.csv(design_df, file = "design.csv", row.names = FALSE)
-      } else {
-        design_df <- cbind(divisions$get_coords(extra_cols = TRUE),
-                           allocation = self$get_allocation(),
-                           manage_pr = self$get_manage_pr())
+        design_df$mod_establish_pr <- self$get_mod_establish_pr()
       }
+      if (optimal == "none") {
+        if (!is.null(exist_alloc)) {
+          design_df$exist_alloc <- exist_alloc
+        }
+      } else {
+        design_df$allocation <- self$get_allocation()
+        if (exist_manage_pr_present) {
+          design_df$alloc_manage_pr <-
+            calculate_manage_pr(self$get_allocation(), incl_exist = FALSE)
+        }
+      }
+      design_df$manage_pr <- self$get_manage_pr()
       if (any(unlist(output_cost))) {
         design_df$control_cost <- round(cost, 2)
       }
       write.csv(design_df, file = "design.csv", row.names = FALSE)
     } else if (divisions$get_type() == "other") {
+      design_df <- divisions$get_data()
       if (!is.null(previous_control)) {
-        design_df <- cbind(divisions$get_data(),
-                           mod_establish_pr = self$get_mod_establish_pr(),
-                           allocation = self$get_allocation(),
-                           manage_pr = self$get_manage_pr())
-      } else {
-        design_df <- cbind(divisions$get_data(),
-                           allocation = self$get_allocation(),
-                           manage_pr = self$get_manage_pr())
+        design_df$mod_establish_pr <- self$get_mod_establish_pr()
       }
+      if (optimal == "none") {
+        if (!is.null(exist_alloc)) {
+          design_df$exist_alloc <- exist_alloc
+        }
+      } else {
+        design_df$allocation <- self$get_allocation()
+        if (exist_manage_pr_present) {
+          design_df$alloc_manage_pr <-
+            calculate_manage_pr(self$get_allocation(), incl_exist = FALSE)
+        }
+      }
+      design_df$manage_pr <- self$get_manage_pr()
       if (any(unlist(output_cost))) {
         design_df$control_cost <- round(cost, 2)
       }
@@ -733,7 +764,16 @@ ControlDesign.ManageContext <- function(context,
     }
 
     # Save summary
-    summary_data <- data.frame(total_allocation = sum(self$get_allocation()))
+    if (optimal == "none") {
+      if (!is.null(exist_alloc)) {
+        total_allocation <- sum(exist_alloc)
+      } else {
+        total_allocation <- 0
+      }
+    } else {
+      total_allocation <- sum(self$get_allocation())
+    }
+    summary_data <- data.frame(total_allocation = total_allocation)
     if (!all(alloc_cost == 1)) {
       summary_data$allocation_cost <- sum(self$get_allocation()*alloc_cost)
     }
@@ -743,6 +783,14 @@ ControlDesign.ManageContext <- function(context,
     if (optimal == "saving") {
       summary_data$total_saving <- sum(establish_pr*benefit*
                                          self$get_manage_pr())
+    }
+    if (optimal != "none" && exist_manage_pr_present) {
+      alloc_manage_pr <- calculate_manage_pr(self$get_allocation(),
+                                             incl_exist = FALSE)
+      summary_data$alloc_average_pr <- calculate_average_pr(alloc_manage_pr)
+      if (!relative_establish_pr) {
+        summary_data$alloc_overall_pr <- calculate_overall_pr(alloc_manage_pr)
+      }
     }
     summary_data$average_pr <- self$get_average_pr()
     if (!relative_establish_pr) {

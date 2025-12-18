@@ -194,15 +194,19 @@ when actual (not relative) \code{establish_pr} values are provided.}
 \item{\code{save_design(...)}}{Save the management design as a
 collection of raster TIF and/or comma-separated value (CSV) files,
 appropriate for the \code{divisions} type, including the management
-resource \code{allocation}, the probability of management success (or
-effectiveness) values (\code{manage_pr}), \code{control_cost}
-(combined control allocation and fixed costs), and a \code{summary}
-(CSV) of the total allocation, costs (when applicable), the weighted
-average probability of success (\code{average_pr}), and (when
-available) the overall system-wide probability of success (or
-effectiveness) of the management design (\code{overall_pr}).
-\code{Terra} raster write options may be passed to the function for
-saving grid-based designs.}
+resource \code{allocation}, the corresponding probability of
+management success (or effectiveness) values (\code{alloc_manage_pr})
+when existing sensitivity is included, the overall probability of
+management success values (\code{manage_pr}), \code{manage_cost}
+(combined allocation and fixed costs), and a \code{summary} (CSV) of
+the total allocation, costs (when applicable), the weighted average
+probability of success (\code{average_pr}), and (when available) the
+overall system-wide probability of success (or effectiveness) of the
+management design (\code{overall_pr}), as well as the component of
+each (\code{alloc_average_pr} and \code{alloc_overall_pr}
+respectively) corresponding to the allocation when existing
+sensitivity is included. \code{Terra} raster write options may be
+passed to the function for saving grid-based designs.}
 }
 }
 \description{
