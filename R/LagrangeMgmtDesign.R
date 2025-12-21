@@ -361,7 +361,7 @@ LagrangeMgmtDesign.ManageContext <- function(context,
         is.numeric(overall_pr) || search_alpha) {
       interval <- (0:100)/100*alpha_min
       alpha_range <- range(interval)[2] - range(interval)[1]
-      precision <- 8 # for alpha
+      precision <- 12 # for alpha
       while (alpha_range > abs(best_alpha*10^(-1*precision))) {
 
         # Get allocation for each alpha in interval
