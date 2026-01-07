@@ -28,7 +28,7 @@
 #'   the invasive species has been detected (e.g. via treatment).
 #' @param removal_cost Numeric vector of distributed removal costs (combined
 #'   resource and fixed costs) or a single cost value for each location where
-#'   removal is applied. For spatially-implicit area-based regions, costs
+#'   removal is applied. For spatially-implicit area-based regions, cost
 #'   should be specified as cost per metres squared. Costs are accumulated for
 #'   each application of the removal at each (scheduled) simulation time step.
 #'   The cost unit may be added as an attribute

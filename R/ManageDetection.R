@@ -14,11 +14,11 @@
 #'   detection sensitivities.
 #' @param surv_cost Numeric vector of distributed surveillance costs (combined
 #'   resource and fixed costs) or a single cost value for each location where
-#'   surveillance is applied. For spatially-implicit area-based regions, costs
-#'   should be specified as cost per metres squared. Costs are accumulated for
-#'   each application of the surveillance at each (scheduled) simulation time
-#'   step. The cost unit may be added as an attribute
-#'   (\code{attr(surv_cost, "unit")}), or set within the
+#'   surveillance is applied. For spatially-implicit area-based regions, cost
+#'   should be specified as cost for the entire spatially-implicit area. Costs
+#'   are accumulated for each application of the surveillance at each
+#'   (scheduled) simulation time step. The cost unit may be added as an
+#'   attribute (\code{attr(surv_cost, "unit")}), or set within the
 #'   \code{bsdesign::Context} object associated with the \code{surveillance}
 #'   (\code{bsdesign::SurveillanceDesign}) object. Default is \code{NULL} when
 #'   costs are unavailable.

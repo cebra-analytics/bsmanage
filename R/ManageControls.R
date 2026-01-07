@@ -31,7 +31,7 @@
 #'   population attribute).
 #' @param control_cost Numeric vector of distributed control costs (combined
 #'   resource and fixed costs) or a single cost value for each location where
-#'   control is applied. For spatially-implicit area-based regions, costs
+#'   control is applied. For spatially-implicit area-based regions, cost
 #'   should be specified as cost per metres squared. Costs are accumulated for
 #'   each application of the control at each (scheduled) simulation time step.
 #'   The cost unit may be added as an attribute
