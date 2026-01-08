@@ -17,9 +17,10 @@
 #'   inherited class object representing the distribution of control resources
 #'   and their success probabilities or effectiveness. Required for combined
 #'   surveillance and removal approaches ("search & destroy", traps, etc.).
-#'   Alternatively, optionally utilise to specify the distribution of existing,
-#'   known, or scheduled treatment locations for the reduction or suppression
-#'   of growth, spread, or establishment.
+#'   Alternatively, optionally utilise to specify the distribution (logical
+#'   mask) of existing, known, or scheduled treatment locations for the
+#'   reduction or suppression of growth, spread, or establishment
+#'   (spatially-explicit only).
 #' @param control_mult Control multipliers or rates required for control types
 #'   \code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be a
 #'   single value (0-1), or vector of values for each location specified by
@@ -32,10 +33,12 @@
 #' @param control_cost Numeric vector of distributed control costs (combined
 #'   resource and fixed costs) or a single cost value for each location where
 #'   control is applied. For spatially-implicit area-based regions, cost
-#'   should be specified as cost per metres squared. Costs are accumulated for
-#'   each application of the control at each (scheduled) simulation time step.
-#'   The cost unit may be added as an attribute
-#'   (\code{attr(control_cost, "unit")}), or set within the
+#'   should be specified as either cost for the entire spatially-implicit area
+#'   for control type \code{"search_destroy"}, or cost per metres squared for
+#'   control type \code{"growth"}, \code{"spread"}, or \code{"establishment"}.
+#'   Costs are accumulated for each application of the control at each
+#'   (scheduled) simulation time step. The cost unit may be added as an
+#'   attribute (\code{attr(control_cost, "unit")}), or set within the
 #'   \code{ControlDesign} object associated with the \code{control_design}
 #'   when given. Default is \code{NULL} when costs are unavailable.
 #' @param radius Optional radius (m) of the applied control for types
