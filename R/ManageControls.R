@@ -413,7 +413,20 @@ ManageControls.Region <- function(region, population_model,
       # Attach control costs as an attribute via label
       if (!is.null(control_cost)) {
         if (is.null(schedule) || tm %in% schedule) {
-          attr(n, self$get_cost_label()) <- control_cost*cost_apply
+          if (population_model$get_region()$spatially_implicit()) { # cost/m2
+            if (is.numeric(attr(n, "diffusion_radius"))) {
+              total_area <- pi*(attr(n, "diffusion_radius"))^2
+            } else if (is.numeric(attr(n, "spread_area"))) {
+              total_area <- attr(n, "spread_area")
+            } else {
+              stop(paste("Cannot calculate spatially implicit control cost",
+                         "without area occupied."), call. = FALSE)
+            }
+            attr(n, self$get_cost_label()) <-
+              control_cost*total_area*cost_apply
+          } else {
+            attr(n, self$get_cost_label()) <- control_cost*cost_apply
+          }
         } else {
           attr(n, self$get_cost_label()) <- control_cost*0
         }

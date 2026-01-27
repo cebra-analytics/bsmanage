@@ -312,7 +312,19 @@ ManageRemovals.Region <- function(region, population_model,
 
     # Attach removal costs as an attribute
     if (!is.null(removal_cost)) {
-      attr(n, self$get_cost_label()) <- removal_cost*cost_apply
+      if (population_model$get_region()$spatially_implicit()) { # cost/m2
+        if (is.numeric(attr(n, "diffusion_radius"))) {
+          total_area <- pi*(attr(n, "diffusion_radius"))^2
+        } else if (is.numeric(attr(n, "spread_area"))) {
+          total_area <- attr(n, "spread_area")
+        } else {
+          stop(paste("Cannot calculate spatially implicit removal cost",
+                     "without area occupied."), call. = FALSE)
+        }
+        attr(n, self$get_cost_label()) <- removal_cost*total_area*cost_apply
+      } else {
+        attr(n, self$get_cost_label()) <- removal_cost*cost_apply
+      }
     }
 
     return(n)

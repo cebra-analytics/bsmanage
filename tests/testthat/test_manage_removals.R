@@ -328,4 +328,35 @@ test_that("applies stochastic removals to invasive population", {
   expect_equal(new_n[idx], n[idx] & !expected_removals1)
   expected_removal_cost[idx] <- 2
   expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
+  # spatially-implicit
+  region <- bsspread::Region()
+  stage_matrix <- matrix(c(0.0, 2.0, 5.0,
+                           0.3, 0.0, 0.0,
+                           0.0, 0.6, 0.8),
+                         nrow = 3, ncol = 3, byrow = TRUE)
+  population_model <- bsspread::StagedPopulation(region, stage_matrix)
+  initializer <- bsspread::Initializer(50, region = region,
+                                       population_model = population_model)
+  set.seed(1234)
+  n <- initializer$initialize()
+
+  expect_silent(
+    manage_removals <- ManageRemovals(region, population_model,
+                                      removal_pr = 0.65,
+                                      detected_only = FALSE,
+                                      removal_cost = 2,
+                                      radius = NULL,
+                                      stages = 2:3, schedule = 4:6))
+  expect_error(new_n <- manage_removals$apply(n, 4),
+               paste("Cannot calculate spatially implicit removal cost",
+                     "without area occupied."))
+  attr(n, "spread_area") <- 300
+  set.seed(1234)
+  expected_removals <- array(c(0, stats::rbinom(2, size = n[,2:3], 0.65)), c(1, 3))
+  colnames(expected_removals) <- colnames(n)
+  set.seed(1234)
+  expect_silent(new_n <- manage_removals$apply(n, 4))
+  expect_equal(new_n[,], n[,] - expected_removals[,])
+  expect_equal(attr(new_n, "removed"), expected_removals)
+  expect_equal(attr(new_n, "removal_cost"), 2*300)
 })

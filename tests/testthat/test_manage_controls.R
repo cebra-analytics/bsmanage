@@ -409,4 +409,40 @@ test_that("applies stochastic growth/spread/establishment controls", {
   expect_equal(attr(new_n, "a3_control_establishment_cost"),
                expected_costs*(control_design$get_allocation() > 0 |
                                  establish_mask))
+  # spatially-implicit
+  region <- bsspread::Region()
+  stage_matrix <- matrix(c(0.0, 2.0, 5.0,
+                           0.3, 0.0, 0.0,
+                           0.0, 0.6, 0.8),
+                         nrow = 3, ncol = 3, byrow = TRUE)
+  population_model <- bsspread::StagedPopulation(region, stage_matrix)
+  initializer <- bsspread::Initializer(50, region = region,
+                                       population_model = population_model)
+  set.seed(1234)
+  n <- initializer$initialize()
+  detected <- n*0
+  detected[,2:3] <- round(n[,2:3]*0.7)
+  attr(n, "undetected") <- n - detected
+  expect_silent(
+    manage_controls <- ManageControls(region, population_model,
+                                      control_type = "growth",
+                                      control_design = NULL,
+                                      radius = NULL,
+                                      control_mult = 0.7,
+                                      control_cost = 2,
+                                      stages = 2:3,
+                                      apply_to = "survival",
+                                      schedule = 4:6))
+  expect_error(new_n <- manage_controls$apply(n, 4),
+               paste("Cannot calculate spatially implicit control cost",
+                     "without area occupied."))
+  attr(n, "spread_area") <- 300
+  set.seed(1234)
+  expect_silent(new_n <- manage_controls$apply(n, 4))
+  expect_equal(new_n[,], n[,])
+  expect_equal(attr(new_n, "undetected")[,], (n - detected)[,])
+  expect_equal(as.numeric(attr(new_n, "control_growth")), 0.7)
+  expect_equal(attr(attr(new_n, "control_growth"), "stages"), 2:3)
+  expect_equal(attr(attr(new_n, "control_growth"), "apply_to"), "survival")
+  expect_equal(attr(new_n, "control_growth_cost"), 2*300)
 })
