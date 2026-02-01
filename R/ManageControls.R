@@ -188,7 +188,7 @@ ManageControls.Region <- function(region, population_model,
         control_cost <- control_cost*(control_design$get_manage_pr() > 0)
       } else if (control_type %in% c("growth", "spread", "establishment")) {
         control_cost <-
-          control_cost*(control_mult*rep(1, region$get_locations()) > 0)
+          control_cost*(control_mult*rep(1, region$get_locations()) < 1)
       }
     }
     attr(control_cost, "unit") <- cost_unit
