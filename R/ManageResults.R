@@ -1285,7 +1285,7 @@ ManageResults.Region <- function(region, population_model,
               if (s == "mean") {
                 label <- paste("mean", label)
               } else if (s == "sd") {
-                label <- paste(label, "standard deviation")
+                label <- paste(label, "std. dev.")
               }
               incursion_type <-
                 impacts[[i]]$get_impacts()$get_incursion()$get_type()
@@ -1478,7 +1478,7 @@ ManageResults.Region <- function(region, population_model,
               if (s == "mean") {
                 label <- paste("mean", label)
               } else if (s == "sd") {
-                label <- paste(label, "standard deviation")
+                label <- paste(label, "std. dev.")
               }
               if (direct_action ||
                   population_model$get_type() %in% c("unstructured",
@@ -1584,7 +1584,7 @@ ManageResults.Region <- function(region, population_model,
               if (s == "mean") {
                 label <- paste("mean", label)
               } else if (s == "sd") {
-                label <- paste(label, "standard deviation")
+                label <- paste(label, "std. dev.")
               }
               cost_unit <- attr(results$actions[[i]]$cost, "unit")
               attr_list <- list(
@@ -1608,7 +1608,7 @@ ManageResults.Region <- function(region, population_model,
                 if (s == "mean") {
                   label <- paste("mean", label)
                 } else if (s == "sd") {
-                  label <- paste(label, "standard deviation")
+                  label <- paste(label, "std. dev.")
                 }
                 attr_list$label <- title_case(label)
                 attr(output_list[[output_cum_cost_key]], "metadata") <-
@@ -1702,7 +1702,7 @@ ManageResults.Region <- function(region, population_model,
               if (s == "mean") {
                 label <- paste("mean", label)
               } else if (s == "sd") {
-                label <- paste(label, "standard deviation")
+                label <- paste(label, "std. dev.")
               }
               cost_unit <- attr(results$actions$cost, "unit")
               attr_list <- list(
@@ -1724,7 +1724,7 @@ ManageResults.Region <- function(region, population_model,
                 if (s == "mean") {
                   label <- paste("mean", label)
                 } else if (s == "sd") {
-                  label <- paste(label, "standard deviation")
+                  label <- paste(label, "std. dev.")
                 }
                 attr_list$label <- title_case(label)
                 attr(output_list[[output_cum_cost_key]], "metadata") <-
@@ -1795,7 +1795,7 @@ ManageResults.Region <- function(region, population_model,
               if (s == "mean") {
                 label <- paste("mean", label)
               } else if (s == "sd") {
-                label <- paste(label, "standard deviation")
+                label <- paste(label, "std. dev.")
               }
               cost_unit <- attr(results$cost, "unit")
               attr_list <- list(
@@ -1817,7 +1817,7 @@ ManageResults.Region <- function(region, population_model,
                 if (s == "mean") {
                   label <- paste("mean", label)
                 } else if (s == "sd") {
-                  label <- paste(label, "standard deviation")
+                  label <- paste(label, "std. dev.")
                 }
                 attr_list$label <- title_case(label)
                 attr(output_list[[output_cum_cost_key]], "metadata") <-
