@@ -29,12 +29,37 @@ test_that("initializes with region, population, and surveillance", {
     stages = 2:3),
     "Surveillance object must be compatible with the region object.")
   expect_error(manage_detection <- ManageDetection(
+    region, population_model, surveillance,
+    sensitivity_threshhold = 0),
+    paste("The sensitivity population size threshold parameter should be a",
+          "numeric value > 0."))
+  expect_message(manage_detection <- ManageDetection(
+    region, population_model, surveillance,
+    sensitivity_type = "individual",
+    sensitivity_threshhold = 5),
+    paste("Ignoring the sensitivity population size threshold value, it is",
+          "not used for a individual level sensitivity type."))
+  expect_error(manage_detection <- ManageDetection(
+    region, population_model, surveillance,
+    sensitivity_type = "population"),
+    paste("A sensitivity population size threshold is required for a",
+          "population level sensitivity type."))
+  expect_message(manage_detection <- ManageDetection(
+    region, population_model, surveillance,
+    sensitivity_type = "presence",
+    sensitivity_threshhold = 5),
+    paste("The sensitivity population size threshold value of 5 has been set",
+          "to 1 for a presence level sensitivity type."))
+  expect_error(manage_detection <- ManageDetection(
     region, population_model, surveillance, surv_cost = 1:5, stages = 2:3,
     schedule = 4:6),
     paste("The surveillance cost parameter must be a numeric vector with",
           "values for each location."))
   expect_silent(manage_detection <- ManageDetection(
-    region, population_model, surveillance, surv_cost = 1, stages = 2:3,
+    region, population_model, surveillance,
+    sensitivity_type = "population",
+    sensitivity_threshhold = 5,
+    surv_cost = 1, stages = 2:3,
     schedule = 4:6))
   expect_is(manage_detection, "ManageDetection")
   expect_s3_class(manage_detection, "ManageActions")

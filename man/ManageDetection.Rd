@@ -9,6 +9,8 @@ ManageDetection(
   region,
   population_model,
   surveillance,
+  sensitivity_type = c("individual", "population", "presence"),
+  sensitivity_threshhold = NULL,
   surv_cost = NULL,
   stages = NULL,
   schedule = NULL,
@@ -19,6 +21,8 @@ ManageDetection(
   region,
   population_model,
   surveillance,
+  sensitivity_type = c("individual", "population", "presence"),
+  sensitivity_threshhold = NULL,
   surv_cost = NULL,
   stages = NULL,
   schedule = NULL,
@@ -37,6 +41,28 @@ simulations.}
 \item{surveillance}{A \code{bsdesign::SurveillanceDesign} or inherited class
 object representing the distribution of surveillance resources and their
 detection sensitivities.}
+
+\item{sensitivity_type}{Configures how the surveillance detection
+sensitivity values are specified. May be specified at either: the
+\code{"individual"} level (default), whereby sensitivity values denote the
+probability of detection for each invasive individual; the
+\code{"population"} size (threshold) level, whereby sensitivity values
+denote the probability of detection for (local) populations having at
+least at certain size, specified via a threshold value (below), and the
+probability of detection for (local) population sizes below the threshold
+value is reduced proportionally (i.e. scaled by size/threshold); the
+\code{"presence"}/absence level, whereby sensitivity values denote the
+probability of detection any (local) presence of the invasive species
+(equivalent to threshold = 1).}
+
+\item{sensitivity_threshhold}{The threshold (minimum) population size (of
+detectable individuals) for (locally) applying surveillance detection
+probability (sensitivity) values when \code{sensitivity_type} is
+\code{"population"}. The probability of detection for (local) population
+sizes below the threshold value is reduced proportionally (i.e. scaled by
+size/threshold). Default is \code{NULL} when \code{sensitivity_type} is
+\code{"population"}, or is set to \code{1} when \code{sensitivity_type} is
+\code{"presence"}.}
 
 \item{surv_cost}{Numeric vector of distributed surveillance costs (combined
 resource and fixed costs) or a single cost value for each location where

@@ -12,6 +12,26 @@
 #' @param surveillance A \code{bsdesign::SurveillanceDesign} or inherited class
 #'   object representing the distribution of surveillance resources and their
 #'   detection sensitivities.
+#' @param sensitivity_type Configures how the surveillance detection
+#'   sensitivity values are specified. May be specified at either: the
+#'   \code{"individual"} level (default), whereby sensitivity values denote the
+#'   probability of detection for each invasive individual; the
+#'   \code{"population"} size (threshold) level, whereby sensitivity values
+#'   denote the probability of detection for (local) populations having at
+#'   least at certain size, specified via a threshold value (below), and the
+#'   probability of detection for (local) population sizes below the threshold
+#'   value is reduced proportionally (i.e. scaled by size/threshold); the
+#'   \code{"presence"}/absence level, whereby sensitivity values denote the
+#'   probability of detection any (local) presence of the invasive species
+#'   (equivalent to threshold = 1).
+#' @param sensitivity_threshhold The threshold (minimum) population size (of
+#'   detectable individuals) for (locally) applying surveillance detection
+#'   probability (sensitivity) values when \code{sensitivity_type} is
+#'   \code{"population"}. The probability of detection for (local) population
+#'   sizes below the threshold value is reduced proportionally (i.e. scaled by
+#'   size/threshold). Default is \code{NULL} when \code{sensitivity_type} is
+#'   \code{"population"}, or is set to \code{1} when \code{sensitivity_type} is
+#'   \code{"presence"}.
 #' @param surv_cost Numeric vector of distributed surveillance costs (combined
 #'   resource and fixed costs) or a single cost value for each location where
 #'   surveillance is applied. For spatially-implicit area-based regions, cost
@@ -67,6 +87,10 @@
 ManageDetection <- function(region,
                             population_model,
                             surveillance,
+                            sensitivity_type = c("individual",
+                                                 "population",
+                                                 "presence"),
+                            sensitivity_threshhold = NULL,
                             surv_cost = NULL,
                             stages = NULL,
                             schedule = NULL, ...) {
@@ -78,6 +102,10 @@ ManageDetection <- function(region,
 ManageDetection.Region <- function(region,
                                    population_model,
                                    surveillance,
+                                   sensitivity_type = c("individual",
+                                                        "population",
+                                                        "presence"),
+                                   sensitivity_threshhold = NULL,
                                    surv_cost = NULL,
                                    stages = NULL,
                                    schedule = NULL, ...) {
@@ -99,6 +127,33 @@ ManageDetection.Region <- function(region,
              region$get_locations()) {
     stop("Surveillance object must be compatible with the region object.",
          call. = FALSE)
+  }
+
+  # Check and process sensitivity type and threshold
+  sensitivity_type <- match.arg(sensitivity_type)
+  if (!is.null(sensitivity_threshhold) &&
+      (!is.numeric(sensitivity_threshhold) || sensitivity_threshhold < 1)) {
+    stop(paste("The sensitivity population size threshold parameter should be",
+               "a numeric value > 0."),
+         call. = FALSE)
+  }
+  if (sensitivity_type == "individual" && is.numeric(sensitivity_threshhold)) {
+    message(paste("Ignoring the sensitivity population size threshold value,",
+                  "it is not used for a individual level sensitivity type."))
+  } else if (sensitivity_type == "population" &&
+             population_model$get_type() %in% c("unstructured",
+                                                "stage_structured") &&
+             !is.numeric(sensitivity_threshhold)) {
+    stop(paste("A sensitivity population size threshold is required for a",
+               "population level sensitivity type."),
+         call. = FALSE)
+  } else if (sensitivity_type == "presence") {
+    if (is.numeric(sensitivity_threshhold) && sensitivity_threshhold != 1) {
+      message(paste("The sensitivity population size threshold value of",
+                    sensitivity_threshhold, "has been set to 1 for a presence",
+                    "level sensitivity type."))
+    }
+    sensitivity_threshhold <- 1
   }
 
   # Check and process surveillance cost
@@ -188,18 +243,22 @@ ManageDetection.Region <- function(region,
         detect_pr <- surveillance$get_sensitivity()[idx]
 
         # Sample detections
-        if (population_model$get_type() == "stage_structured") {
-          for (i in self$get_stages()) {
-            detected[idx,i] <- stats::rbinom(length(idx),
-                                             size = undetected[idx,i],
-                                             prob = detect_pr)
+        if (sensitivity_type == "individual") {
+          if (population_model$get_type() == "stage_structured") {
+            for (i in self$get_stages()) {
+              detected[idx,i] <- stats::rbinom(length(idx),
+                                               size = undetected[idx,i],
+                                               prob = detect_pr)
+            }
+            undetected[idx,] <- undetected[idx,] - detected[idx,]
+          } else {
+            detected[idx] <- stats::rbinom(length(idx),
+                                           size = undetected[idx],
+                                           prob = detect_pr)
+            undetected[idx] <- undetected[idx] - detected[idx]
           }
-          undetected[idx,] <- undetected[idx,] - detected[idx,]
-        } else {
-          detected[idx] <- stats::rbinom(length(idx),
-                                         size = undetected[idx],
-                                         prob = detect_pr)
-          undetected[idx] <- undetected[idx] - detected[idx]
+        } else if (sensitivity_type %in% c("population", "presence")) {
+          # TODO ####
         }
       }
 
