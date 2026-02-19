@@ -15,6 +15,13 @@
 #'   indicated via a population attribute when present, else removal is applied
 #'   at all locations. Default is \code{1}, indicating all (detected)
 #'   occurrences are removed.
+#' @param removal_pr_type Configures how the removal probability values are
+#'   specified. May be specified at either: the code{"individual"} level
+#'   (default), whereby removal probability values denote the probability of
+#'   removal for each (removable) invasive individual; the \code{"population"}
+#'   level, whereby removal probability values denote the probability of
+#'   removing all (removable) individuals within the (local) invasive
+#'   population.
 #' @param remove_always A logical indication of whether or not removal is
 #'   always to applied to locations where invasive species are present (even
 #'   when they are not detected by explicit surveillance). Default is
@@ -80,6 +87,8 @@
 #' @export
 ManageRemovals <- function(region, population_model,
                            removal_pr = 1,
+                           removal_pr_type = c("individual",
+                                               "population"),
                            remove_always = FALSE,
                            detected_only = FALSE,
                            removal_cost = NULL,
@@ -92,6 +101,8 @@ ManageRemovals <- function(region, population_model,
 #' @export
 ManageRemovals.Region <- function(region, population_model,
                                   removal_pr = 1,
+                                  removal_pr_type = c("individual",
+                                                      "population"),
                                   remove_always = FALSE,
                                   detected_only = FALSE,
                                   removal_cost = NULL,
@@ -106,7 +117,7 @@ ManageRemovals.Region <- function(region, population_model,
                         schedule = schedule,
                         class = "ManageRemovals")
 
-  # Validate removal probability and radius
+  # Validate removal probability
   if (is.null(removal_pr) ||
       (!is.null(removal_pr) &&
        (!is.numeric(removal_pr) ||
@@ -118,6 +129,11 @@ ManageRemovals.Region <- function(region, population_model,
   if (length(removal_pr) == 1) {
     removal_pr <- rep(removal_pr, region$get_locations())
   }
+
+  # Check removal probability type
+  removal_pr_type <- match.arg(removal_pr_type)
+
+  # Validate radius
   if (!is.null(radius) && (!is.numeric(radius) || radius < 0)) {
     stop("The radius (m) parameter must be numeric and >= 0.", call. = FALSE)
   }

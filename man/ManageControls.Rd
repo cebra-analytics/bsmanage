@@ -10,6 +10,7 @@ ManageControls(
   population_model,
   control_type = c("search_destroy", "growth", "spread", "establishment"),
   control_design = NULL,
+  manage_pr_type = c("individual", "population"),
   control_mult = NULL,
   control_cost = NULL,
   radius = NULL,
@@ -24,6 +25,7 @@ ManageControls(
   population_model,
   control_type = c("search_destroy", "growth", "spread", "establishment"),
   control_design = NULL,
+  manage_pr_type = c("individual", "population"),
   control_mult = NULL,
   control_cost = NULL,
   radius = NULL,
@@ -54,6 +56,14 @@ Alternatively, optionally utilise to specify the distribution (logical
 mask) of existing, known, or scheduled treatment locations for the
 reduction or suppression of growth, spread, or establishment
 (spatially-explicit only).}
+
+\item{manage_pr_type}{Configures how the control design effectiveness
+(probability of management success) values are specified. May be specified
+at either: the code{"individual"} level (default), whereby effectiveness
+values denote the probability of control for each (controllable) invasive
+individual; the \code{"population"} level, whereby effectiveness values
+denote the probability of controlling all (controllable) individuals
+within the (local) invasive population.}
 
 \item{control_mult}{Control multipliers or rates required for control types
 \code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be a

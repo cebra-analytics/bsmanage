@@ -21,6 +21,13 @@
 #'   mask) of existing, known, or scheduled treatment locations for the
 #'   reduction or suppression of growth, spread, or establishment
 #'   (spatially-explicit only).
+#' @param manage_pr_type Configures how the control design effectiveness
+#'   (probability of management success) values are specified. May be specified
+#'   at either: the code{"individual"} level (default), whereby effectiveness
+#'   values denote the probability of control for each (controllable) invasive
+#'   individual; the \code{"population"} level, whereby effectiveness values
+#'   denote the probability of controlling all (controllable) individuals
+#'   within the (local) invasive population.
 #' @param control_mult Control multipliers or rates required for control types
 #'   \code{"growth"}, \code{"spread"}, or \code{"establishment"}. May be a
 #'   single value (0-1), or vector of values for each location specified by
@@ -99,6 +106,8 @@ ManageControls <- function(region, population_model,
                                             "spread",
                                             "establishment"),
                            control_design = NULL,
+                           manage_pr_type = c("individual",
+                                              "population"),
                            control_mult = NULL,
                            control_cost = NULL,
                            radius = NULL,
@@ -116,6 +125,8 @@ ManageControls.Region <- function(region, population_model,
                                                    "spread",
                                                    "establishment"),
                                   control_design = NULL,
+                                  manage_pr_type = c("individual",
+                                                     "population"),
                                   control_mult = NULL,
                                   control_cost = NULL,
                                   radius = NULL,
@@ -147,6 +158,9 @@ ManageControls.Region <- function(region, population_model,
     stop("Control design must be compatible with the region object.",
          call. = FALSE)
   }
+
+  # Check control design effectiveness type
+  manage_pr_type <- match.arg(manage_pr_type)
 
   # Validate control multiplier, radius, and growth apply to
   if (is.null(control_mult) &&

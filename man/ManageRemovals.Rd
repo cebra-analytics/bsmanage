@@ -9,6 +9,7 @@ ManageRemovals(
   region,
   population_model,
   removal_pr = 1,
+  removal_pr_type = c("individual", "population"),
   remove_always = FALSE,
   detected_only = FALSE,
   removal_cost = NULL,
@@ -22,6 +23,7 @@ ManageRemovals(
   region,
   population_model,
   removal_pr = 1,
+  removal_pr_type = c("individual", "population"),
   remove_always = FALSE,
   detected_only = FALSE,
   removal_cost = NULL,
@@ -46,6 +48,14 @@ of removal at locations where the invasive species has been detected, as
 indicated via a population attribute when present, else removal is applied
 at all locations. Default is \code{1}, indicating all (detected)
 occurrences are removed.}
+
+\item{removal_pr_type}{Configures how the removal probability values are
+specified. May be specified at either: the code{"individual"} level
+(default), whereby removal probability values denote the probability of
+removal for each (removable) invasive individual; the \code{"population"}
+level, whereby removal probability values denote the probability of
+removing all (removable) individuals within the (local) invasive
+population.}
 
 \item{remove_always}{A logical indication of whether or not removal is
 always to applied to locations where invasive species are present (even

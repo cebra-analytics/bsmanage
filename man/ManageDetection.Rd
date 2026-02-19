@@ -45,15 +45,16 @@ detection sensitivities.}
 \item{sensitivity_type}{Configures how the surveillance detection
 sensitivity values are specified. May be specified at either: the
 \code{"individual"} level (default), whereby sensitivity values denote the
-probability of detection for each invasive individual; the
+probability of detection for each (detectable) invasive individual; the
 \code{"population"} size (threshold) level, whereby sensitivity values
-denote the probability of detection for (local) populations having at
-least at certain size, specified via a threshold value (below), and the
-probability of detection for (local) population sizes below the threshold
-value is reduced proportionally (i.e. scaled by size/threshold); the
-\code{"presence"}/absence level, whereby sensitivity values denote the
-probability of detection any (local) presence of the invasive species
-(equivalent to threshold = 1).}
+denote the probability of detecting (local) populations having at
+least at certain size (of detectable individuals), specified via a
+threshold value (below), and the probability of detection for (local)
+population sizes below the threshold value is reduced proportionally (i.e.
+scaled by size/threshold); the \code{"presence"}/absence level, whereby
+sensitivity values denote the probability of detection any (local)
+presence of (detectable individuals within) the invasive species
+population (equivalent to threshold = 1).}
 
 \item{sensitivity_threshhold}{The threshold (minimum) population size (of
 detectable individuals) for (locally) applying surveillance detection
