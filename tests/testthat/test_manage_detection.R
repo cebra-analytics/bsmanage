@@ -30,13 +30,13 @@ test_that("initializes with region, population, and surveillance", {
     "Surveillance object must be compatible with the region object.")
   expect_error(manage_detection <- ManageDetection(
     region, population_model, surveillance,
-    sensitivity_threshhold = 0),
+    sensitivity_threshold = 0),
     paste("The sensitivity population size threshold parameter should be a",
           "numeric value > 0."))
   expect_message(manage_detection <- ManageDetection(
     region, population_model, surveillance,
     sensitivity_type = "individual",
-    sensitivity_threshhold = 5),
+    sensitivity_threshold = 5),
     paste("Ignoring the sensitivity population size threshold value, it is",
           "not used for a individual level sensitivity type."))
   expect_error(manage_detection <- ManageDetection(
@@ -47,7 +47,7 @@ test_that("initializes with region, population, and surveillance", {
   expect_message(manage_detection <- ManageDetection(
     region, population_model, surveillance,
     sensitivity_type = "presence",
-    sensitivity_threshhold = 5),
+    sensitivity_threshold = 5),
     paste("The sensitivity population size threshold value of 5 has been set",
           "to 1 for a presence level sensitivity type."))
   expect_error(manage_detection <- ManageDetection(
@@ -58,7 +58,7 @@ test_that("initializes with region, population, and surveillance", {
   expect_silent(manage_detection <- ManageDetection(
     region, population_model, surveillance,
     sensitivity_type = "population",
-    sensitivity_threshhold = 5,
+    sensitivity_threshold = 5,
     surv_cost = 1, stages = 2:3,
     schedule = 4:6))
   expect_is(manage_detection, "ManageDetection")
@@ -154,6 +154,33 @@ test_that("applies stochastic detection to invasive population", {
   expect_equal(as.numeric(attr(new_n, "a1_surv_cost")),
                2*(surveillance$get_sensitivity() > 0))
   expect_equal(attr(attr(new_n, "a1_surv_cost"), "unit"), "$")
+  # population level sensitivity
+  expect_silent(manage_detection <- ManageDetection(
+    region, population_model, surveillance,
+    sensitivity_type = "population",
+    sensitivity_threshold = 20,
+    stages = 2:3, schedule = 4:6))
+  adj_sens <- c(0.5, 0.75, 1)*pmin(rowSums(n[idx, 2:3]), 20)/20
+  detected <- rep(0, length(idx))
+  set.seed(1234)
+  for (i in 1:1000) {
+    new_n <- manage_detection$apply(n, 4)
+    detected <- detected + (rowSums(attr(new_n, "detected")[idx,]) > 0)
+  }
+  expect_true(all(abs(detected/1000 - adj_sens) < 0.05))
+  # presence/absence level sensitivity
+  expect_silent(manage_detection <- ManageDetection(
+    region, population_model, surveillance,
+    sensitivity_type = "presence",
+    stages = 2:3, schedule = 4:6))
+  detected <- rep(0, length(idx))
+  set.seed(1234)
+  for (i in 1:1000) {
+    new_n <- manage_detection$apply(n, 4)
+    detected <- detected + (rowSums(attr(new_n, "detected")[idx,]) > 0)
+  }
+  expect_true(all(abs(detected/1000 - c(0.5, 0.75, 1)) < 0.05))
+  expect_equal(detected[3], 1000)
   # unstructured population
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   n <- rowSums(n)
@@ -177,6 +204,21 @@ test_that("applies stochastic detection to invasive population", {
   expect_equal(as.numeric(attr(new_n2, "surv_cost")),
                2*(surveillance$get_sensitivity() > 0))
   expect_equal(attr(attr(new_n2, "surv_cost"), "unit"), "$")
+  # population level sensitivity
+  expect_silent(manage_detection <- ManageDetection(
+    region, population_model, surveillance,
+    sensitivity_type = "population",
+    sensitivity_threshold = 20,
+    schedule = 4:6))
+  n[idx] <- 75 - n[idx]
+  adj_sens <- c(0.5, 0.75, 1)*pmin(n[idx], 20)/20
+  detected <- rep(0, length(idx))
+  set.seed(1234)
+  for (i in 1:1000) {
+    new_n <- manage_detection$apply(n, 4)
+    detected <- detected + (attr(new_n, "detected")[idx] > 0)
+  }
+  expect_true(all(abs(detected/1000 - adj_sens) < 0.05))
   # presence-only population
   population_model <- bsspread::PresencePopulation(region)
   n <- n > 0

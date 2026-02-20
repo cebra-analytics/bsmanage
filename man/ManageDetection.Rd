@@ -10,7 +10,7 @@ ManageDetection(
   population_model,
   surveillance,
   sensitivity_type = c("individual", "population", "presence"),
-  sensitivity_threshhold = NULL,
+  sensitivity_threshold = NULL,
   surv_cost = NULL,
   stages = NULL,
   schedule = NULL,
@@ -22,7 +22,7 @@ ManageDetection(
   population_model,
   surveillance,
   sensitivity_type = c("individual", "population", "presence"),
-  sensitivity_threshhold = NULL,
+  sensitivity_threshold = NULL,
   surv_cost = NULL,
   stages = NULL,
   schedule = NULL,
@@ -56,7 +56,7 @@ sensitivity values denote the probability of detection any (local)
 presence of (detectable individuals within) the invasive species
 population (equivalent to threshold = 1).}
 
-\item{sensitivity_threshhold}{The threshold (minimum) population size (of
+\item{sensitivity_threshold}{The threshold (minimum) population size (of
 detectable individuals) for (locally) applying surveillance detection
 probability (sensitivity) values when \code{sensitivity_type} is
 \code{"population"}. The probability of detection for (local) population

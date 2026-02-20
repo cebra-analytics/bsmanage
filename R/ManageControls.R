@@ -278,6 +278,22 @@ ManageControls.Region <- function(region, population_model,
           # Get control effectiveness (probability)
           control_pr <- control_design$get_manage_pr()[idx]
 
+          # Transform population level effectiveness values
+          if (manage_pr_type == "population" &&
+              population_model$get_type() %in% c("unstructured",
+                                                 "stage_structured")) {
+
+            # Controllable occupied population sizes
+            if (population_model$get_type() == "stage_structured") {
+              n_idx <- rowSums(n[idx, self$get_stages(), drop = FALSE])
+            } else {
+              n_idx <- n[idx]
+            }
+
+            # Transform overall to individual probabilities
+            control_pr <- control_pr^(1/n_idx)
+          }
+
           # Sample number controlled and remove when search & destroy
           if (population_model$get_type() == "stage_structured") {
             n_apply <- lapply(n_apply, function(a) array(a, dim(n)))

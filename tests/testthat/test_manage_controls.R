@@ -211,7 +211,28 @@ test_that("applies stochastic search and destroy controls to population", {
                expected_controls[idx,])
   expect_equal(attr(new_n, "a2_control_search_destroy_cost")[idx],
                expected_costs[idx])
-
+  # population level effectiveness
+  expect_silent(
+    manage_controls <- ManageControls(region, population_model,
+                                      control_type = "search_destroy",
+                                      control_design = control_design,
+                                      manage_pr_type = "population",
+                                      stages = 2:3, schedule = 4:6))
+  idx1 <- which(rowSums(n[,2:3]) > 0)
+  controlled <- undetected <- destroyed <- rep(0, length(idx1))
+  set.seed(1234)
+  for (i in 1:1000) {
+    new_n <- manage_controls$apply(n, 4)
+    controlled <- controlled + (rowSums(new_n[idx1, 2:3]) == 0)
+    undetected <- undetected + (
+      rowSums(attr(new_n, "undetected")[idx1, 2:3]) > 0)
+    destroyed <- destroyed + (
+      rowSums(attr(new_n, "control_search_destroy")[idx1, 2:3]) ==
+        rowSums(n[idx1, 2:3]))
+  }
+  expect_true(all(abs(controlled/1000 - exist_manage_pr[idx1]) < 0.05))
+  expect_true(all(abs(undetected/1000 - (1 - exist_manage_pr[idx1])) < 0.05))
+  expect_equal(destroyed, controlled)
   # unstructured
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   n <- rowSums(n)
@@ -259,6 +280,26 @@ test_that("applies stochastic search and destroy controls to population", {
   expect_equal(attr(new_n2, "control_search_destroy"), expected_controls_plus)
   expect_equal(attr(new_n2, "control_search_destroy_cost")[idx],
                expected_costs[idx])
+  # population level effectiveness
+  expect_silent(
+    manage_controls <- ManageControls(region, population_model,
+                                      control_type = "search_destroy",
+                                      control_design = control_design,
+                                      manage_pr_type = "population",
+                                      schedule = 4:6))
+  idx1 <- which(n > 0)
+  controlled <- undetected <- destroyed <- rep(0, length(idx1))
+  set.seed(1234)
+  for (i in 1:1000) {
+    new_n <- manage_controls$apply(n, 4)
+    controlled <- controlled + (new_n[idx1] == 0)
+    undetected <- undetected + (attr(new_n, "undetected")[idx1] > 0)
+    destroyed <-
+      destroyed + (attr(new_n, "control_search_destroy")[idx1] == n[idx1])
+  }
+  expect_true(all(abs(controlled/1000 - exist_manage_pr[idx1]) < 0.05))
+  expect_true(all(abs(undetected/1000 - (1 - exist_manage_pr[idx1])) < 0.05))
+  expect_equal(destroyed, controlled)
   # presence-only
   population_model <- bsspread::PresencePopulation(region)
   n <- n > 0

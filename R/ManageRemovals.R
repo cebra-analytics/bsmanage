@@ -267,13 +267,34 @@ ManageRemovals.Region <- function(region, population_model,
 
       # Sample and apply removals
       if (length(idx) > 0) {
+
+        # Removal probabilities at locations
+        removal_pr_idx <- removal_pr[idx]
+
+        # Transform population level effectiveness values
+        if (removal_pr_type == "population" &&
+            population_model$get_type() %in% c("unstructured",
+                                               "stage_structured")) {
+
+          # Removable occupied population sizes
+          if (population_model$get_type() == "stage_structured") {
+            n_idx <- rowSums(n[idx, self$get_stages(), drop = FALSE])
+          } else {
+            n_idx <- n[idx]
+          }
+
+          # Transform overall to individual probabilities
+          removal_pr_idx <- removal_pr_idx^(1/n_idx)
+        }
+
+        # Sample and apply
         if (population_model$get_type() == "stage_structured") {
           n_apply <- lapply(n_apply, function(a) array(a, dim(n)))
           for (i in c("detected", "undetected")) {
             for (j in self$get_stages()) {
               removed[[i]][idx, j] <-
                 stats::rbinom(length(idx), size = n_apply[[i]][idx, j],
-                              prob = removal_pr[idx])
+                              prob = removal_pr_idx)
             }
           }
           if ("undetected" %in% names(attributes(n))) { # update
@@ -286,7 +307,7 @@ ManageRemovals.Region <- function(region, population_model,
           for (i in c("detected", "undetected")) {
             removed[[i]][idx] <-
               stats::rbinom(length(idx), size = n_apply[[i]][idx],
-                            prob = removal_pr[idx])
+                            prob = removal_pr_idx)
           }
           if (population_model$get_type() == "presence_only") {
             removed <- lapply(removed, as.logical)

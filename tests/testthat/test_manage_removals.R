@@ -277,6 +277,25 @@ test_that("applies stochastic removals to invasive population", {
   expected_removal_cost[] <- 0
   expected_removal_cost[rowSums(attr(new_n, "removed")) > 0] <- 2
   expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
+  # population level removal probability
+  expect_silent(
+    manage_removals <- ManageRemovals(region, population_model,
+                                      removal_pr = template_vect,
+                                      removal_pr_type = "population",
+                                      detected_only = FALSE,
+                                      stages = 2:3))
+  idx2 <- which(rowSums(n[,2:3]) > 0)
+  attr(n, "undetected") <- NULL
+  removed <- zeroed <- rep(0, length(idx2))
+  set.seed(1234)
+  for (i in 1:1000) {
+    new_n <- manage_removals$apply(n, 4)
+    removed <- removed + (
+      rowSums(attr(new_n, "removed")[idx2, 2:3]) == rowSums(n[idx2, 2:3]))
+    zeroed <- zeroed + (rowSums(new_n[idx2, 2:3]) == 0)
+  }
+  expect_true(all(abs(removed/1000 - template_vect[idx2]) < 0.05))
+  expect_equal(zeroed, removed)
   # unstructured population
   population_model <- bsspread::UnstructPopulation(region, growth = 1.2)
   set.seed(1234)
@@ -303,6 +322,23 @@ test_that("applies stochastic removals to invasive population", {
   expect_equal(new_n[idx], n[idx] - expected_removals1)
   expected_removal_cost[idx] <- 2
   expect_equal(attr(new_n, "removal_cost"), expected_removal_cost)
+  # population level removal probability
+  expect_silent(
+    manage_removals <- ManageRemovals(region, population_model,
+                                      removal_pr = template_vect,
+                                      removal_pr_type = "population",
+                                      detected_only = FALSE))
+  idx2 <- which(n > 0)
+  attr(n, "undetected") <- NULL
+  removed <- zeroed <- rep(0, length(idx2))
+  set.seed(1234)
+  for (i in 1:1000) {
+    new_n <- manage_removals$apply(n, 4)
+    removed <- removed + (attr(new_n, "removed")[idx2] == n[idx2])
+    zeroed <- zeroed + (new_n[idx2] == 0)
+  }
+  expect_true(all(abs(removed/1000 - template_vect[idx2]) < 0.05))
+  expect_equal(zeroed, removed)
   # presence-only population
   population_model <- bsspread::PresencePopulation(region)
   n <- n > 0
