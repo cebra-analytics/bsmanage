@@ -63,6 +63,8 @@
 #'       prefix (default is \code{TRUE}).}
 #'     \item{\code{get_surveillance()}}{Get the surveillance design class
 #'       object.}
+#'     \item{\code{get_sensitivity_type()}}{Get the surveillance sensitivity
+#'       type.}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       detection are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
@@ -188,6 +190,11 @@ ManageDetection.Region <- function(region,
     return(surveillance)
   }
 
+  # Get the surveillance sensitivity type
+  self$get_sensitivity_type <- function() {
+    return(sensitivity_type)
+  }
+
   # Does the surveillance cost parameter have a value?
   self$include_cost <- function() {
     return(is.numeric(surv_cost))
@@ -297,7 +304,15 @@ ManageDetection.Region <- function(region,
       attr(n, self$get_label()) <- as.logical(detected)
       attr(n, "undetected") <- as.logical(undetected)
     } else {
-      attr(n, self$get_label()) <- detected
+      if (sensitivity_type %in% c("population", "presence")) {
+        if (population_model$get_type() == "stage_structured") {
+          attr(n, self$get_label()) <- +(rowSums(detected) > 0)
+        } else {
+          attr(n, self$get_label()) <- +(detected > 0)
+        }
+      } else { # individual
+        attr(n, self$get_label()) <- detected
+      }
       attr(n, "undetected") <- undetected
     }
 

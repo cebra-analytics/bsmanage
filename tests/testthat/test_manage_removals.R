@@ -45,9 +45,11 @@ test_that("initializes with region, population, and other parameters", {
   expect_named(manage_removals,
                c(c("get_type", "get_id", "set_id", "get_label", "get_stages",
                    "get_schedule", "include_cost", "get_cost_label",
-                   "get_cost_unit", "clear_attributes", "apply")))
+                   "get_cost_unit", "clear_attributes", "apply",
+                   "get_removal_pr_type")))
   expect_equal(manage_removals$get_type(), "removal")
   expect_equal(manage_removals$get_label(), "removed")
+  expect_equal(manage_removals$get_removal_pr_type(), "individual")
   expect_equal(manage_removals$get_stages(), 2:3)
   expect_equal(manage_removals$get_schedule(), 4:6)
   expect_true(manage_removals$include_cost())
@@ -290,8 +292,7 @@ test_that("applies stochastic removals to invasive population", {
   set.seed(1234)
   for (i in 1:1000) {
     new_n <- manage_removals$apply(n, 4)
-    removed <- removed + (
-      rowSums(attr(new_n, "removed")[idx2, 2:3]) == rowSums(n[idx2, 2:3]))
+    removed <- removed + attr(new_n, "removed")[idx2]
     zeroed <- zeroed + (rowSums(new_n[idx2, 2:3]) == 0)
   }
   expect_true(all(abs(removed/1000 - template_vect[idx2]) < 0.05))
@@ -334,7 +335,7 @@ test_that("applies stochastic removals to invasive population", {
   set.seed(1234)
   for (i in 1:1000) {
     new_n <- manage_removals$apply(n, 4)
-    removed <- removed + (attr(new_n, "removed")[idx2] == n[idx2])
+    removed <- removed + attr(new_n, "removed")[idx2]
     zeroed <- zeroed + (new_n[idx2] == 0)
   }
   expect_true(all(abs(removed/1000 - template_vect[idx2]) < 0.05))

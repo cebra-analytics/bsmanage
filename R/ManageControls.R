@@ -78,6 +78,8 @@
 #'       label used in simulation results (e.g."<id>_control_growth" or
 #'       "control_growth"). Set \code{include_id} to include the action
 #'       \code{id} as a label prefix (default is \code{TRUE}).}
+#'     \item{\code{get_manage_pr_type()}}{Get the control design effectiveness
+#'       (probability of management success) type.}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       controls are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
@@ -215,6 +217,11 @@ ManageControls.Region <- function(region, population_model,
     } else {
       return(paste0("control_", control_type))
     }
+  }
+
+  # Get the control effectiveness type
+  self$get_manage_pr_type <- function() {
+    return(manage_pr_type)
   }
 
   # Does the control cost parameter have a value?
@@ -358,7 +365,17 @@ ManageControls.Region <- function(region, population_model,
       }
 
       # Attach control
-      attr(n, self$get_label()) <- controlled
+      if (manage_pr_type == "population") {
+        if (population_model$get_type() == "stage_structured") {
+          attr(n, self$get_label()) <-
+            +(rowSums(controlled) > 0 &
+                rowSums(n[,self$get_stages(), drop = FALSE]) == 0)
+        } else {
+          attr(n, self$get_label()) <- +(controlled > 0 & n == 0)
+        }
+      } else { # individual
+        attr(n, self$get_label()) <- controlled
+      }
 
       # Attach control costs as an attribute via label
       if (!is.null(control_cost)) {

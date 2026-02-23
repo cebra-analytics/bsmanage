@@ -67,10 +67,11 @@ test_that("initializes with region, population, and surveillance", {
                c(c("get_type", "get_id", "set_id", "get_label", "get_stages",
                    "get_schedule", "include_cost", "get_cost_label",
                    "get_cost_unit", "clear_attributes", "apply",
-                   "get_surveillance")))
+                   "get_surveillance", "get_sensitivity_type")))
   expect_equal(manage_detection$get_type(), "detection")
   expect_equal(manage_detection$get_label(), "detected")
   expect_is(manage_detection$get_surveillance(), "SpatialSurvDesign")
+  expect_equal(manage_detection$get_sensitivity_type(), "population")
   expect_equal(manage_detection$get_stages(), 2:3)
   expect_equal(manage_detection$get_schedule(), 4:6)
   expect_true(manage_detection$include_cost())
@@ -165,7 +166,7 @@ test_that("applies stochastic detection to invasive population", {
   set.seed(1234)
   for (i in 1:1000) {
     new_n <- manage_detection$apply(n, 4)
-    detected <- detected + (rowSums(attr(new_n, "detected")[idx,]) > 0)
+    detected <- detected + attr(new_n, "detected")[idx]
   }
   expect_true(all(abs(detected/1000 - adj_sens) < 0.05))
   # presence/absence level sensitivity
@@ -177,7 +178,7 @@ test_that("applies stochastic detection to invasive population", {
   set.seed(1234)
   for (i in 1:1000) {
     new_n <- manage_detection$apply(n, 4)
-    detected <- detected + (rowSums(attr(new_n, "detected")[idx,]) > 0)
+    detected <- detected + attr(new_n, "detected")[idx]
   }
   expect_true(all(abs(detected/1000 - c(0.5, 0.75, 1)) < 0.05))
   expect_equal(detected[3], 1000)
@@ -216,7 +217,7 @@ test_that("applies stochastic detection to invasive population", {
   set.seed(1234)
   for (i in 1:1000) {
     new_n <- manage_detection$apply(n, 4)
-    detected <- detected + (attr(new_n, "detected")[idx] > 0)
+    detected <- detected + attr(new_n, "detected")[idx]
   }
   expect_true(all(abs(detected/1000 - adj_sens) < 0.05))
   # presence-only population

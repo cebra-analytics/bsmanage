@@ -106,6 +106,7 @@ for accessing attributes and applying simulated management removals:
 label used in simulation results ("\if{html}{\out{<id>}}_removed" or "removed").
 Set \code{include_id} to include the action \code{id} as a label
 prefix (default is \code{TRUE}).}
+\item{\code{get_removal_pr_type()}}{Get the removal probability type.}
 \item{\code{get_stages()}}{Get the population stages to which management
 removals are applied.}
 \item{\code{get_schedule()}}{Get the scheduled simulation time steps in

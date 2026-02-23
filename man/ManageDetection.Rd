@@ -100,6 +100,8 @@ Set \code{include_id} to include the action \code{id} as a label
 prefix (default is \code{TRUE}).}
 \item{\code{get_surveillance()}}{Get the surveillance design class
 object.}
+\item{\code{get_sensitivity_type()}}{Get the surveillance sensitivity
+type.}
 \item{\code{get_stages()}}{Get the population stages to which management
 detection are applied.}
 \item{\code{get_schedule()}}{Get the scheduled simulation time steps in

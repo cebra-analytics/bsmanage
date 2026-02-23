@@ -266,9 +266,17 @@ ManageResults.Region <- function(region, population_model,
     }
     results$actions <- lapply(actions, function(actions_i) {
       zeros <- list()
-      direct_action <- (actions_i$get_label(include_id = FALSE) %in%
+      action_label <- actions_i$get_label(include_id = FALSE)
+      direct_action <- (action_label %in%
                           c("detected", "control_search_destroy", "removed"))
-      if (is.numeric(stages) && direct_action) {
+      indiv_level_pr <-
+        ((action_label == "detected" &&
+            actions_i$get_sensitivity_type() == "individual") ||
+           (action_label == "control_search_destroy" &&
+             actions_i$get_manage_pr_type() == "individual") ||
+           (action_label == "removed" &&
+              actions_i$get_removal_pr_type() == "individual"))
+      if (is.numeric(stages) && direct_action && indiv_level_pr) {
         if (is.numeric(combine_stages)) {
           zeros$action <- array(0L, c(region$get_locations(), 1))
           colnames(zeros$action) <- stage_labels
@@ -295,7 +303,7 @@ ManageResults.Region <- function(region, population_model,
       }
       if (replicates > 1) { # summaries
         zeros$action <- list(mean = zeros$action)
-        if (direct_action) {
+        if (direct_action && indiv_level_pr) {
           zeros$action$sd <- zeros$action$mean
         }
         if (include_collated) {
@@ -312,12 +320,11 @@ ManageResults.Region <- function(region, population_model,
         }
       }
       actions_list <- list()
-      actions_list[[actions_i$get_label(include_id = FALSE)]] <- list()
+      actions_list[[action_label]] <- list()
       if (include_collated) {
         for (tm in as.character(c(0, seq(collation_steps, time_steps,
                                          by = collation_steps)))) {
-          actions_list[[actions_i$get_label(include_id = FALSE)]][[tm]] <-
-            zeros$action
+          actions_list[[action_label]][[tm]] <- zeros$action
         }
         actions_list$total <- list()
         for (tm in as.character(0:time_steps)) {
@@ -325,18 +332,16 @@ ManageResults.Region <- function(region, population_model,
         }
       } else {
         for (tm in as.character(0:time_steps)) {
-          actions_list[[actions_i$get_label(include_id = FALSE)]][[tm]] <-
-            zeros$action
+          actions_list[[action_label]][[tm]] <- zeros$action
         }
       }
       if (actions_i$include_cost()) {
         actions_list$cost <- list()
-        actions_list$cost[[actions_i$get_label(include_id = FALSE)]] <- list()
+        actions_list$cost[[action_label]] <- list()
         if (include_collated) {
           for (tm in as.character(c(0, seq(collation_steps, time_steps,
                                            by = collation_steps)))) {
-            actions_list$cost[[actions_i$get_label(include_id = FALSE)
-                               ]][[tm]] <- zeros$action_cost
+            actions_list$cost[[action_label]][[tm]] <- zeros$action_cost
           }
           actions_list$cost$total <- list()
           for (tm in as.character(0:time_steps)) {
@@ -344,8 +349,7 @@ ManageResults.Region <- function(region, population_model,
           }
         } else {
           for (tm in as.character(0:time_steps)) {
-            actions_list$cost[[actions_i$get_label(include_id = FALSE)
-                               ]][[tm]] <- zeros$action_cost
+            actions_list$cost[[action_label]][[tm]] <- zeros$action_cost
           }
         }
         actions_list$cost$cumulative <- actions_list$cost
@@ -598,22 +602,31 @@ ManageResults.Region <- function(region, population_model,
         n_a <- attr(n, actions[[i]]$get_label())*1
         direct_action <-
           (a %in% c("detected", "control_search_destroy", "removed"))
+        indiv_level_pr <-
+          ((a == "detected" &&
+              actions[[i]]$get_sensitivity_type() == "individual") ||
+             (a == "control_search_destroy" &&
+                actions[[i]]$get_manage_pr_type() == "individual") ||
+             (a == "removed" &&
+                actions[[i]]$get_removal_pr_type() == "individual"))
 
         # Combine stages when required
         if (population_model$get_type() == "stage_structured" &&
-            direct_action && is.numeric(combine_stages)) {
+            direct_action && indiv_level_pr && is.numeric(combine_stages)) {
           n_a <- matrix(rowSums(n_a[,combine_stages, drop = FALSE]), ncol = 1)
           colnames(n_a) <- stage_labels
         }
 
         # Binarize growth, spread, & establishment control (indirect actions)
+        # or when population level probabilities
         if (a %in%  c("control_growth", "control_spread",
-                      "control_establishment")) {
+                      "control_establishment") || !indiv_level_pr) {
           n_a <- +(n_a < 1)
         }
 
         # Shape total when population is staged
-        if (include_collated && is.numeric(stages) && direct_action) {
+        if (include_collated && is.numeric(stages) && direct_action &&
+            indiv_level_pr) {
           total_n_a <- array(colSums(n_a), c(1, ncol(n_a)))
           colnames(total_n_a) <- stage_labels
         } else {
@@ -672,7 +685,7 @@ ManageResults.Region <- function(region, population_model,
             previous_mean <- results$actions[[i]][[a]][[tmc]]$mean
             results$actions[[i]][[a]][[tmc]]$mean <<-
               previous_mean + (n_a - previous_mean)/r
-            if (direct_action) {
+            if (direct_action && indiv_level_pr) {
               previous_sd <- results$actions[[i]][[a]][[tmc]]$sd
               results$actions[[i]][[a]][[tmc]]$sd <<-
                 (previous_sd +
@@ -1001,8 +1014,16 @@ ManageResults.Region <- function(region, population_model,
         for (i in 1:length(actions)) {
           i_names <- names(results$actions[[i]])
           for (a in i_names[i_names != "cost"]) {
+            indiv_level_pr <-
+              ((a == "detected" &&
+                  actions[[i]]$get_sensitivity_type() == "individual") ||
+                 (a == "control_search_destroy" &&
+                    actions[[i]]$get_manage_pr_type() == "individual") ||
+                 (a == "removed" &&
+                    actions[[i]]$get_removal_pr_type() == "individual"))
             if (include_collated && a == "total" ||
-                a %in% c("detected", "control_search_destroy", "removed")) {
+                (a %in% c("detected", "control_search_destroy", "removed") &&
+                 indiv_level_pr)) {
               for (tmc in names(results$actions[[i]][[a]])) {
                 results$actions[[i]][[a]][[tmc]]$sd <<-
                   sqrt(results$actions[[i]][[a]][[tmc]]$sd/(replicates - 1))
@@ -1083,7 +1104,15 @@ ManageResults.Region <- function(region, population_model,
       if (length(actions) > 0) {
         for (i in 1:length(results$actions)) {
           for (a in names(results$actions[[i]])) {
-            if (a %in%  c("detected", "control_search_destroy", "removed")) {
+            indiv_level_pr <-
+              ((a == "detected" &&
+                  actions[[i]]$get_sensitivity_type() == "individual") ||
+                 (a == "control_search_destroy" &&
+                    actions[[i]]$get_manage_pr_type() == "individual") ||
+                 (a == "removed" &&
+                    actions[[i]]$get_removal_pr_type() == "individual"))
+            if (a %in%  c("detected", "control_search_destroy", "removed") &&
+                indiv_level_pr) {
               for (tmc in names(results$actions[[i]][[a]])) {
                 for (s in summaries) {
                   if (replicates > 1) {
@@ -1310,7 +1339,7 @@ ManageResults.Region <- function(region, population_model,
       # Save actions
       if (length(actions) > 0) {
 
-        # Save rasters for each impact aspect at each time step
+        # Save rasters for each action at each time step
         if (!is.null(names(actions))) {
           action_i <- names(actions)    # named actions
         } else {
@@ -1329,6 +1358,13 @@ ManageResults.Region <- function(region, population_model,
           a <- actions[[i]]$get_label(include_id = FALSE)
           direct_action <-
             (a %in%  c("detected", "control_search_destroy", "removed"))
+          indiv_level_pr <-
+            ((a == "detected" &&
+                actions[[i]]$get_sensitivity_type() == "individual") ||
+               (a == "control_search_destroy" &&
+                  actions[[i]]$get_manage_pr_type() == "individual") ||
+               (a == "removed" &&
+                  actions[[i]]$get_removal_pr_type() == "individual"))
           a_name <- a_key <- sub("control_", "", a, fixed = TRUE)
           if (actions[[i]]$get_type() == "control") {
             if (a_key == "search_destroy") {
@@ -1353,14 +1389,14 @@ ManageResults.Region <- function(region, population_model,
           # Create and save an action results raster per stage
           result_stages <- stages
           if (is.null(stages) || is.numeric(combine_stages) ||
-              !direct_action) {
+              !direct_action || !indiv_level_pr) {
             result_stages <- 1
           }
           for (j in 1:result_stages) {
 
             # Stage post-fix
             if (population_model$get_type() == "stage_structured" &&
-                is.null(combine_stages) && direct_action) {
+                is.null(combine_stages) && direct_action && indiv_level_pr) {
               jc <- paste0("_stage_", j)
             } else {
               jc <- ""
@@ -1368,7 +1404,7 @@ ManageResults.Region <- function(region, population_model,
 
             # Replicate summaries or single replicate
             if (replicates > 1) {
-              if (direct_action) {
+              if (direct_action && indiv_level_pr) {
                 summaries <- c("mean", "sd")
               } else {
                 summaries <- c("mean")
@@ -1397,7 +1433,7 @@ ManageResults.Region <- function(region, population_model,
 
                 # Copy actions into a raster and update non-zero indicator
                 if (population_model$get_type() == "stage_structured" &&
-                    direct_action) {
+                    direct_action && indiv_level_pr) {
                   if (replicates > 1) {
                     output_rast <-
                       region$get_rast(
@@ -1452,7 +1488,11 @@ ManageResults.Region <- function(region, population_model,
                 if (population_model$get_type() == "presence_only") {
                   label <- paste("presence", label)
                 } else {
-                  label <- paste("number", label)
+                  if (indiv_level_pr) {
+                    label <- paste("number", label)
+                  } else {
+                    label <- paste("population", label)
+                  }
                 }
               } else {
                 label <- paste(label, "applied")
@@ -1462,7 +1502,7 @@ ManageResults.Region <- function(region, population_model,
               } else if (population_model$get_type() == "unstructured") {
                 stage <- NULL
               } else if (population_model$get_type() == "stage_structured") {
-                if (direct_action) {
+                if (direct_action && indiv_level_pr) {
                   if (is.null(combine_stages)) {
                     stage <- stage_labels[j]
                     label <- paste(stage_labels[j], label)
@@ -1480,10 +1520,12 @@ ManageResults.Region <- function(region, population_model,
               } else if (s == "sd") {
                 label <- paste(label, "std. dev.")
               }
-              if (direct_action ||
+              if (direct_action && indiv_level_pr &&
                   population_model$get_type() %in% c("unstructured",
                                                      "stage_structured")) {
                 scale_type <- "continuous"
+              } else if (s %in% c("mean", "sd")) {
+                scale_type <- "percent"
               } else {
                 scale_type <- "discrete"
               }
@@ -2073,6 +2115,13 @@ ManageResults.Region <- function(region, population_model,
           a <- actions[[i]]$get_label(include_id = FALSE)
           direct_action <-
             (a %in%  c("detected", "control_search_destroy", "removed"))
+          indiv_level_pr <-
+            ((a == "detected" &&
+                actions[[i]]$get_sensitivity_type() == "individual") ||
+               (a == "control_search_destroy" &&
+                  actions[[i]]$get_manage_pr_type() == "individual") ||
+               (a == "removed" &&
+                  actions[[i]]$get_removal_pr_type() == "individual"))
           a_name <- a_key <- sub("control_", "", a, fixed = TRUE)
           if (actions[[i]]$get_type() == "control") {
             a_key <- paste0(a_key, "_control")
@@ -2102,7 +2151,7 @@ ManageResults.Region <- function(region, population_model,
           # Resolve result stages
           result_stages <- stages
           if (is.null(stages) || is.numeric(combine_stages) ||
-              !direct_action) {
+              !direct_action || !indiv_level_pr) {
             result_stages <- 1
             j_fname <- ""
           } else {
@@ -2114,7 +2163,7 @@ ManageResults.Region <- function(region, population_model,
 
             # Replicate summaries or single replicate
             if (replicates > 1) {
-              if (direct_action) {
+              if (direct_action && indiv_level_pr) {
                 summaries <- c("mean", "sd")
               } else {
                 summaries <- c("mean")
@@ -2129,7 +2178,7 @@ ManageResults.Region <- function(region, population_model,
               # Combine coordinates and collated values & write to CSV files
               for (s in summaries) {
                 if (population_model$get_type() == "stage_structured" &&
-                    direct_action) {
+                    direct_action && indiv_level_pr) {
                   if (replicates > 1) {
                     output_df <- lapply(results$actions[[i]][[a]],
                                         function(a_tm) a_tm[[s]][,j])
@@ -2197,7 +2246,7 @@ ManageResults.Region <- function(region, population_model,
 
             # Save CSVs without coordinates (spatially implicit)
             if (population_model$get_type() == "stage_structured" &&
-                direct_action) {
+                direct_action && indiv_level_pr) {
               if (replicates > 1) {
                 for (j in 1:result_stages) {
                   output_df <- sapply(results$actions[[i]][[a]],
@@ -2457,7 +2506,7 @@ ManageResults.Region <- function(region, population_model,
           # Resolve result stages
           result_stages <- stages
           if (is.null(stages) || is.numeric(combine_stages) ||
-              !direct_action) {
+              !direct_action || !indiv_level_pr) {
             result_stages <- 1
             j_fname <- ""
           } else {
@@ -2818,6 +2867,13 @@ ManageResults.Region <- function(region, population_model,
         a_lab <- actions[[i]]$get_label(include_id = FALSE)
         direct_action <-
           (a_lab %in%  c("detected", "control_search_destroy", "removed"))
+        indiv_level_pr <-
+          ((a_lab == "detected" &&
+              actions[[i]]$get_sensitivity_type() == "individual") ||
+             (a_lab == "control_search_destroy" &&
+                actions[[i]]$get_manage_pr_type() == "individual") ||
+             (a_lab == "removed" &&
+                actions[[i]]$get_removal_pr_type() == "individual"))
         a_name <- a_key <- sub("control_", "", a_lab, fixed = TRUE)
         if (actions[[i]]$get_type() == "control") {
           a_key <- paste0(a_key, "_control")
@@ -2828,7 +2884,11 @@ ManageResults.Region <- function(region, population_model,
           }
         }
         if (direct_action) {
-          plot_y_label <- sprintf("Number %s", a_name)
+          if (indiv_level_pr) {
+            plot_y_label <- sprintf("Number %s", a_name)
+          } else {
+            plot_y_label <- sprintf("Local populations %s", a_name)
+          }
         } else {
           plot_y_label <- sprintf("Locations %s applied", a_name)
         }
@@ -2854,7 +2914,11 @@ ManageResults.Region <- function(region, population_model,
           if (population_model$get_type() == "presence_only") {
             a_name <- paste("presence", a_name)
           } else {
-            a_name <- paste("number", a_name)
+            if (indiv_level_pr) {
+              a_name <- paste("number", a_name)
+            } else {
+              a_name <- paste("populations", a_name)
+            }
           }
         } else {
           a_name <- paste(a_name, "applied")
@@ -2862,7 +2926,7 @@ ManageResults.Region <- function(region, population_model,
 
         # Resolve the number of (combined) stages used in the results
         result_stages <- stages
-        if (is.null(stages) || is.numeric(combine_stages) || !direct_action) {
+        if (is.null(stages) || is.numeric(combine_stages) || !indiv_level_pr) {
           result_stages <- 1
         }
 
@@ -2870,7 +2934,7 @@ ManageResults.Region <- function(region, population_model,
         stage_label <- ""
         stage_file <- ""
         if (population_model$get_type() == "stage_structured" &&
-            direct_action) {
+            indiv_level_pr) {
           if (is.numeric(stages) && is.null(combine_stages)) {
             stage_label <- paste0(stage_labels, " ")
             stage_file <- paste0("_stage_", 1:result_stages)
@@ -2897,7 +2961,7 @@ ManageResults.Region <- function(region, population_model,
             a <- a_lab
           }
           if (replicates > 1) {
-            if (include_collated || direct_action) {
+            if (include_collated || indiv_level_pr) {
               values <- sapply(results$actions[[i]][[a]],
                                function(tot) as.data.frame(
                                  lapply(tot, function(m) m[s])))
@@ -2911,7 +2975,7 @@ ManageResults.Region <- function(region, population_model,
                              function(tot) tot[s])
           }
           if (replicates > 1) { # plot summary mean +/- 2 SD
-            if (include_collated || direct_action) {
+            if (include_collated || indiv_level_pr) {
               values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
                              sd = as.numeric(values["sd",,drop = FALSE]))
             } else {
@@ -2925,7 +2989,7 @@ ManageResults.Region <- function(region, population_model,
             } else {
               filename <- sprintf("actions%s_%s%s.png", ic[1], a_key,
                                   stage_file[s])
-              if (direct_action) {
+              if (indiv_level_pr) {
                 main_title <- sprintf("action%s %s%s (mean +/- 2 SD)", ic[2],
                                       stage_label[s], a_name)
               } else {
@@ -2933,7 +2997,7 @@ ManageResults.Region <- function(region, population_model,
                                       stage_label[s], a_name)
               }
             }
-            if (include_collated || direct_action) {
+            if (include_collated || indiv_level_pr) {
               ylim <- c(0, 1.1*max(values$mean + 2*values$sd))
             } else {
               ylim <- c(0, 1.1*max(values$mean))

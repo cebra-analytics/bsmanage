@@ -123,6 +123,8 @@ for accessing attributes and applying simulated management controls:
 label used in simulation results (e.g."\if{html}{\out{<id>}}_control_growth" or
 "control_growth"). Set \code{include_id} to include the action
 \code{id} as a label prefix (default is \code{TRUE}).}
+\item{\code{get_manage_pr_type()}}{Get the control design effectiveness
+(probability of management success) type.}
 \item{\code{get_stages()}}{Get the population stages to which management
 controls are applied.}
 \item{\code{get_schedule()}}{Get the scheduled simulation time steps in

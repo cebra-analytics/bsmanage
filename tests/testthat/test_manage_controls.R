@@ -47,9 +47,11 @@ test_that("initializes with region, population, and other parameters", {
   expect_named(manage_controls,
                c(c("get_type", "get_id", "set_id", "get_label", "get_stages",
                    "get_schedule", "include_cost", "get_cost_label",
-                   "get_cost_unit", "clear_attributes", "apply")))
+                   "get_cost_unit", "clear_attributes", "apply",
+                   "get_manage_pr_type")))
   expect_equal(manage_controls$get_type(), "control")
   expect_equal(manage_controls$get_label(), "control_search_destroy")
+  expect_equal(manage_controls$get_manage_pr_type(), "individual")
   expect_equal(manage_controls$get_stages(), 2:3)
   expect_equal(manage_controls$get_schedule(), 4:6)
   expect_true(manage_controls$include_cost())
@@ -226,9 +228,7 @@ test_that("applies stochastic search and destroy controls to population", {
     controlled <- controlled + (rowSums(new_n[idx1, 2:3]) == 0)
     undetected <- undetected + (
       rowSums(attr(new_n, "undetected")[idx1, 2:3]) > 0)
-    destroyed <- destroyed + (
-      rowSums(attr(new_n, "control_search_destroy")[idx1, 2:3]) ==
-        rowSums(n[idx1, 2:3]))
+    destroyed <- destroyed + attr(new_n, "control_search_destroy")[idx1]
   }
   expect_true(all(abs(controlled/1000 - exist_manage_pr[idx1]) < 0.05))
   expect_true(all(abs(undetected/1000 - (1 - exist_manage_pr[idx1])) < 0.05))
@@ -294,8 +294,7 @@ test_that("applies stochastic search and destroy controls to population", {
     new_n <- manage_controls$apply(n, 4)
     controlled <- controlled + (new_n[idx1] == 0)
     undetected <- undetected + (attr(new_n, "undetected")[idx1] > 0)
-    destroyed <-
-      destroyed + (attr(new_n, "control_search_destroy")[idx1] == n[idx1])
+    destroyed <- destroyed + attr(new_n, "control_search_destroy")[idx1]
   }
   expect_true(all(abs(controlled/1000 - exist_manage_pr[idx1]) < 0.05))
   expect_true(all(abs(undetected/1000 - (1 - exist_manage_pr[idx1])) < 0.05))

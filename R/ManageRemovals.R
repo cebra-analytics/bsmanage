@@ -63,6 +63,7 @@
 #'       label used in simulation results ("<id>_removed" or "removed").
 #'       Set \code{include_id} to include the action \code{id} as a label
 #'       prefix (default is \code{TRUE}).}
+#'     \item{\code{get_removal_pr_type()}}{Get the removal probability type.}
 #'     \item{\code{get_stages()}}{Get the population stages to which management
 #'       removals are applied.}
 #'     \item{\code{get_schedule()}}{Get the scheduled simulation time steps in
@@ -164,6 +165,11 @@ ManageRemovals.Region <- function(region, population_model,
     } else {
       return("removed")
     }
+  }
+
+  # Get the removal probability type
+  self$get_removal_pr_type <- function() {
+    return(removal_pr_type)
   }
 
   # Does the removal cost parameter have a value?
@@ -344,7 +350,17 @@ ManageRemovals.Region <- function(region, population_model,
     if (population_model$get_type() == "presence_only") {
       attr(n, self$get_label()) <- as.logical(removed)
     } else {
-      attr(n, self$get_label()) <- removed
+      if (removal_pr_type == "population") {
+        if (population_model$get_type() == "stage_structured") {
+          attr(n, self$get_label()) <-
+            +(rowSums(removed) > 0 &
+                rowSums(n[,self$get_stages(), drop = FALSE]) == 0)
+        } else {
+          attr(n, self$get_label()) <- +(removed > 0 & n == 0)
+        }
+      } else { # individual
+        attr(n, self$get_label()) <- removed
+      }
     }
 
     # Attach removal costs as an attribute
