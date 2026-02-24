@@ -366,7 +366,7 @@ ManageControls.Region <- function(region, population_model,
 
       # Attach control
       if (population_model$get_type() == "presence_only") {
-        attr(n, self$get_label()) <- as.logical(controlled) & !as.logical(n)
+        attr(n, self$get_label()) <- as.logical(controlled)
       } else {
         if (population_model$get_type() == "stage_structured") {
           attr(n, self$get_label()) <-
