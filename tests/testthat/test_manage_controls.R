@@ -150,6 +150,8 @@ test_that("applies stochastic search and destroy controls to population", {
   colnames(expected_controls) <- colnames(n)
   expected_controls[101:150, 2:3] <- stats::rbinom(100, size = n[101:150, 2:3],
                                                    exist_manage_pr[101:150])
+  expected_controlled <- (rowSums((n - expected_controls)[,2:3]) == 0 &
+                            rowSums(n[,2:3]) > 0)
   attr(n, "attachment") <- "extra"
   expected_n <- n - expected_controls
   attr(expected_n, "control_search_destroy") <- expected_controls
@@ -168,7 +170,9 @@ test_that("applies stochastic search and destroy controls to population", {
   expect_equal(new_n[idx,], expected_n[idx,])
   expect_equal(attr(new_n, "undetected")[idx,],
                n[idx,] - expected_controls[idx,])
-  expect_equal(attr(new_n, "control_search_destroy")[idx,],
+  expect_equal(as.logical(attr(new_n, "control_search_destroy")),
+               expected_controlled)
+  expect_equal(attr(attr(new_n, "control_search_destroy"), "number")[idx,],
                expected_controls[idx,])
   expect_equal(attr(new_n, "control_search_destroy_cost")[idx],
                expected_costs[idx])
@@ -192,24 +196,30 @@ test_that("applies stochastic search and destroy controls to population", {
   })
   expected_controls_plus <-
     expected_controls2$detected + expected_controls2$undetected
+  expected_controlled2 <-
+    (rowSums((new_n - expected_controls_plus)[,2:3]) == 0 &
+       rowSums(new_n[,2:3]) > 0)
   set.seed(1234)
   expect_silent(new_n2 <- manage_controls$apply(new_n, 4))
   expect_equal(new_n2[idx,], new_n[idx,] - expected_controls_plus[idx,])
   expect_equal(attr(new_n2, "undetected")[idx,],
                (attr(new_n, "undetected")[idx,] -
                   expected_controls2$undetected[idx,]))
-  expect_equal(attr(new_n2, "control_search_destroy")[idx,],
+  expect_equal(as.logical(attr(new_n2, "control_search_destroy")),
+               expected_controlled2)
+  expect_equal(attr(attr(new_n2, "control_search_destroy"), "number")[idx,],
                expected_controls_plus[idx,])
   expect_equal(attr(new_n2, "control_search_destroy_cost")[idx],
                expected_costs[idx])
-
   expect_silent(manage_controls$set_id("a2"))
   set.seed(1234)
   expect_silent(new_n <- manage_controls$apply(n, 4))
   new_n[idx,] ; expected_n[idx,]
   expect_equal(attr(new_n, "undetected")[idx,],
                n[idx,] - expected_controls[idx,])
-  expect_equal(attr(new_n, "a2_control_search_destroy")[idx,],
+  expect_equal(as.logical(attr(new_n, "a2_control_search_destroy")),
+               expected_controlled)
+  expect_equal(attr(attr(new_n, "a2_control_search_destroy"), "number")[idx,],
                expected_controls[idx,])
   expect_equal(attr(new_n, "a2_control_search_destroy_cost")[idx],
                expected_costs[idx])
@@ -240,6 +250,7 @@ test_that("applies stochastic search and destroy controls to population", {
   expected_controls <- n*0
   expected_controls[101:150] <- stats::rbinom(50, size = n[101:150],
                                               exist_manage_pr[101:150])
+  expected_controlled <- n - expected_controls == 0 & n > 0
   expected_n <- n - expected_controls
   expected_costs <- 2*(exist_manage_pr > 0)
   attr(expected_costs, "unit") <- "$"
@@ -253,7 +264,10 @@ test_that("applies stochastic search and destroy controls to population", {
   expect_silent(new_n <- manage_controls$apply(n, 4))
   expect_equal(as.numeric(new_n), expected_n)
   expect_equal(attr(new_n, "undetected"), n - expected_controls)
-  expect_equal(attr(new_n, "control_search_destroy"), expected_controls)
+  expect_equal(as.logical(attr(new_n, "control_search_destroy")),
+               expected_controlled)
+  expect_equal(attr(attr(new_n, "control_search_destroy"), "number"),
+               expected_controls)
   expect_equal(attr(new_n, "control_search_destroy_cost"), expected_costs)
   # duplicate with extra detections and removals
   attr(new_n, "undetected")[101:110] <- 0
@@ -272,12 +286,16 @@ test_that("applies stochastic search and destroy controls to population", {
   })
   expected_controls_plus <-
     expected_controls2$detected + expected_controls2$undetected
+  expected_controlled2 <- new_n - expected_controls_plus == 0 & new_n > 0
   set.seed(1234)
   expect_silent(new_n2 <- manage_controls$apply(new_n, 4))
   expect_equal(as.numeric(new_n2), as.numeric(new_n) - expected_controls_plus)
   expect_equal(attr(new_n2, "undetected"),
                attr(new_n, "undetected") - expected_controls2$undetected)
-  expect_equal(attr(new_n2, "control_search_destroy"), expected_controls_plus)
+  expect_equal(as.logical(attr(new_n2, "control_search_destroy")),
+               expected_controlled2)
+  expect_equal(attr(attr(new_n2, "control_search_destroy"), "number"),
+               expected_controls_plus)
   expect_equal(attr(new_n2, "control_search_destroy_cost")[idx],
                expected_costs[idx])
   # population level effectiveness

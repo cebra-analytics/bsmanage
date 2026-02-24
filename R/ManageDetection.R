@@ -300,20 +300,18 @@ ManageDetection.Region <- function(region,
     }
 
     # Attach detected and undetected as attributes
-    if (population_model$get_type() == "presence_only") {
+    if (population_model$get_type() == "stage_structured") {
+      attr(n, self$get_label()) <- as.logical(rowSums(detected))
+    } else {
       attr(n, self$get_label()) <- as.logical(detected)
+    }
+    if (population_model$get_type() == "presence_only") {
       attr(n, "undetected") <- as.logical(undetected)
     } else {
-      if (sensitivity_type %in% c("population", "presence")) {
-        if (population_model$get_type() == "stage_structured") {
-          attr(n, self$get_label()) <- +(rowSums(detected) > 0)
-        } else {
-          attr(n, self$get_label()) <- +(detected > 0)
-        }
-      } else { # individual
-        attr(n, self$get_label()) <- detected
-      }
       attr(n, "undetected") <- undetected
+      if (sensitivity_type == "individual") {
+        attr(attr(n, self$get_label()), "number") <- detected
+      }
     }
 
     return(n)

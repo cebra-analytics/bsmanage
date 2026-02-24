@@ -350,16 +350,15 @@ ManageRemovals.Region <- function(region, population_model,
     if (population_model$get_type() == "presence_only") {
       attr(n, self$get_label()) <- as.logical(removed)
     } else {
-      if (removal_pr_type == "population") {
-        if (population_model$get_type() == "stage_structured") {
-          attr(n, self$get_label()) <-
-            +(rowSums(removed) > 0 &
-                rowSums(n[,self$get_stages(), drop = FALSE]) == 0)
-        } else {
-          attr(n, self$get_label()) <- +(removed > 0 & n == 0)
-        }
-      } else { # individual
-        attr(n, self$get_label()) <- removed
+      if (population_model$get_type() == "stage_structured") {
+        attr(n, self$get_label()) <-
+          (rowSums(removed) > 0 &
+             rowSums(n[,self$get_stages(), drop = FALSE]) == 0)
+      } else {
+        attr(n, self$get_label()) <- (removed > 0 & n == 0)
+      }
+      if (removal_pr_type == "individual") {
+        attr(attr(n, self$get_label()), "number") <- removed
       }
     }
 

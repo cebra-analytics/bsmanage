@@ -365,16 +365,19 @@ ManageControls.Region <- function(region, population_model,
       }
 
       # Attach control
-      if (manage_pr_type == "population") {
+      if (population_model$get_type() == "presence_only") {
+        attr(n, self$get_label()) <- as.logical(controlled) & !as.logical(n)
+      } else {
         if (population_model$get_type() == "stage_structured") {
           attr(n, self$get_label()) <-
-            +(rowSums(controlled) > 0 &
-                rowSums(n[,self$get_stages(), drop = FALSE]) == 0)
+            (rowSums(controlled) > 0 &
+               rowSums(n[,self$get_stages(), drop = FALSE]) == 0)
         } else {
-          attr(n, self$get_label()) <- +(controlled > 0 & n == 0)
+          attr(n, self$get_label()) <- (controlled > 0 & n == 0)
         }
-      } else { # individual
-        attr(n, self$get_label()) <- controlled
+        if (manage_pr_type == "individual") {
+          attr(attr(n, self$get_label()), "number") <- controlled
+        }
       }
 
       # Attach control costs as an attribute via label

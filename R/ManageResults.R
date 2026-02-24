@@ -200,6 +200,25 @@ ManageResults.Region <- function(region, population_model,
   # Include collated and totals?
   include_collated <- (region$get_locations() > 1)
 
+  # Direct action?
+  is_direct_action <- function(a) {
+    return(a$get_label(include_id = FALSE) %in%
+             c("detected", "control_search_destroy", "removed"))
+  }
+
+  # Individual type action probabilities?
+  is_indiv_type_action <- function(a) {
+    action_label <- a$get_label(include_id = FALSE)
+    return(population_model$get_type() %in%
+             c("unstructured", "stage_structured") &&
+             ((action_label == "detected" &&
+                 a$get_sensitivity_type() == "individual") ||
+                (action_label == "control_search_destroy" &&
+                   a$get_manage_pr_type() == "individual") ||
+                (action_label == "removed" &&
+                   a$get_removal_pr_type() == "individual")))
+  }
+
   # Initialize additional incursion management result lists
   results <- list()
 
@@ -265,50 +284,63 @@ ManageResults.Region <- function(region, population_model,
       }
     }
     results$actions <- lapply(actions, function(actions_i) {
+
+      # Build list of initial zeros
       zeros <- list()
-      action_label <- actions_i$get_label(include_id = FALSE)
-      direct_action <- (action_label %in%
-                          c("detected", "control_search_destroy", "removed"))
-      indiv_level_pr <-
-        ((action_label == "detected" &&
-            actions_i$get_sensitivity_type() == "individual") ||
-           (action_label == "control_search_destroy" &&
-             actions_i$get_manage_pr_type() == "individual") ||
-           (action_label == "removed" &&
-              actions_i$get_removal_pr_type() == "individual"))
-      if (is.numeric(stages) && direct_action && indiv_level_pr) {
-        if (is.numeric(combine_stages)) {
-          zeros$action <- array(0L, c(region$get_locations(), 1))
-          colnames(zeros$action) <- stage_labels
-          if (include_collated) {
-            zeros$total_action <- zeros$action[1,, drop = FALSE]
+
+      # Binary indicator of action success
+      zeros$action <- rep(0L, region$get_locations())
+      if (include_collated) {
+        zeros$total_action <- 0L
+      }
+
+      # Number of individuals when applicable
+      direct_action <- is_direct_action(actions_i) # needed? ####
+      include_indiv <- is_indiv_type_action(actions_i)
+      if (include_indiv) {
+        if (is.numeric(stages)) {
+          if (is.numeric(combine_stages)) {
+            zeros$action_num <- array(0L, c(region$get_locations(), 1))
+            colnames(zeros$action_num) <- stage_labels
+            if (include_collated) {
+              zeros$total_action_num <- zeros$action_num[1,, drop = FALSE]
+            }
+          } else {
+            zeros$action_num <- population_model$make(initial = 0L)
+            if (include_collated) {
+              zeros$total_action_num <- zeros$action_num[1,, drop = FALSE]
+            }
           }
         } else {
-          zeros$action <- population_model$make(initial = 0L)
+          zeros$action_num <- rep(0L, region$get_locations())
           if (include_collated) {
-            zeros$total_action <- zeros$action[1,, drop = FALSE]
+            zeros$total_action_num <- 0L
           }
         }
-      } else {
-        zeros$action <- rep(0L, region$get_locations())
-        if (include_collated) {
-          zeros$total_action <- 0L
-        }
       }
+
+      # Action costs
       if (actions_i$include_cost()) {
         zeros$action_cost <- rep(0L, region$get_locations())
         if (include_collated) {
           zeros$total_action_cost <- 0L
         }
       }
-      if (replicates > 1) { # summaries
+
+      # Summary statistics when applicable
+      if (replicates > 1) {
         zeros$action <- list(mean = zeros$action)
-        if (direct_action && indiv_level_pr) {
-          zeros$action$sd <- zeros$action$mean
-        }
         if (include_collated) {
           zeros$total_action <- list(mean = zeros$total_action,
                                      sd = zeros$total_action)
+        }
+        if (include_indiv) {
+          zeros$action_num <- list(mean = zeros$action_num,
+                                   sd = zeros$action_num)
+          if (include_collated) {
+            zeros$total_action_num <- list(mean = zeros$total_action_num,
+                                           sd = zeros$total_action_num)
+          }
         }
         if (actions_i$include_cost()) {
           zeros$action_cost <- list(mean = zeros$action_cost,
@@ -319,7 +351,10 @@ ManageResults.Region <- function(region, population_model,
           }
         }
       }
+
+      # Build initial action list
       actions_list <- list()
+      action_label <- actions_i$get_label(include_id = FALSE)
       actions_list[[action_label]] <- list()
       if (include_collated) {
         for (tm in as.character(c(0, seq(collation_steps, time_steps,
@@ -333,6 +368,24 @@ ManageResults.Region <- function(region, population_model,
       } else {
         for (tm in as.character(0:time_steps)) {
           actions_list[[action_label]][[tm]] <- zeros$action
+        }
+      }
+      if (include_indiv) {
+        actions_list$number <- list()
+        actions_list$number[[action_label]] <- list()
+        if (include_collated) {
+          for (tm in as.character(c(0, seq(collation_steps, time_steps,
+                                           by = collation_steps)))) {
+            actions_list$number[[action_label]][[tm]] <- zeros$action_num
+          }
+          actions_list$number$total <- list()
+          for (tm in as.character(0:time_steps)) {
+            actions_list$number$total[[tm]] <- zeros$total_action_num
+          }
+        } else {
+          for (tm in as.character(0:time_steps)) {
+            actions_list$number[[action_label]][[tm]] <- zeros$action_num
+          }
         }
       }
       if (actions_i$include_cost()) {
@@ -600,27 +653,20 @@ ManageResults.Region <- function(region, population_model,
         # Get attribute from n
         a <- actions[[i]]$get_label(include_id = FALSE)
         n_a <- attr(n, actions[[i]]$get_label())*1
-        direct_action <-
-          (a %in% c("detected", "control_search_destroy", "removed"))
-        indiv_level_pr <-
-          ((a == "detected" &&
-              actions[[i]]$get_sensitivity_type() == "individual") ||
-             (a == "control_search_destroy" &&
-                actions[[i]]$get_manage_pr_type() == "individual") ||
-             (a == "removed" &&
-                actions[[i]]$get_removal_pr_type() == "individual"))
+
+        # Number of individuals when applicable
+        include_indiv <- is_indiv_type_action(actions_i)
 
         # Combine stages when required
         if (population_model$get_type() == "stage_structured" &&
-            direct_action && indiv_level_pr && is.numeric(combine_stages)) {
+            include_indiv && is.numeric(combine_stages)) {
           n_a <- matrix(rowSums(n_a[,combine_stages, drop = FALSE]), ncol = 1)
           colnames(n_a) <- stage_labels
         }
 
         # Binarize growth, spread, & establishment control (indirect actions)
-        # or when population level probabilities
         if (a %in%  c("control_growth", "control_spread",
-                      "control_establishment") || !indiv_level_pr) {
+                      "control_establishment")) {
           n_a <- +(n_a < 1)
         }
 

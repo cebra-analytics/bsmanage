@@ -34,8 +34,10 @@ test_that("initializes inherited object with impacts and actions", {
                                 optimal = "none",
                                 exist_sens = template_vect)
   actions <- list(
-    a3 = ManageDetection(region, population_model, surveillance),
-    a4 = ManageRemovals(region, population_model))
+    a3 = ManageDetection(region, population_model, surveillance,
+                         sensitivity_type = "presence"),
+    a4 = ManageRemovals(region, population_model,
+                        removal_pr_type = "population"))
   expect_silent(results <- ManageResults(region,
                                          population_model = population_model))
   expect_error(results <- ManageResults(region,
@@ -95,18 +97,46 @@ test_that("initializes inherited object with impacts and actions", {
                     a4 = list(removed = collated, total = totals)))
   expect_equal(lapply(result_list$impacts, function(i) attr(i, "unit")),
                list(a1 = "$", a2 = "$"))
+  # include individual numbers
+  actions <- list(
+    a3 = ManageDetection(region, population_model, surveillance,
+                         sensitivity_type = "individual"),
+    a4 = ManageRemovals(region, population_model,
+                        removal_pr_type = "individual"))
+  results <- ManageResults(region, population_model = population_model,
+                           impacts = impacts, actions = actions,
+                           time_steps = 10, collation_steps = 2,
+                           replicates = 1) # silent
+  result_list <- results$get_list()
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i, length)),
+               list(a3 = list(detected = 6, total = 11, number = 2),
+                    a4 = list(removed = 6, total = 11, number = 2)))
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i, function(j) sapply(j, length))),
+               list(a3 = list(detected = collated, total = totals,
+                              number = c(detected = 6, total = 11)),
+                    a4 = list(removed = collated, total = totals,
+                              number = c(removed = 6, total = 11))))
+  expect_equal(lapply(result_list$actions,
+                      function(i) lapply(i$number,
+                                         function(j) sapply(j, length))),
+               list(a3 = list(detected = collated, total = totals),
+                    a4 = list(removed = collated, total = totals)))
   # with action costs and monetary-only impacts
   control_cost1 <- 4; attr(control_cost1, "unit") <- "$"
   control_cost2 <- 5; attr(control_cost2, "unit") <- "$"
   removal_cost <- 6; attr(removal_cost, "unit") <- "$"
   actions <- list(
     a3 = ManageDetection(region, population_model, surveillance,
-                         surv_cost = 3),
+                         sensitivity_type = "presence", surv_cost = 3),
     a4 = ManageControls(region, population_model, control_type = "growth",
                         control_mult = 0.4, control_cost = control_cost1),
     a5 = ManageControls(region, population_model, control_type = "spread",
                         control_mult = 0.5, control_cost = control_cost2),
-    a6 = ManageRemovals(region, population_model, removal_cost = removal_cost))
+    a6 = ManageRemovals(region, population_model,
+                        removal_pr_type = "population",
+                        removal_cost = removal_cost))
   expect_silent(
     results <- ManageResults(region, population_model = population_model,
                              impacts = impacts[1], actions = actions,
