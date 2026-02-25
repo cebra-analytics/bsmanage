@@ -289,7 +289,7 @@ ManageResults.Region <- function(region, population_model,
       zeros <- list()
 
       # Binary indicator of action success
-      zeros$action <- rep(0L, region$get_locations())
+      zeros$action <- rep(FALSE, region$get_locations())
       if (include_collated) {
         zeros$total_action <- 0L
       }
@@ -329,7 +329,7 @@ ManageResults.Region <- function(region, population_model,
 
       # Summary statistics when applicable
       if (replicates > 1) {
-        zeros$action <- list(mean = zeros$action)
+        zeros$action <- list(mean = +zeros$action)
         if (include_collated) {
           zeros$total_action <- list(mean = zeros$total_action,
                                      sd = zeros$total_action)
@@ -652,31 +652,36 @@ ManageResults.Region <- function(region, population_model,
 
         # Get attribute from n
         a <- actions[[i]]$get_label(include_id = FALSE)
-        n_a <- attr(n, actions[[i]]$get_label())*1
 
-        # Number of individuals when applicable
-        include_indiv <- is_indiv_type_action(actions_i)
-
-        # Combine stages when required
-        if (population_model$get_type() == "stage_structured" &&
-            include_indiv && is.numeric(combine_stages)) {
-          n_a <- matrix(rowSums(n_a[,combine_stages, drop = FALSE]), ncol = 1)
-          colnames(n_a) <- stage_labels
-        }
-
-        # Binarize growth, spread, & establishment control (indirect actions)
+        # Growth, spread, & establishment control (indirect actions)
         if (a %in%  c("control_growth", "control_spread",
                       "control_establishment")) {
-          n_a <- +(n_a < 1)
+          n_a <- attr(n, actions[[i]]$get_label()) < 1
+        } else { # direct action binary success
+          n_a <- as.logical(attr(n, actions[[i]]$get_label()))
         }
+        total_n_a <- sum(n_a)
 
-        # Shape total when population is staged
-        if (include_collated && is.numeric(stages) && direct_action &&
-            indiv_level_pr) {
-          total_n_a <- array(colSums(n_a), c(1, ncol(n_a)))
-          colnames(total_n_a) <- stage_labels
-        } else {
-          total_n_a <- sum(n_a)
+        # Number of individuals when applicable
+        include_indiv <- is_indiv_type_action(actions[[i]])
+        if (include_indiv) {
+          n_a_num <- attr(attr(n, actions[[i]]$get_label()), "number")
+
+          # Combine stages when required
+          if (population_model$get_type() == "stage_structured" &&
+              is.numeric(combine_stages)) {
+            n_a_num <- matrix(rowSums(n_a_num[,combine_stages, drop = FALSE]),
+                              ncol = 1)
+            colnames(n_a_num) <- stage_labels
+          }
+
+          # Shape total when population is staged
+          if (include_collated && is.numeric(stages)) {
+            total_n_a_num <- array(colSums(n_a_num), c(1, ncol(n_a_num)))
+            colnames(total_n_a) <- stage_labels
+          } else {
+            total_n_a_num <- sum(n_a_num)
+          }
         }
 
         # Get attached action cost
@@ -731,13 +736,6 @@ ManageResults.Region <- function(region, population_model,
             previous_mean <- results$actions[[i]][[a]][[tmc]]$mean
             results$actions[[i]][[a]][[tmc]]$mean <<-
               previous_mean + (n_a - previous_mean)/r
-            if (direct_action && indiv_level_pr) {
-              previous_sd <- results$actions[[i]][[a]][[tmc]]$sd
-              results$actions[[i]][[a]][[tmc]]$sd <<-
-                (previous_sd +
-                   ((n_a - previous_mean)*
-                      (n_a - results$actions[[i]][[a]][[tmc]]$mean)))
-            }
           }
 
           # Total applied actions at every time step
@@ -750,6 +748,38 @@ ManageResults.Region <- function(region, population_model,
               (previous_sd + ((total_n_a - previous_mean)*
                                 (total_n_a -
                                    results$actions[[i]]$total[[tmc]]$mean)))
+          }
+
+          # Number of individuals when applicable
+          if (include_indiv) {
+
+            # All applied action numbers recorded in specified time steps
+            if (!include_collated || tm %% collation_steps == 0) {
+              previous_mean <- results$actions[[i]]$number[[a]][[tmc]]$mean
+              results$actions[[i]]$number[[a]][[tmc]]$mean <<-
+                previous_mean + (n_a_num - previous_mean)/r
+              if (direct_action && indiv_level_pr) {
+                previous_sd <- results$actions[[i]]$number[[a]][[tmc]]$sd
+                results$actions[[i]]$number[[a]][[tmc]]$sd <<-
+                  (previous_sd + (
+                    (n_a_num - previous_mean)*
+                      (n_a_num -
+                         results$actions[[i]]$number[[a]][[tmc]]$mean)))
+              }
+            }
+
+            # Total applied action numbers at every time step
+            if ("total" %in% names(results$actions[[i]])) {
+              previous_mean <- results$actions[[i]]$number$total[[tmc]]$mean
+              results$actions[[i]]$number$total[[tmc]]$mean <<-
+                previous_mean + (total_n_a_num - previous_mean)/r
+              previous_sd <- results$actions[[i]]$number$total[[tmc]]$sd
+              results$actions[[i]]$number$total[[tmc]]$sd <<-
+                (previous_sd + (
+                  (total_n_a_num - previous_mean)*
+                    (total_n_a_num -
+                       results$actions[[i]]$number$total[[tmc]]$mean)))
+            }
           }
 
           # Record action costs and cumulative costs
@@ -822,9 +852,23 @@ ManageResults.Region <- function(region, population_model,
             results$actions[[i]][[a]][[tmc]] <<- n_a
           }
 
-          # Total combined aspects at every time step
+          # Total applied actions at every time step
           if ("total" %in% names(results$actions[[i]])) {
             results$actions[[i]]$total[[tmc]] <<- total_n_a
+          }
+
+          # Number of individuals when applicable
+          if (include_indiv) {
+
+            # All applied action numbers recorded in specified time steps
+            if (!include_collated || tm %% collation_steps == 0) {
+              results$actions[[i]]$number[[a]][[tmc]] <<- n_a_num
+            }
+
+            # Total applied action numbers at every time step
+            if ("total" %in% names(results$actions[[i]])) {
+              results$actions[[i]]$number$total[[tmc]] <<- total_n_a_num
+            }
           }
 
           # Record action costs and cumulative costs
