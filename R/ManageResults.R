@@ -207,7 +207,7 @@ ManageResults.Region <- function(region, population_model,
   }
 
   # Individual type action probabilities?
-  is_indiv_type_action <- function(a) {
+  indiv_type_action <- function(a) {
     action_label <- a$get_label(include_id = FALSE)
     return(population_model$get_type() %in%
              c("unstructured", "stage_structured") &&
@@ -296,7 +296,7 @@ ManageResults.Region <- function(region, population_model,
 
       # Number of individuals when applicable
       direct_action <- is_direct_action(actions_i) # needed? ####
-      include_indiv <- is_indiv_type_action(actions_i)
+      include_indiv <- indiv_type_action(actions_i)
       if (include_indiv) {
         if (is.numeric(stages)) {
           if (is.numeric(combine_stages)) {
@@ -663,7 +663,7 @@ ManageResults.Region <- function(region, population_model,
         total_n_a <- sum(n_a)
 
         # Number of individuals when applicable
-        include_indiv <- is_indiv_type_action(actions[[i]])
+        include_indiv <- indiv_type_action(actions[[i]])
         if (include_indiv) {
           n_a_num <- attr(attr(n, actions[[i]]$get_label()), "number")
 
@@ -678,7 +678,7 @@ ManageResults.Region <- function(region, population_model,
           # Shape total when population is staged
           if (include_collated && is.numeric(stages)) {
             total_n_a_num <- array(colSums(n_a_num), c(1, ncol(n_a_num)))
-            colnames(total_n_a) <- stage_labels
+            colnames(total_n_a_num) <- stage_labels
           } else {
             total_n_a_num <- sum(n_a_num)
           }
@@ -758,14 +758,12 @@ ManageResults.Region <- function(region, population_model,
               previous_mean <- results$actions[[i]]$number[[a]][[tmc]]$mean
               results$actions[[i]]$number[[a]][[tmc]]$mean <<-
                 previous_mean + (n_a_num - previous_mean)/r
-              if (direct_action && indiv_level_pr) {
-                previous_sd <- results$actions[[i]]$number[[a]][[tmc]]$sd
-                results$actions[[i]]$number[[a]][[tmc]]$sd <<-
-                  (previous_sd + (
-                    (n_a_num - previous_mean)*
-                      (n_a_num -
-                         results$actions[[i]]$number[[a]][[tmc]]$mean)))
-              }
+              previous_sd <- results$actions[[i]]$number[[a]][[tmc]]$sd
+              results$actions[[i]]$number[[a]][[tmc]]$sd <<-
+                (previous_sd + (
+                  (n_a_num - previous_mean)*
+                    (n_a_num -
+                       results$actions[[i]]$number[[a]][[tmc]]$mean)))
             }
 
             # Total applied action numbers at every time step
@@ -1102,24 +1100,28 @@ ManageResults.Region <- function(region, population_model,
       # Transform action standard deviations
       if (replicates > 1) { # summaries
         for (i in 1:length(actions)) {
-          i_names <- names(results$actions[[i]])
-          for (a in i_names[i_names != "cost"]) {
-            indiv_level_pr <-
-              ((a == "detected" &&
-                  actions[[i]]$get_sensitivity_type() == "individual") ||
-                 (a == "control_search_destroy" &&
-                    actions[[i]]$get_manage_pr_type() == "individual") ||
-                 (a == "removed" &&
-                    actions[[i]]$get_removal_pr_type() == "individual"))
-            if (include_collated && a == "total" ||
-                (a %in% c("detected", "control_search_destroy", "removed") &&
-                 indiv_level_pr)) {
-              for (tmc in names(results$actions[[i]][[a]])) {
-                results$actions[[i]][[a]][[tmc]]$sd <<-
-                  sqrt(results$actions[[i]][[a]][[tmc]]$sd/(replicates - 1))
+
+          # Total action success/applies
+          if (include_collated && "total" %in% names(results$actions[[i]])) {
+            for (tmc in names(results$actions[[i]]$total)) {
+              results$actions[[i]]$total[[tmc]]$sd <<-
+                sqrt(results$actions[[i]]$total[[tmc]]$sd/(replicates - 1))
+            }
+          }
+
+          # Number of individuals when applicable
+          include_indiv <- indiv_type_action(actions[[i]])
+          if (include_indiv && "number" %in% names(results$actions[[i]])) {
+            for (a in names(results$actions[[i]]$number)) {
+              for (tmc in names(results$actions[[i]]$number[[a]])) {
+                results$actions[[i]]$number[[a]][[tmc]]$sd <<-
+                  sqrt(results$actions[[i]]$number[[a]][[tmc]]$sd/
+                         (replicates - 1))
               }
             }
           }
+
+          # Action costs
           if ("cost" %in% names(results$actions[[i]])) {
             a <- actions[[i]]$get_label(include_id = FALSE)
             for (tmc in names(results$actions[[i]]$cost[[a]])) {
@@ -1193,23 +1195,17 @@ ManageResults.Region <- function(region, population_model,
       }
       if (length(actions) > 0) {
         for (i in 1:length(results$actions)) {
-          for (a in names(results$actions[[i]])) {
-            indiv_level_pr <-
-              ((a == "detected" &&
-                  actions[[i]]$get_sensitivity_type() == "individual") ||
-                 (a == "control_search_destroy" &&
-                    actions[[i]]$get_manage_pr_type() == "individual") ||
-                 (a == "removed" &&
-                    actions[[i]]$get_removal_pr_type() == "individual"))
-            if (a %in%  c("detected", "control_search_destroy", "removed") &&
-                indiv_level_pr) {
-              for (tmc in names(results$actions[[i]][[a]])) {
+          include_indiv <- indiv_type_action(actions[[i]])
+          if (include_indiv && "number" %in% names(results$actions[[i]])) {
+            for (a in names(results$actions[[i]]$number)) {
+              for (tmc in names(results$actions[[i]]$number[[a]])) {
                 for (s in summaries) {
                   if (replicates > 1) {
-                    colnames(results$actions[[i]][[a]][[tmc]][[s]]) <<-
+                    colnames(results$actions[[i]]$number[[a]][[tmc]][[s]]) <<-
                       stage_labels
                   } else {
-                    colnames(results$actions[[i]][[a]][[tmc]]) <<- stage_labels
+                    colnames(results$actions[[i]]$number[[a]][[tmc]]) <<-
+                      stage_labels
                   }
                 }
               }
