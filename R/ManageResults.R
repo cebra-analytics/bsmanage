@@ -201,7 +201,7 @@ ManageResults.Region <- function(region, population_model,
   include_collated <- (region$get_locations() > 1)
 
   # Direct action?
-  is_direct_action <- function(a) {
+  direct_action <- function(a) {
     return(a$get_label(include_id = FALSE) %in%
              c("detected", "control_search_destroy", "removed"))
   }
@@ -295,7 +295,6 @@ ManageResults.Region <- function(region, population_model,
       }
 
       # Number of individuals when applicable
-      direct_action <- is_direct_action(actions_i) # needed? ####
       include_indiv <- indiv_type_action(actions_i)
       if (include_indiv) {
         if (is.numeric(stages)) {
@@ -1440,155 +1439,210 @@ ManageResults.Region <- function(region, population_model,
             ic <- c(paste0("_", i), paste0(" ", i))
           }
 
-          # Action key/name. Direct action?
+          # Action and cost key/names
           a <- actions[[i]]$get_label(include_id = FALSE)
-          direct_action <-
-            (a %in%  c("detected", "control_search_destroy", "removed"))
-          indiv_level_pr <-
-            ((a == "detected" &&
-                actions[[i]]$get_sensitivity_type() == "individual") ||
-               (a == "control_search_destroy" &&
-                  actions[[i]]$get_manage_pr_type() == "individual") ||
-               (a == "removed" &&
-                  actions[[i]]$get_removal_pr_type() == "individual"))
           a_name <- a_key <- sub("control_", "", a, fixed = TRUE)
-          if (actions[[i]]$get_type() == "control") {
-            if (a_key == "search_destroy") {
+          if (a == "detected") {
+            cost_name <- cost_key <- "detection"
+          } else if (a == "removed") {
+            cost_name <- cost_key <- "removal"
+          } else if (actions[[i]]$get_type() == "control") {
+            if (a == "control_search_destroy") {
               a_name <- "search & destroy"
-            }
-            a_key <- paste0(a_key, "_control")
-            a_name <- paste(a_name, "control")
-          }
-
-          # Action cost and cumulative cost key/name
-          if ("cost" %in% names(results$actions[[i]])) {
-            if (a_key == "detected") {
-              cost_name <- cost_key <- "detection"
-            } else if (a_key == "removed") {
-              cost_name <- cost_key <- "removal"
+              a_key <- "found_destroyed"
+              cost_key <- "search_destroy"
             } else {
-              cost_key <- a_key
-              cost_name <- a_name
+              cost_key <- a_key <- paste0(a_key, "_control")
             }
+            cost_name <- a_name <- paste(a_name, "control")
           }
 
-          # Create and save an action results raster per stage
-          result_stages <- stages
-          if (is.null(stages) || is.numeric(combine_stages) ||
-              !direct_action || !indiv_level_pr) {
-            result_stages <- 1
+          ## Local population action success/application (binary)
+
+          # Replicate summaries or single replicate & post-fix
+          if (replicates > 1) {
+            s <- "mean"
+            sc <- "_mean"
+          } else {
+            s <- sc <- ""
           }
-          for (j in 1:result_stages) {
 
-            # Stage post-fix
-            if (population_model$get_type() == "stage_structured" &&
-                is.null(combine_stages) && direct_action && indiv_level_pr) {
-              jc <- paste0("_stage_", j)
-            } else {
-              jc <- ""
-            }
+          # Add nested list to output list
+          output_key <- paste0("actions", ic[1], "_", a_key, sc)
+          output_list[[output_key]] <- list()
 
-            # Replicate summaries or single replicate
+          # Initialise non-zero indicator
+          nonzero_list[[output_key]] <- FALSE
+
+          for (tmc in names(results$actions[[i]][[a]])) {
+
+            # Copy actions into a raster and update non-zero indicator
             if (replicates > 1) {
-              if (direct_action && indiv_level_pr) {
+              output_rast <-
+                region$get_rast(results$actions[[i]][[a]][[tmc]][[s]])
+              nonzero_list[[output_key]] <-
+                nonzero_list[[output_key]] |
+                (sum(results$actions[[i]][[a]][[tmc]][[s]]) > 0)
+            } else {
+              output_rast <-
+                region$get_rast(results$actions[[i]][[a]][[tmc]])
+              nonzero_list[[output_key]] <-
+                nonzero_list[[output_key]] |
+                (sum(results$actions[[i]][[a]][[tmc]]) > 0)
+            }
+
+            # Write raster to file
+            filename <- sprintf(
+              paste0("actions%s_%s_t%0",
+                     nchar(as.character(time_steps)), "d%s.tif"),
+              ic[1], a_key, as.integer(tmc), sc)
+            output_list[[output_key]][[tmc]] <-
+              terra::writeRaster(output_rast, filename, ...)
+          }
+
+          # Add list of actions metadata as an attribute
+          if (a == "control_search_destroy") {
+            label <- "found & destroyed"
+          } else {
+            label <- a_name
+          }
+          if (direct_action(actions[[i]])) {
+            if (population_model$get_type() == "presence_only") {
+              label <- paste("presence", label)
+            } else {
+              label <- paste("population", label)
+            }
+          } else {
+            label <- paste(label, "applied")
+          }
+          label <- paste0("action", ic[2], " ", label)
+          if (s == "mean") {
+            label <- paste("mean", label)
+          }
+          if (s == "mean") {
+            scale_type <- "percent"
+          } else {
+            scale_type <- "discrete"
+          }
+          attr(output_list[[output_key]], "metadata") <- list(
+            category = "action",
+            type = actions[[i]]$get_type(),
+            name = a_name,
+            stage = NULL,
+            cost = FALSE,
+            cumulative = FALSE,
+            summary = s,
+            label = title_case(label),
+            units = "",
+            scale_type = scale_type,
+            nonzero = nonzero_list[[output_key]]
+          )
+
+          ## Number of individuals when applicable
+          include_indiv <- indiv_type_action(actions[[i]])
+          if (include_indiv) {
+
+            # Create and save an action results raster per stage
+            result_stages <- stages
+            if (is.null(stages) || is.numeric(combine_stages)) {
+              result_stages <- 1
+            }
+            for (j in 1:result_stages) {
+
+              # Stage post-fix
+              if (population_model$get_type() == "stage_structured" &&
+                  is.null(combine_stages)) {
+                jc <- paste0("_stage_", j)
+              } else {
+                jc <- ""
+              }
+
+              # Replicate summaries or single replicate
+              if (replicates > 1) {
                 summaries <- c("mean", "sd")
               } else {
-                summaries <- c("mean")
-              }
-            } else {
-              summaries <- ""
-            }
-
-            for (s in summaries) {
-
-              # Summary post-fix
-              if (replicates > 1) {
-                sc <- paste0("_", s)
-              } else {
-                sc <- s
+                summaries <- ""
               }
 
-              # Add nested list to output list
-              output_key <- paste0("actions", ic[1], "_", a_key, jc, sc)
-              output_list[[output_key]] <- list()
+              for (s in summaries) {
 
-              # Initialise non-zero indicator
-              nonzero_list[[output_key]] <- FALSE
-
-              for (tmc in names(results$actions[[i]][[a]])) {
-
-                # Copy actions into a raster and update non-zero indicator
-                if (population_model$get_type() == "stage_structured" &&
-                    direct_action && indiv_level_pr) {
-                  if (replicates > 1) {
-                    output_rast <-
-                      region$get_rast(
-                        results$actions[[i]][[a]][[tmc]][[s]][,j])
-                    nonzero_list[[output_key]] <-
-                      (nonzero_list[[output_key]] |
-                         sum(results$actions[[i]][[a]][[tmc]][[s]][,j]) > 0)
-                  } else {
-                    output_rast <-
-                      region$get_rast(results$actions[[i]][[a]][[tmc]][,j])
-                    nonzero_list[[output_key]] <-
-                      (nonzero_list[[output_key]] |
-                         sum(results$actions[[i]][[a]][[tmc]][,j]) > 0)
-                  }
-                  if (is.null(combine_stages)) {
-                    names(output_rast) <- stage_labels[j]
-                  } else if (is.numeric(combine_stages)) {
-                    names(output_rast) <- "combined"
-                  }
+                # Summary post-fix
+                if (replicates > 1) {
+                  sc <- paste0("_", s)
                 } else {
-                  if (replicates > 1) {
-                    output_rast <-
-                      region$get_rast(results$actions[[i]][[a]][[tmc]][[s]])
-                    nonzero_list[[output_key]] <-
-                      (nonzero_list[[output_key]] |
-                         sum(results$actions[[i]][[a]][[tmc]][[s]]) > 0)
-                  } else {
-                    output_rast <-
-                      region$get_rast(results$actions[[i]][[a]][[tmc]])
-                    nonzero_list[[output_key]] <-
-                      (nonzero_list[[output_key]] |
-                         sum(results$actions[[i]][[a]][[tmc]]) > 0)
-                  }
+                  sc <- s
                 }
 
-                # Write raster to file
-                filename <- sprintf(
-                  paste0("actions%s_%s%s_t%0",
-                         nchar(as.character(time_steps)), "d%s.tif"),
-                  ic[1], a_key, jc, as.integer(tmc), sc)
-                output_list[[output_key]][[tmc]] <-
-                  terra::writeRaster(output_rast, filename, ...)
-              }
+                # Add nested list to output list
+                output_key <- paste0("actions", ic[1], "_number_", a_key, jc,
+                                     sc)
+                output_list[[output_key]] <- list()
 
-              # Add list of actions metadata as an attribute
-              if (a == "control_search_destroy") {
-                label <- "found & destroyed"
-              } else {
-                label <- a_name
-              }
-              if (direct_action) {
-                if (population_model$get_type() == "presence_only") {
-                  label <- paste("presence", label)
-                } else {
-                  if (indiv_level_pr) {
-                    label <- paste("number", label)
+                # Initialise non-zero indicator
+                nonzero_list[[output_key]] <- FALSE
+
+                for (tmc in names(results$actions[[i]]$number[[a]])) {
+
+                  # Copy actions into a raster and update non-zero indicator
+                  if (population_model$get_type() == "stage_structured") {
+                    if (replicates > 1) {
+                      output_rast <-
+                        region$get_rast(
+                          results$actions[[i]]$number[[a]][[tmc]][[s]][,j])
+                      nonzero_list[[output_key]] <-
+                        nonzero_list[[output_key]] |
+                        (sum(results$actions[[i]]$number[[a]][[tmc]][[s]][,j])
+                         > 0)
+                    } else {
+                      output_rast <-
+                        region$get_rast(
+                          results$actions[[i]]$number[[a]][[tmc]][,j])
+                      nonzero_list[[output_key]] <-
+                        nonzero_list[[output_key]] |
+                        (sum(results$actions[[i]]$number[[a]][[tmc]][,j]) > 0)
+                    }
+                    if (is.null(combine_stages)) {
+                      names(output_rast) <- stage_labels[j]
+                    } else if (is.numeric(combine_stages)) {
+                      names(output_rast) <- "combined"
+                    }
                   } else {
-                    label <- paste("population", label)
+                    if (replicates > 1) {
+                      output_rast <-
+                        region$get_rast(
+                          results$actions[[i]]$number[[a]][[tmc]][[s]])
+                      nonzero_list[[output_key]] <-
+                        nonzero_list[[output_key]] |
+                        (sum(results$actions[[i]]$number[[a]][[tmc]][[s]]) > 0)
+                    } else {
+                      output_rast <-
+                        region$get_rast(
+                          results$actions[[i]]$number[[a]][[tmc]])
+                      nonzero_list[[output_key]] <-
+                        nonzero_list[[output_key]] |
+                        (sum(results$actions[[i]]$number[[a]][[tmc]]) > 0)
+                    }
                   }
+
+                  # Write raster to file
+                  filename <- sprintf(
+                    paste0("actions%s_number_%s%s_t%0",
+                           nchar(as.character(time_steps)), "d%s.tif"),
+                    ic[1], a_key, jc, as.integer(tmc), sc)
+                  output_list[[output_key]][[tmc]] <-
+                    terra::writeRaster(output_rast, filename, ...)
                 }
-              } else {
-                label <- paste(label, "applied")
-              }
-              if (population_model$get_type() == "presence_only") {
-                stage <- NULL
-              } else if (population_model$get_type() == "unstructured") {
-                stage <- NULL
-              } else if (population_model$get_type() == "stage_structured") {
-                if (direct_action && indiv_level_pr) {
+
+                # Add list of actions metadata as an attribute
+                if (a == "control_search_destroy") {
+                  label <- "found & destroyed"
+                } else {
+                  label <- a_name
+                }
+                label <- paste("number", label)
+                if (population_model$get_type() == "unstructured") {
+                  stage <- NULL
+                } else if (population_model$get_type() == "stage_structured") {
                   if (is.null(combine_stages)) {
                     stage <- stage_labels[j]
                     label <- paste(stage_labels[j], label)
@@ -1596,38 +1650,27 @@ ManageResults.Region <- function(region, population_model,
                     stage <- "combined"
                     label <- paste("combined stage", label)
                   }
-                } else {
-                  stage <- NULL
                 }
+                label <- paste0("action", ic[2], " ", label)
+                if (s == "mean") {
+                  label <- paste("mean", label)
+                } else if (s == "sd") {
+                  label <- paste(label, "std. dev.")
+                }
+                attr(output_list[[output_key]], "metadata") <- list(
+                  category = "action",
+                  type = actions[[i]]$get_type(),
+                  name = paste("number", a_name),
+                  stage = stage,
+                  cost = FALSE,
+                  cumulative = FALSE,
+                  summary = s,
+                  label = title_case(label),
+                  units = "",
+                  scale_type = "continuous",
+                  nonzero = nonzero_list[[output_key]]
+                )
               }
-              label <- paste0("action", ic[2], " ", label)
-              if (s == "mean") {
-                label <- paste("mean", label)
-              } else if (s == "sd") {
-                label <- paste(label, "std. dev.")
-              }
-              if (direct_action && indiv_level_pr &&
-                  population_model$get_type() %in% c("unstructured",
-                                                     "stage_structured")) {
-                scale_type <- "continuous"
-              } else if (s %in% c("mean", "sd")) {
-                scale_type <- "percent"
-              } else {
-                scale_type <- "discrete"
-              }
-              attr(output_list[[output_key]], "metadata") <- list(
-                category = "action",
-                type = actions[[i]]$get_type(),
-                name = a_name,
-                stage = stage,
-                cost = FALSE,
-                cumulative = FALSE,
-                summary = s,
-                label = title_case(label),
-                units = "",
-                scale_type = scale_type,
-                nonzero = nonzero_list[[output_key]]
-              )
             }
           }
 
@@ -1650,7 +1693,8 @@ ManageResults.Region <- function(region, population_model,
               }
 
               # Add nested list to output list
-              output_cost_key <- paste0("action_costs", ic[1], "_", cost_key, sc)
+              output_cost_key <- paste0("action_costs", ic[1], "_", cost_key,
+                                        sc)
               output_list[[output_cost_key]] <- list()
               nonzero_list[[output_cost_key]] <- FALSE
               if ("cumulative" %in% names(results$actions[[i]]$cost)) {
@@ -1972,7 +2016,7 @@ ManageResults.Region <- function(region, population_model,
     # Save population spread results
     super$save_csv()
 
-    # Filename parts summaries or single replicate
+    # File-name parts summaries or single replicate
     s_fname <- list("", mean = "_mean", sd = "_sd")
 
     # Time step labels
@@ -2197,24 +2241,28 @@ ManageResults.Region <- function(region, population_model,
             ic <- paste0("_", i)
           }
 
-          # Action key/name. Direct action?
+          # Action key/name
           a <- actions[[i]]$get_label(include_id = FALSE)
-          direct_action <-
-            (a %in%  c("detected", "control_search_destroy", "removed"))
-          indiv_level_pr <-
-            ((a == "detected" &&
-                actions[[i]]$get_sensitivity_type() == "individual") ||
-               (a == "control_search_destroy" &&
-                  actions[[i]]$get_manage_pr_type() == "individual") ||
-               (a == "removed" &&
-                  actions[[i]]$get_removal_pr_type() == "individual"))
           a_name <- a_key <- sub("control_", "", a, fixed = TRUE)
           if (actions[[i]]$get_type() == "control") {
-            a_key <- paste0(a_key, "_control")
             if (a_key == "search_destroy") {
-              a_name <- "found & destroyed"
+              a_name <- "search & destroy"
+              a_key <- "found_destroyed"
             } else {
-              a_name <- paste(a_name, "control")
+              a_key <- paste0(a_key, "_control")
+            }
+            a_name <- paste(a_name, "control")
+          }
+
+          # Action cost and cumulative cost key/name
+          if ("cost" %in% names(results$actions[[i]])) {
+            if (a_key == "detected") {
+              cost_name <- cost_key <- "detection"
+            } else if (a_key == "removed") {
+              cost_name <- cost_key <- "removal"
+            } else {
+              cost_key <- a_key
+              cost_name <- a_name
             }
           }
 

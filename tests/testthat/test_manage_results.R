@@ -1494,37 +1494,84 @@ test_that("collates and finalizes staged action results", {
     exist_manage_pr = exist_manage_pr)
   actions <- list(
     a3 = ManageDetection(region, population_model, surveillance,
-                         sensitivity_type = "presence",
+                         sensitivity_type = "presence", surv_cost = 3,
                          stages = 2:3, schedule = 2:3),
     a4 = ManageRemovals(region, population_model, removal_pr = template_vect,
-                        removal_pr_type = "population",
+                        removal_pr_type = "population", removal_cost = 4,
                         stages = 2:3, schedule = 2:3),
     a5 = ManageControls(region, population_model,
                         control_type = "search_destroy",
                         control_design = control_design,
-                        manage_pr_type = "population",
+                        manage_pr_type = "population", control_cost = 5,
                         stages = 2:3, schedule = 2:3))
   expect_silent(results <- ManageResults(
     region, population_model = population_model,
     actions = actions, time_steps = 4,
     collation_steps = 2, replicates = 3))
-  zero_results <- lapply(results$get_list()$actions,
-                         function(i) lapply(i, function(j) j[["2"]]))
+  zero_results <- lapply(results$get_list()$actions, function(i) {
+    idx <- 0
+    i_names <- names(i)
+    lapply(i, function(j) {
+      idx <<- idx + 1
+      if (i_names[idx] == "cost") {
+        idx2 <- 0
+        j_names <- names(j)
+        lapply(j, function(k) {
+          idx2 <<- idx2 + 1
+          if (j_names[idx2] == "cumulative") {
+            lapply(k, function(l) l[["2"]])
+          } else {
+            k[["2"]]
+          }
+        })
+      } else {
+        j[["2"]]
+      }
+    })
+  })
   locs <- region$get_locations()
-  expect_equal(lapply(zero_results$a3, function(a) lapply(a, length)),
+  expect_equal(lapply(zero_results$a3[1:2], function(a) lapply(a, length)),
                list(detected = list(mean = locs),
                     total = list(mean = 1, sd = 1)))
-  expect_equal(lapply(zero_results$a4, function(a) lapply(a, length)),
+  expect_equal(lapply(zero_results$a3$cost[1:2],
+                      function(a) lapply(a, length)),
+               list(detected = list(mean = locs, sd = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(zero_results$a3$cost$cumulative,
+                      function(a) lapply(a, length)),
+               list(detected = list(mean = locs, sd = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(zero_results$a4[1:2], function(a) lapply(a, length)),
                list(removed = list(mean = locs),
                     total = list(mean = 1, sd = 1)))
-  expect_equal(lapply(zero_results$a5, function(a) lapply(a, length)),
+  expect_equal(lapply(zero_results$a4$cost[1:2],
+                      function(a) lapply(a, length)),
+               list(removed = list(mean = locs, sd = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(zero_results$a4$cost$cumulative,
+                      function(a) lapply(a, length)),
+               list(removed = list(mean = locs, sd = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(zero_results$a5[1:2], function(a) lapply(a, length)),
                list(control_search_destroy = list(mean = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(zero_results$a5$cost[1:2],
+                      function(a) lapply(a, length)),
+               list(control_search_destroy = list(mean = locs, sd = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(zero_results$a5$cost$cumulative,
+                      function(a) lapply(a, length)),
+               list(control_search_destroy = list(mean = locs, sd = locs),
                     total = list(mean = 1, sd = 1)))
   set.seed(1234)
   n_r <- list(); n_r2 <- list()
   n <- rep(0, region$get_locations())
   n[idx] <- (9:11)*5
   n <- population_model$make(initial = n)
+  n <- actions$a3$apply(n, 0); n <- actions$a4$apply(n, 0);
+  n <- actions$a5$apply(n, 0); n_0 <- n
+  attributes(n)[c("a3_detected", "undetected", "a4_removed",
+                  "a5_control_search_destroy")] <- NULL
   n <- actions$a3$apply(n, 2); n <- actions$a4$apply(n, 2)
   n <- actions$a5$apply(n, 2); n_r[[1]] <- n
   attributes(n)[c("a3_detected", "undetected", "a4_removed",
@@ -1549,31 +1596,83 @@ test_that("collates and finalizes staged action results", {
                   "a5_control_search_destroy")] <- NULL
   n <- actions$a3$apply(n, 4); n <- actions$a4$apply(n, 4)
   n <- actions$a5$apply(n, 4); n_r2[[3]] <- n
+  expect_silent(results$collate(r = 1, tm = 0, n = n_0))
   expect_silent(results$collate(r = 1, tm = 2, n = n_r[[1]]))
   expect_silent(results$collate(r = 1, tm = 4, n = n_r2[[1]]))
+  expect_silent(results$collate(r = 2, tm = 0, n = n_0))
   expect_silent(results$collate(r = 2, tm = 2, n = n_r[[2]]))
   expect_silent(results$collate(r = 2, tm = 4, n = n_r2[[2]]))
+  expect_silent(results$collate(r = 3, tm = 0, n = n_0))
   expect_silent(results$collate(r = 3, tm = 2, n = n_r[[3]]))
   expect_silent(results$collate(r = 3, tm = 4, n = n_r2[[3]]))
   expect_silent(results$finalize())
   expect_silent(result_list <- results$get_list())
-  action_results <- lapply(result_list$actions,
-                           function(i) lapply(i, function(j) j[["2"]]))
-  expect_equal(lapply(action_results$a3, function(a) lapply(a, length)),
+  action_results <- lapply(result_list$actions, function(i) {
+    idx <- 0
+    i_names <- names(i)
+    lapply(i, function(j) {
+      idx <<- idx + 1
+      if (i_names[idx] == "cost") {
+        idx2 <- 0
+        j_names <- names(j)
+        lapply(j, function(k) {
+          idx2 <<- idx2 + 1
+          if (j_names[idx2] == "cumulative") {
+            lapply(k, function(l) l[["2"]])
+          } else {
+            k[["2"]]
+          }
+        })
+      } else {
+        j[["2"]]
+      }
+    })
+  })
+  expect_equal(lapply(action_results$a3[1:2], function(a) lapply(a, length)),
                list(detected = list(mean = locs),
                     total = list(mean = 1, sd = 1)))
-  expect_equal(lapply(action_results$a4, function(a) lapply(a, length)),
+  expect_equal(lapply(action_results$a3$cost[1:2],
+                      function(a) lapply(a, length)),
+               list(detected = list(mean = locs, sd = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(action_results$a3$cost$cumulative,
+                      function(a) lapply(a, length)),
+               list(detected = list(mean = locs, sd = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(action_results$a4[1:2], function(a) lapply(a, length)),
                list(removed = list(mean = locs),
                     total = list(mean = 1, sd = 1)))
-  expect_equal(lapply(action_results$a5, function(a) lapply(a, length)),
+  expect_equal(lapply(action_results$a4$cost[1:2],
+                      function(a) lapply(a, length)),
+               list(removed = list(mean = locs, sd = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(action_results$a4$cost$cumulative,
+                      function(a) lapply(a, length)),
+               list(removed = list(mean = locs, sd = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(action_results$a5[1:2], function(a) lapply(a, length)),
                list(control_search_destroy = list(mean = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(action_results$a5$cost[1:2],
+                      function(a) lapply(a, length)),
+               list(control_search_destroy = list(mean = locs, sd = locs),
+                    total = list(mean = 1, sd = 1)))
+  expect_equal(lapply(action_results$a5$cost$cumulative,
+                      function(a) lapply(a, length)),
+               list(control_search_destroy = list(mean = locs, sd = locs),
                     total = list(mean = 1, sd = 1)))
   expect_equal(action_results$a3$total$mean,
                sum(action_results$a3$detected$mean))
+  expect_equal(action_results$a3$cost$total$mean,
+               sum(action_results$a3$cost$detected$mean))
   expect_equal(action_results$a4$total$mean,
                sum(action_results$a4$removed$mean))
+  expect_equal(action_results$a4$cost$total$mean,
+               sum(action_results$a4$cost$removed$mean))
   expect_equal(action_results$a5$total$mean,
                sum(action_results$a5$control_search_destroy$mean))
+  expect_equal(action_results$a5$cost$total$mean,
+               sum(action_results$a5$cost$control_search_destroy$mean))
 })
 
 test_that("collates and finalizes spatially implicit staged action results", {
