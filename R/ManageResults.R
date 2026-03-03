@@ -3009,179 +3009,225 @@ ManageResults.Region <- function(region, population_model,
           ic <- c(paste0("_", i), paste0(" ", i))
         }
 
-        # Action label/key/name. Direct action?
+        # Action and cost key/names
         a_lab <- actions[[i]]$get_label(include_id = FALSE)
-        direct_action <-
-          (a_lab %in%  c("detected", "control_search_destroy", "removed"))
-        indiv_level_pr <-
-          ((a_lab == "detected" &&
-              actions[[i]]$get_sensitivity_type() == "individual") ||
-             (a_lab == "control_search_destroy" &&
-                actions[[i]]$get_manage_pr_type() == "individual") ||
-             (a_lab == "removed" &&
-                actions[[i]]$get_removal_pr_type() == "individual"))
         a_name <- a_key <- sub("control_", "", a_lab, fixed = TRUE)
-        if (actions[[i]]$get_type() == "control") {
-          a_key <- paste0(a_key, "_control")
-          if (a_key == "search_destroy_control") {
+        if (a_lab == "detected") {
+          cost_name <- cost_key <- "detection"
+        } else if (a_lab == "removed") {
+          cost_name <- cost_key <- "removal"
+        } else if (actions[[i]]$get_type() == "control") {
+          if (a_lab == "control_search_destroy") {
+            a_key <- "found_destroyed"
             a_name <- "found & destroyed"
+            cost_key <- "search_destroy"
+            cost_name <- "search & destroy"
           } else {
-            a_name <- paste(a_name, "control")
-          }
-        }
-        if (direct_action) {
-          if (indiv_level_pr) {
-            plot_y_label <- sprintf("Number %s", a_name)
-          } else {
-            plot_y_label <- sprintf("Local populations %s", a_name)
-          }
-        } else {
-          plot_y_label <- sprintf("Locations %s applied", a_name)
-        }
-
-        # Action cost and cumulative cost key/name
-        if ("cost" %in% names(results$actions[[i]])) {
-          if (a_key == "detected") {
-            cost_name <- cost_key <- "detection"
-          } else if (a_key == "removed") {
-            cost_name <- cost_key <- "removal"
-          } else {
-            cost_key <- a_key
-            if (a_key == "search_destroy_control") {
-              cost_name <- "search & destroy control"
-            } else {
-              cost_name <- a_name
-            }
+            cost_key <- a_key <- paste0(a_key, "_control")
+            cost_name <- a_name <- paste(a_name, "control")
           }
         }
 
-        # Pre/post-fix action name
-        if (direct_action) {
-          if (population_model$get_type() == "presence_only") {
-            a_name <- paste("presence", a_name)
-          } else {
-            if (indiv_level_pr) {
-              a_name <- paste("number", a_name)
-            } else {
-              a_name <- paste("populations", a_name)
-            }
-          }
-        } else {
-          a_name <- paste(a_name, "applied")
-        }
+        ## Local population action success/application (binary)
 
-        # Resolve the number of (combined) stages used in the results
-        result_stages <- stages
-        if (is.null(stages) || is.numeric(combine_stages) || !indiv_level_pr) {
-          result_stages <- 1
-        }
-
-        # Stage label for plot headings and files
-        stage_label <- ""
-        stage_file <- ""
-        if (population_model$get_type() == "stage_structured" &&
-            indiv_level_pr) {
-          if (is.numeric(stages) && is.null(combine_stages)) {
-            stage_label <- paste0(stage_labels, " ")
-            stage_file <- paste0("_stage_", 1:result_stages)
-          } else if (is.numeric(combine_stages)) {
-            if (length(combine_stages) == 1) {
-              stage_label <- paste0(
-                attr(population_model$get_growth(),
-                     "labels")[combine_stages], " ")
-            } else {
-              stage_label <- paste0(sprintf(
-                "stages %s-%s", min(combine_stages), max(combine_stages)),
-                " ")
-            }
-          }
-        }
-
-        # Plot per result stage
-        for (s in 1:result_stages) {
-
-          # Plot action totals/values for result stage
+        # Plot labels and title components
+        if (direct_action(actions[[i]])) {
           if (include_collated) {
-            a <- "total"
+            if (population_model$get_type() == "presence_only") {
+              plot_y_label <- sprintf("Local presences %s", a_name)
+              a_title <- paste("presences", a_name)
+            } else {
+              plot_y_label <- sprintf("Local populations %s", a_name)
+              a_title <- paste("populations", a_name)
+            }
           } else {
-            a <- a_lab
+            if (population_model$get_type() == "presence_only") {
+              plot_y_label <- sprintf("Presence %s", a_name)
+              a_title <- paste("presence", a_name)
+            } else {
+              plot_y_label <- sprintf("Population %s", a_name)
+              a_title <- paste("population", a_name)
+            }
           }
-          if (replicates > 1) {
-            if (include_collated || indiv_level_pr) {
-              values <- sapply(results$actions[[i]][[a]],
+        } else {
+          if (include_collated) {
+            plot_y_label <- sprintf("Locations %s applied", a_name)
+          } else {
+            plot_y_label <- title_case(sprintf("%s applied", a_name))
+          }
+          a_title <- paste(a_name, "applied")
+        }
+
+        # Plot action totals/values for result stage
+        if (include_collated) {
+          a <- "total"
+        } else {
+          a <- a_lab
+        }
+        if (replicates > 1) {
+          if (include_collated) {
+            values <- sapply(results$actions[[i]][[a]],
+                             function(tot) as.data.frame(tot))
+          } else {
+            values <- t(as.matrix(sapply(results$actions[[i]][[a]],
+                                         function(tot) tot$mean)))
+            rownames(values) <- "mean"
+          }
+        } else {
+          values <- sapply(results$actions[[i]][[a]], function(tot) tot)
+        }
+        if (replicates > 1) { # plot summary mean +/- 2 SD
+          if (include_collated) {
+            values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
+                           sd = as.numeric(values["sd",,drop = FALSE]))
+          } else {
+            values <- list(mean = as.numeric(values["mean",,drop = FALSE]))
+          }
+          if (include_collated) {
+            filename <- sprintf("total_actions%s_%s.png", ic[1], a_key)
+            main_title <- sprintf("total action%s %s (mean +/- 2 SD)", ic[2],
+                                  a_title)
+          } else {
+            filename <- sprintf("actions%s_%s.png", ic[1], a_key)
+            main_title <- sprintf("action%s %s (mean)", ic[2], a_title)
+          }
+          if (include_collated) {
+            ylim <- c(0, 1.1*max(values$mean + 2*values$sd))
+          } else {
+            ylim <- c(0, 1.1*max(values$mean))
+          }
+          grDevices::png(filename = filename, width = width, height = height)
+          graphics::plot(0:time_steps, values$mean, type = "l",
+                         main = title_case(main_title),
+                         xlab = plot_x_label,
+                         ylab = plot_y_label,
+                         ylim = ylim)
+          if (include_collated) {
+            graphics::lines(0:time_steps, values$mean + 2*values$sd,
+                            lty = "dashed")
+            graphics::lines(0:time_steps,
+                            pmax(0, values$mean - 2*values$sd),
+                            lty = "dashed")
+          }
+          invisible(grDevices::dev.off())
+        } else {
+          if (include_collated) {
+            filename <- sprintf("total_actions%s_%s.png", ic[1], a_key)
+            main_title <- sprintf("total action%s %s", ic[2], a_title)
+          } else {
+            filename <- sprintf("actions%s_%s.png", ic[1], a_key)
+            main_title <- sprintf("action%s %s", ic[2], a_title)
+          }
+          grDevices::png(filename = filename, width = width,
+                         height = height)
+          graphics::plot(0:time_steps, values, type = "l",
+                         main = title_case(main_title),
+                         xlab = plot_x_label,
+                         ylab = plot_y_label,
+                         ylim = c(0, 1.1*max(values)))
+          invisible(grDevices::dev.off())
+        }
+
+        ## Number of individuals when applicable
+        include_indiv <- indiv_type_action(actions[[i]])
+        if (include_indiv) {
+
+          # Plot labels and title components
+          plot_y_label <- sprintf("Number %s", a_name)
+          a_title <- paste("number", a_name)
+
+          # Resolve the number of (combined) stages used in the results
+          result_stages <- stages
+          if (is.null(stages) || is.numeric(combine_stages)) {
+            result_stages <- 1
+          }
+
+          # Stage label for plot headings and files
+          stage_label <- ""
+          stage_file <- ""
+          if (population_model$get_type() == "stage_structured") {
+            if (is.numeric(stages) && is.null(combine_stages)) {
+              stage_label <- paste0(stage_labels, " ")
+              stage_file <- paste0("_stage_", 1:result_stages)
+            } else if (is.numeric(combine_stages)) {
+              if (length(combine_stages) == 1) {
+                stage_label <- paste0(
+                  attr(population_model$get_growth(),
+                       "labels")[combine_stages], " ")
+              } else {
+                stage_label <- paste0(sprintf(
+                  "stages %s-%s", min(combine_stages), max(combine_stages)),
+                  " ")
+              }
+            }
+          }
+
+          # Plot per result stage
+          for (s in 1:result_stages) {
+
+            # Plot action totals/values for result stage
+            if (include_collated) {
+              a <- "total"
+            } else {
+              a <- a_lab
+            }
+            if (replicates > 1) {
+              values <- sapply(results$actions[[i]]$number[[a]],
                                function(tot) as.data.frame(
                                  lapply(tot, function(m) m[s])))
             } else {
-              values <- t(as.matrix(sapply(results$actions[[i]][[a]],
-                                           function(tot) tot$mean[s])))
-              rownames(values) <- "mean"
+              values <- sapply(results$actions[[i]]$number[[a]],
+                               function(tot) tot[s])
             }
-          } else {
-            values <- sapply(results$actions[[i]][[a]],
-                             function(tot) tot[s])
-          }
-          if (replicates > 1) { # plot summary mean +/- 2 SD
-            if (include_collated || indiv_level_pr) {
+            if (replicates > 1) { # plot summary mean +/- 2 SD
               values <- list(mean = as.numeric(values["mean",,drop = FALSE]),
                              sd = as.numeric(values["sd",,drop = FALSE]))
-            } else {
-              values <- list(mean = as.numeric(values["mean",,drop = FALSE]))
-            }
-            if (include_collated) {
-              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_key,
-                                  stage_file[s])
-              main_title <- sprintf("total action%s %s%s (mean +/- 2 SD)",
-                                    ic[2], stage_label[s], a_name)
-            } else {
-              filename <- sprintf("actions%s_%s%s.png", ic[1], a_key,
-                                  stage_file[s])
-              if (indiv_level_pr) {
-                main_title <- sprintf("action%s %s%s (mean +/- 2 SD)", ic[2],
-                                      stage_label[s], a_name)
+              if (include_collated) {
+                filename <- sprintf("total_actions%s_number_%s%s.png", ic[1],
+                                    a_key, stage_file[s])
+                main_title <- sprintf("total action%s %s%s (mean +/- 2 SD)",
+                                      ic[2], stage_label[s], a_title)
               } else {
-                main_title <- sprintf("action%s %s%s (mean)", ic[2],
-                                      stage_label[s], a_name)
+                filename <- sprintf("actions%s_number_%s%s.png", ic[1], a_key,
+                                    stage_file[s])
+                main_title <- sprintf("action%s %s%s (mean +/- 2 SD)", ic[2],
+                                      stage_label[s], a_title)
               }
-            }
-            if (include_collated || indiv_level_pr) {
               ylim <- c(0, 1.1*max(values$mean + 2*values$sd))
-            } else {
-              ylim <- c(0, 1.1*max(values$mean))
-            }
-            grDevices::png(filename = filename, width = width, height = height)
-            graphics::plot(0:time_steps, values$mean, type = "l",
-                           main = title_case(main_title),
-                           xlab = plot_x_label,
-                           ylab = plot_y_label,
-                           ylim = ylim)
-            if (include_collated || direct_action) {
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values$mean, type = "l",
+                             main = title_case(main_title),
+                             xlab = plot_x_label,
+                             ylab = plot_y_label,
+                             ylim = ylim)
               graphics::lines(0:time_steps, values$mean + 2*values$sd,
                               lty = "dashed")
               graphics::lines(0:time_steps,
                               pmax(0, values$mean - 2*values$sd),
                               lty = "dashed")
-            }
-            invisible(grDevices::dev.off())
-          } else {
-            if (include_collated) {
-              filename <- sprintf("total_actions%s_%s%s.png", ic[1], a_key,
-                                  stage_file[s])
-              main_title <- sprintf("total action%s %s%s", ic[2],
-                                    stage_label[s], a_name)
+              invisible(grDevices::dev.off())
             } else {
-              filename <- sprintf("actions%s_%s%s.png", ic[1], a_key,
-                                  stage_file[s])
-              main_title <- sprintf("action%s %s%s", ic[2], stage_label[s],
-                                    a_name)
+              if (include_collated) {
+                filename <- sprintf("total_actions%s_number_%s%s.png", ic[1],
+                                    a_key, stage_file[s])
+                main_title <- sprintf("total action%s %s%s", ic[2],
+                                      stage_label[s], a_title)
+              } else {
+                filename <- sprintf("actions%s_number_%s%s.png", ic[1], a_key,
+                                    stage_file[s])
+                main_title <- sprintf("action%s %s%s", ic[2], stage_label[s],
+                                      a_title)
+              }
+              grDevices::png(filename = filename, width = width,
+                             height = height)
+              graphics::plot(0:time_steps, values, type = "l",
+                             main = title_case(main_title),
+                             xlab = plot_x_label,
+                             ylab = plot_y_label,
+                             ylim = c(0, 1.1*max(values)))
+              invisible(grDevices::dev.off())
             }
-            grDevices::png(filename = filename, width = width,
-                           height = height)
-            graphics::plot(0:time_steps, values, type = "l",
-                           main = title_case(main_title),
-                           xlab = plot_x_label,
-                           ylab = plot_y_label,
-                           ylim = c(0, 1.1*max(values)))
-            invisible(grDevices::dev.off())
           }
         }
 

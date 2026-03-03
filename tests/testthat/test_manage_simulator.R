@@ -153,19 +153,29 @@ test_that("runs simulator with correct configuration", {
   expect_equal(unname(results_list$impacts[[2]]$aspect2),
                lapply(1:3, function (i)
                  (initial_n > 0)*template_vect*200*0.7*impact_mask[[i]]))
-
   expect_length(results_list$actions, 2)
   expect_equal(lapply(results_list$actions, function(i) lapply(i, length)),
+               list(list(detected = 3, total = 5, number = 2),
+                    list(removed = 3, total = 5, number = 2)))
+  expect_equal(lapply(results_list$actions,
+                      function(i) lapply(i$number, length)),
                list(list(detected = 3, total = 5),
                     list(removed = 3, total = 5)))
-  expect_named(results_list$actions[[1]]$detected, as.character(seq(0, 4, 2)))
   action_mask <- unname(lapply(results_list$occupancy, function(n) n > 0))
   action_mask[[1]] <- initial_n > 0 # detection before removal
-  expect_equal(unname(lapply(results_list$actions[[1]]$detected,
+  expect_named(results_list$actions[[1]]$detected, as.character(seq(0, 4, 2)))
+  expect_named(results_list$actions[[1]]$number$detected,
+               as.character(seq(0, 4, 2)))
+  expect_equal(unname(results_list$actions[[1]]$detected), action_mask)
+  expect_equal(unname(lapply(results_list$actions[[1]]$number$detected,
                              function(n) n > 0)), action_mask)
   expect_named(results_list$actions[[2]]$removed, as.character(seq(0, 4, 2)))
-  expect_equal(unname(lapply(results_list$actions[[2]]$removed,
+  expect_named(results_list$actions[[2]]$number$removed,
+               as.character(seq(0, 4, 2)))
+  expect_equal(unname(lapply(results_list$actions[[2]]$number$removed,
                              function(n) n > 0)), action_mask)
-  expect_equal(results_list$population[["0"]],
-               initial_n - results_list$actions[[2]]$removed[["0"]])
+  expect_equal(results_list$actions[[2]]$removed[["0"]],
+               initial_n > 0 & !results_list$population[["0"]])
+  expect_equal(results_list$actions[[2]]$number$removed[["0"]],
+               initial_n - results_list$population[["0"]])
 })
