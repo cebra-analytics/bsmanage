@@ -1193,7 +1193,7 @@ ManageResults.Region <- function(region, population_model,
         summaries <- 1
       }
       if (length(actions) > 0) {
-        for (i in 1:length(results$actions)) {
+        for (i in 1:length(actions)) {
           include_indiv <- indiv_type_action(actions[[i]])
           if (include_indiv && "number" %in% names(results$actions[[i]])) {
             for (a in names(results$actions[[i]]$number)) {
