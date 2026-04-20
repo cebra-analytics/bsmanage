@@ -369,15 +369,8 @@ ControlDesign.ManageContext <- function(context,
     if (length(min_alloc) == 1) {
       min_alloc <- rep(min_alloc, parts)
     }
-    if (discrete_alloc) {
-      min_alloc <- pmax(ceiling(min_alloc), 1)
-    }
   } else {
-    if (discrete_alloc) {
-      min_alloc <- rep(1, parts)
-    } else {
-      min_alloc <- rep(0, parts)
-    }
+    min_alloc <- rep(0, parts)
   }
   if (is.null(exist_manage_pr)) {
     exist_manage_pr <- rep(0, parts)
@@ -436,11 +429,6 @@ ControlDesign.ManageContext <- function(context,
 
       if (optimal == "effectiveness" && !relative_establish_pr) {
 
-        # handle establish_pr of 1 via substituting for close to 1
-        if (any(establish_pr == 1)) {
-          establish_pr[which(establish_pr == 1)] <- 1 - 1e-16
-        }
-
         # maximum effectiveness
         return((-1*establish_pr*(1 - exist_manage_pr)*
                   lambda/alloc_cost*exp(-1*lambda*n_alloc))/
@@ -460,36 +448,49 @@ ControlDesign.ManageContext <- function(context,
     f_pos <<- function(alpha) {
       values <- lambda/alloc_cost*benefit*establish_pr*(1 - exist_manage_pr)
       idx <- which(values > 0)
-      if (optimal == "effectiveness" && !relative_establish_pr) {
+      if (length(idx) && optimal == "effectiveness" &&
+          !relative_establish_pr) {
 
         # maximum effectiveness
         idx <- idx[which(1 - lambda[idx]/alloc_cost[idx]/alpha > 0)]
-        values[-idx] <- 0
-        values[idx] <- pmax(
-          (alloc_cost[idx]/lambda[idx]*
-             (log(-1*lambda[idx]/alloc_cost[idx]/alpha + 1) -
-                log(1/establish_pr[idx]) +
-                log(1 - exist_manage_pr[idx]))), 0)
-        idx <- which(values > 0)
-        values[idx] <- (pmax(min_alloc[idx]*alloc_cost[idx], values[idx]) +
-                          fixed_cost[idx])
+        if (length(idx)) {
+          values[-idx] <- 0
+          values[idx] <- pmax(
+            (alloc_cost[idx]/lambda[idx]*
+               (log(-1*lambda[idx]/alloc_cost[idx]/alpha + 1) -
+                  log(1/establish_pr[idx]) +
+                  log(1 - exist_manage_pr[idx]))), 0)
+          idx <- which(values > 0)
+          if (length(idx)) {
+            values[idx] <- (pmax(min_alloc[idx]*alloc_cost[idx],
+                                 values[idx]) + fixed_cost[idx])
+          } else {
+            values[] <- 0
+          }
+        } else {
+          values[] <- 0
+        }
 
-      } else {
+      } else if (length(idx)) {
 
         # maximum saving/benefit (benefit = 1 for successes)
         incl_x <- (optimal == "saving")
         idx <- idx[which((alpha - 1*incl_x) >= -1*values[idx])]
-        values[-idx] <- 0
-        values[idx] <-
-          (pmax(min_alloc[idx]*alloc_cost[idx],
-                (-1*alloc_cost[idx]/lambda[idx]*
-                   log(-1*(alpha - 1*incl_x)/values[idx]))) +
-             fixed_cost[idx])
+        if (length(idx)) {
+          values[-idx] <- 0
+          values[idx] <-
+            (pmax(min_alloc[idx]*alloc_cost[idx],
+                  (-1*alloc_cost[idx]/lambda[idx]*
+                     log(-1*(alpha - 1*incl_x)/values[idx]))) +
+               fixed_cost[idx])
 
-        # limit to zero cost allocation via f_obj(0)
-        if (optimal == "saving") {
-          values <-
-            (values < benefit*establish_pr*(1 - exist_manage_pr))*values
+          # limit to zero cost allocation via f_obj(0)
+          if (optimal == "saving") {
+            values <-
+              (values < benefit*establish_pr*(1 - exist_manage_pr))*values
+          }
+        } else {
+          values[] <- 0
         }
       }
 
@@ -500,7 +501,7 @@ ControlDesign.ManageContext <- function(context,
     alpha_unconstr <<- (optimal == "saving") - 1
 
     # Minimum marginal benefit alpha
-    alpha_min <<- min(f_deriv(fixed_cost))
+    alpha_min <<- max(min(f_deriv(fixed_cost)), -1e12)
 
     # Function for calculating unit effectiveness
     f_unit_eff <<- function(x_alloc) {
@@ -516,7 +517,7 @@ ControlDesign.ManageContext <- function(context,
     }
 
     # Search alpha for optimal objective (even when no constraints)
-    search_alpha <<- any(fixed_cost > 0 | min_alloc > 0)
+    search_alpha <<- any(fixed_cost > 0 | min_alloc > 0) || discrete_alloc
   }
   set_lagrange_params()
 
@@ -594,18 +595,17 @@ ControlDesign.ManageContext <- function(context,
           # Add discrete allocation
           n_alloc <- floor((x_alloc >= fixed_cost)*
                              (x_alloc - fixed_cost)/alloc_cost)
-          # n_alloc <- (n_alloc*alloc_cost > fixed_cost)*n_alloc
           qty_alloc <<- qty_alloc + n_alloc
 
           # Alter parameters and indicate further allocation required
           fixed_cost[which(qty_alloc > 0)] <<- 0
           exist_manage_pr <<- calculate_manage_pr(n_alloc)
-          add_allocation <- (sum(x_alloc) > 0)
+          add_allocation <- (sum(n_alloc) > 0 || all(min_alloc < 1))
           if (is.numeric(budget)) {
             total_x_alloc <- sum(qty_alloc*alloc_cost +
                                    (qty_alloc > 0)*fixed_cost_orig)
-            add_allocation <- (total_x_alloc < budget && add_allocation)
-            budget <<- budget - total_x_alloc
+            add_allocation <- (total_x_alloc < budget_orig && add_allocation)
+            budget <<- budget_orig - total_x_alloc
           }
           if (is.numeric(average_pr)) {
             add_allocation <-
@@ -617,6 +617,7 @@ ControlDesign.ManageContext <- function(context,
               (calculate_overall_pr(exist_manage_pr) < overall_pr &&
                  add_allocation)
           }
+          min_alloc <<- pmax(ceiling(min_alloc), 1)
           min_alloc[which(qty_alloc > 0)] <<- 1
 
           # Reset Lagrange parameters

@@ -360,12 +360,21 @@ LagrangeMgmtDesign.ManageContext <- function(context,
     if (is.numeric(budget) || is.numeric(average_pr) ||
         is.numeric(overall_pr) || search_alpha) {
       interval <- (0:100)/100*alpha_min
-      alpha_range <- range(interval)[2] - range(interval)[1]
-      precision <- 12 # for alpha
-      while (alpha_range > abs(best_alpha*10^(-1*precision))) {
+      best_obj <- c()
+      best_alpha_list <- c()
+      precision <- 12 # for alpha & objective
+      while (length(best_obj) < 2 ||
+             (abs(diff(best_obj)[1]/best_obj[1]) > 10^(-1*precision) &&
+              abs(diff(best_alpha_list)[1]/
+                  min(best_alpha, -10^(-1*precision))) > 10^(-1*precision))) {
 
         # Get allocation for each alpha in interval
-        alloc <- as.data.frame(t(sapply(interval[-1], function(a) {
+        if (alpha_unconstr == -1 && interval[1] == 0) {
+          interval_constr <- interval[-1]
+        } else {
+          interval_constr <- interval
+        }
+        alloc <- as.data.frame(t(sapply(interval_constr, function(a) {
           alloc <- allocate(a)
           c(obj = sum(f_obj(alloc)), total = attr(alloc, "total"),
             average_pr = attr(alloc, "average_pr"),
@@ -381,26 +390,30 @@ LagrangeMgmtDesign.ManageContext <- function(context,
           if (is.numeric(overall_pr) && max(alloc$overall_pr) >= overall_pr) {
             idx <- sort(unique(c(idx, which(alloc$overall_pr >= overall_pr))))
           }
-          idx <- idx[which(alloc$total[idx] <= min(alloc$total[idx]))]
-          if (min(alloc$obj) < 0) {
-            i <- max(idx[which(alloc$obj[idx] <=
-                                 min(alloc$obj[idx])*(1 - 10^(-1*precision)))])
-          } else {
-            i <- max(idx[which(alloc$obj[idx] <=
-                                 min(alloc$obj[idx])*(1 + 10^(-1*precision)))])
-          }
+          idx <- idx[which.min(alloc$total[idx])]
+          i <- max(idx[which(
+            abs((alloc$obj[idx] - min(alloc$obj[idx]))/min(alloc$obj[idx]))
+            <= 10^(-1*precision))])
         } else {
           i <- max(which(alloc$obj <= min(alloc$obj)))
         }
-        best_alpha <- interval[i + 1]
+        best_alpha <- interval_constr[i]
+        best_obj <- c(alloc$obj[i], best_obj)
+        best_alpha_list <- c(best_alpha, best_alpha_list)
 
         # Update interval and range for next iteration
-        if (i < length(interval) - 1) {
-          interval <- (0:100)/100*(interval[i + 2] - interval[i]) + interval[i]
-        } else {
-          interval <- (0:100)/100*(interval[i + 1] - interval[i]) + interval[i]
+        if (alpha_unconstr == -1 && interval[1] == 0) {
+          i <- i + 1
         }
-        alpha_range <- range(interval)[2] - range(interval)[1]
+        if (i == 1) { # first
+          interval <- (0:100)/100*(interval[i + 1] - interval[i]) + interval[i]
+        } else if (i == length(interval)) { # last
+          interval <- ((0:100)/100*(interval[i] - interval[i - 1]) +
+                         interval[i - 1])
+        } else { # between
+          interval <- ((0:100)/100*(interval[i + 1] - interval[i - 1]) +
+                         interval[i - 1])
+        }
       }
     }
 
