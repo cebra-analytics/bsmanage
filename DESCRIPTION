@@ -37,4 +37,5 @@ Collate:
     'ManageImpacts.R'
     'ManageRemovals.R'
     'ManageResults.R'
+    'manage_run_replicate.R'
     'ManageSimulator.R'
