@@ -91,12 +91,29 @@ test_that("timestep_callback fires once per time step in serial runs", {
   expect_equal(calls, 3L)
 })
 
+test_that("parallel FORK sim_env has no results before workers fork", {
+  skip_if_not(.Platform$OS.type == "unix", "FORK cluster requires Unix")
+  simulator <- make_spread_simulator(replicates = 2L)
+  merge_cb <- function(phase, sim_env, ...) {
+    if (identical(phase, "before_pool")) {
+      expect_null(sim_env$results)
+    }
+    invisible(NULL)
+  }
+  suppressMessages(simulator$run(
+    parallel_replicates = TRUE,
+    replicate_workers = 2L,
+    cluster_type = "FORK",
+    parallel_merge_callback = merge_cb
+  ))
+})
+
 test_that("parallel_merge_callback fires for each merged replicate", {
   skip_if_not(.Platform$OS.type == "unix", "FORK cluster requires Unix")
   simulator <- make_spread_simulator(replicates = 3L)
   phases <- character()
   merge_cb <- function(phase, sim_env, reps_merged, reps_total,
-                       rep_outputs = NULL, out = NULL) {
+                       rep_outputs = NULL, out = NULL, ...) {
     phases <<- c(phases, phase)
     invisible(NULL)
   }

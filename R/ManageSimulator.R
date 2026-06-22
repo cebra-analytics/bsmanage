@@ -198,7 +198,6 @@ ManageSimulator.Region <- function(region,
   }
 
   # Extend (override) run simulator function
-  results <- NULL # DEBUG ####
   self$run <- function(parallel_replicates = FALSE,
                        replicate_workers = NULL,
                        cluster_type = c("auto", "FORK", "PSOCK"),
@@ -241,10 +240,9 @@ ManageSimulator.Region <- function(region,
       actions = actions,
       user_function = user_function
     )
-    manage_setup_results(sim_env)
+    manage_setup_continued_incursions(sim_env)
     sim_env$timestep_callback <- timestep_callback
     sim_env$dispersal_callback <- dispersal_callback
-    results <<- sim_env$results # DEBUG ####
 
     n_workers <- replicate_workers
     if (is.null(n_workers)) {
@@ -257,8 +255,13 @@ ManageSimulator.Region <- function(region,
 
     parallel_stats <- NULL
     if (parallel_replicates) {
+      parent_results <- NULL
       parallel_stats <- run_parallel_replicates(
         sim_env = sim_env,
+        results_factory = function() {
+          parent_results <<- manage_create_results(sim_env)
+          parent_results
+        },
         n_workers = n_workers,
         cluster_type = cluster_type,
         random_seed = random_seed,
@@ -268,8 +271,11 @@ ManageSimulator.Region <- function(region,
         psock_export_envir = psock_export_envir,
         parallel_merge_callback = parallel_merge_callback
       )
+      sim_env$results <- parent_results
+      sim_env$timestep_callback <- timestep_callback
+      sim_env$dispersal_callback <- dispersal_callback
     } else {
-      # Replicates
+      sim_env$results <- manage_create_results(sim_env)
       for (r in seq_len(replicates)) {
         if (!is.null(random_seed) && per_replicate_seed) {
           set.seed(random_seed + as.integer(r) - 1L)

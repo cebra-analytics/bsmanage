@@ -35,15 +35,19 @@ manage_sim_env <- function(region,
   sim_env
 }
 
-#' Initialise ManageResults for a simulation run
+#' Continued-incursions closure for a simulation run
 #'
 #' @noRd
-manage_setup_results <- function(sim_env) {
-  # Continued incursions function
+manage_setup_continued_incursions <- function(sim_env) {
   sim_env$continued_incursions <- sim_env$initializer$continued_incursions()
+  invisible(sim_env)
+}
 
-  # Results setup
-  sim_env$results <- ManageResults(
+#' Create ManageResults for a simulation run
+#'
+#' @noRd
+manage_create_results <- function(sim_env) {
+  ManageResults(
     sim_env$region,
     sim_env$population_model,
     impacts = sim_env$impacts,
@@ -55,6 +59,14 @@ manage_setup_results <- function(sim_env) {
     replicates = sim_env$replicates,
     combine_stages = sim_env$result_stages
   )
+}
+
+#' Initialise continued incursions and ManageResults on sim_env
+#'
+#' @noRd
+manage_setup_results <- function(sim_env) {
+  manage_setup_continued_incursions(sim_env)
+  sim_env$results <- manage_create_results(sim_env)
   invisible(sim_env)
 }
 
@@ -77,7 +89,11 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
   actions <- sim_env$actions
   user_function <- sim_env$user_function
   continued_incursions <- sim_env$continued_incursions
-  results <- sim_env$results
+  results <- if (defer_collate) {
+    NULL
+  } else {
+    sim_env$results
+  }
   timestep_callback <- sim_env$timestep_callback
   dispersal_callback <- sim_env$dispersal_callback
   collations <- if (defer_collate) {
