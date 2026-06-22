@@ -55,7 +55,8 @@
 #'       object.}
 #'     \item{\code{set_dispersal_models(models)}}{Set the list of dispersal
 #'       model objects.}
-#'     \item{\code{run()}}{Run the simulations and return the results.}
+#'     \item{\code{run(...)}}{Run the simulations and return the results.
+#'       Replicate-level parallelism is available via \code{parallel_replicates}.}
 #'   }
 #' @references
 #'   Baker, C. M., Bower, S., Tartaglia, E., Bode, M., Bower, H., & Pressey,
@@ -198,7 +199,12 @@ ManageSimulator.Region <- function(region,
 
   # Extend (override) run simulator function
   results <- NULL # DEBUG ####
-  self$run <- function() {
+  self$run <- function(parallel_replicates = FALSE,
+                       replicate_workers = NULL,
+                       cluster_type = c("auto", "FORK", "PSOCK"),
+                       random_seed = NULL,
+                       per_replicate_seed = TRUE,
+                       worker_init = NULL) {
 
     # Should at least have an initializer and a population model
     object_absence <- c(is.null(initializer), is.null(population_model))
@@ -206,6 +212,12 @@ ManageSimulator.Region <- function(region,
       stop(sprintf("The simulator requires the %s to be set.",
                    paste(c("initializer", "population model")[object_absence],
                          collapse = " and ")),
+           call. = FALSE)
+    }
+
+    if (parallel_replicates && !is.null(replicate_workers) &&
+        replicate_workers < 1L) {
+      stop("replicate_workers must be >= 1 when parallel_replicates is TRUE.",
            call. = FALSE)
     }
 
@@ -227,9 +239,32 @@ ManageSimulator.Region <- function(region,
     manage_setup_results(sim_env)
     results <<- sim_env$results # DEBUG ####
 
-    # Replicates
-    for (r in seq_len(replicates)) {
-      run_one_replicate(r, sim_env)
+    n_workers <- replicate_workers
+    if (is.null(n_workers)) {
+      if (!is.null(parallel_cores)) {
+        n_workers <- min(as.integer(parallel_cores), replicates)
+      } else {
+        n_workers <- 1L
+      }
+    }
+
+    if (parallel_replicates) {
+      run_parallel_replicates(
+        sim_env = sim_env,
+        n_workers = n_workers,
+        cluster_type = cluster_type,
+        random_seed = random_seed,
+        per_replicate_seed = per_replicate_seed,
+        worker_init = worker_init
+      )
+    } else {
+      # Replicates
+      for (r in seq_len(replicates)) {
+        if (!is.null(random_seed) && per_replicate_seed) {
+          set.seed(random_seed + as.integer(r) - 1L)
+        }
+        run_one_replicate(r, sim_env)
+      }
     }
 
     # Finalize results

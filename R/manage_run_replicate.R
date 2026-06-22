@@ -58,8 +58,11 @@ manage_setup_results <- function(sim_env) {
 
 #' Run one simulation replicate and collate into sim_env$results
 #'
+#' When \code{defer_collate = TRUE}, collation steps are returned as
+#' \code{list(r = r, collations = ...)} for parallel worker merge on the parent.
+#'
 #' @noRd
-run_one_replicate <- function(r, sim_env) {
+run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
   region <- sim_env$region
   time_steps <- sim_env$time_steps
   initializer <- sim_env$initializer
@@ -70,6 +73,25 @@ run_one_replicate <- function(r, sim_env) {
   user_function <- sim_env$user_function
   continued_incursions <- sim_env$continued_incursions
   results <- sim_env$results
+  collations <- if (defer_collate) {
+    list()
+  } else {
+    NULL
+  }
+
+  result_collate <- function(tm, n, calc_impacts) {
+    if (defer_collate) {
+      i <- length(collations) + 1L
+      collations[[i]] <<- list(
+        r = r,
+        tm = tm,
+        n = n,
+        calc_impacts = calc_impacts
+      )
+    } else {
+      results$collate(r, tm, n, calc_impacts)
+    }
+  }
 
   # Initialize population array
   n <- initializer$initialize()
@@ -126,7 +148,7 @@ run_one_replicate <- function(r, sim_env) {
   }
 
   # Initial results (t = 0)
-  results$collate(r, 0, n, calc_impacts)
+  result_collate(0L, n, calc_impacts)
 
   # Time steps
   for (tm in seq_len(time_steps)) {
@@ -194,7 +216,7 @@ run_one_replicate <- function(r, sim_env) {
     }
 
     # Collate results
-    results$collate(r, tm, n, calc_impacts)
+    result_collate(tm, n, calc_impacts)
 
     # Continued incursions
     if (is.function(continued_incursions)) {
@@ -203,5 +225,8 @@ run_one_replicate <- function(r, sim_env) {
 
   } # time steps
 
+  if (defer_collate) {
+    return(list(r = r, collations = collations))
+  }
   invisible(NULL)
 }
