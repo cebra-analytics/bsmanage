@@ -204,7 +204,9 @@ ManageSimulator.Region <- function(region,
                        cluster_type = c("auto", "FORK", "PSOCK"),
                        random_seed = NULL,
                        per_replicate_seed = TRUE,
-                       worker_init = NULL) {
+                       worker_init = NULL,
+                       psock_exports = NULL,
+                       psock_export_envir = .GlobalEnv) {
 
     # Should at least have an initializer and a population model
     object_absence <- c(is.null(initializer), is.null(population_model))
@@ -255,7 +257,9 @@ ManageSimulator.Region <- function(region,
         cluster_type = cluster_type,
         random_seed = random_seed,
         per_replicate_seed = per_replicate_seed,
-        worker_init = worker_init
+        worker_init = worker_init,
+        psock_exports = psock_exports,
+        psock_export_envir = psock_export_envir
       )
     } else {
       # Replicates

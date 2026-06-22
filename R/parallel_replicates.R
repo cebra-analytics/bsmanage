@@ -74,7 +74,9 @@ manage_parallel_worker <- function(r) {
 #' @noRd
 parallel_init_cluster <- function(n_workers,
                                   cluster_type,
-                                  worker_init = NULL) {
+                                  worker_init = NULL,
+                                  psock_exports = NULL,
+                                  psock_export_envir = .GlobalEnv) {
   cl <- parallel::makeCluster(n_workers, type = cluster_type, outfile = "")
 
   export_vars <- c(
@@ -96,7 +98,8 @@ parallel_init_cluster <- function(n_workers,
         call. = FALSE
       )
     }
-    parallel::clusterExport(cl, "worker_init", envir = environment())
+    psock_vars <- unique(c("worker_init", psock_exports))
+    parallel::clusterExport(cl, psock_vars, envir = psock_export_envir)
     parallel::clusterEvalQ(cl, {
       worker_init(manage_parallel_worker_state$sim_env)
       force_serial_inner_parallel(manage_parallel_worker_state$sim_env)
@@ -119,7 +122,9 @@ run_parallel_replicates <- function(sim_env,
                                     cluster_type = c("auto", "FORK", "PSOCK"),
                                     random_seed = NULL,
                                     per_replicate_seed = TRUE,
-                                    worker_init = NULL) {
+                                    worker_init = NULL,
+                                    psock_exports = NULL,
+                                    psock_export_envir = .GlobalEnv) {
   cluster_type <- parallel_resolve_cluster_type(cluster_type)
   n_workers <- min(as.integer(n_workers), sim_env$replicates)
   replicate_seq <- seq_len(sim_env$replicates)
@@ -143,7 +148,9 @@ run_parallel_replicates <- function(sim_env,
   cl <- parallel_init_cluster(
     n_workers,
     cluster_type = cluster_type,
-    worker_init = worker_init
+    worker_init = worker_init,
+    psock_exports = psock_exports,
+    psock_export_envir = psock_export_envir
   )
   on.exit({
     parallel::stopCluster(cl)
