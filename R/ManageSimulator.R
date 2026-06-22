@@ -206,7 +206,10 @@ ManageSimulator.Region <- function(region,
                        per_replicate_seed = TRUE,
                        worker_init = NULL,
                        psock_exports = NULL,
-                       psock_export_envir = .GlobalEnv) {
+                       psock_export_envir = .GlobalEnv,
+                       timestep_callback = NULL,
+                       dispersal_callback = NULL,
+                       parallel_merge_callback = NULL) {
 
     # Should at least have an initializer and a population model
     object_absence <- c(is.null(initializer), is.null(population_model))
@@ -239,6 +242,8 @@ ManageSimulator.Region <- function(region,
       user_function = user_function
     )
     manage_setup_results(sim_env)
+    sim_env$timestep_callback <- timestep_callback
+    sim_env$dispersal_callback <- dispersal_callback
     results <<- sim_env$results # DEBUG ####
 
     n_workers <- replicate_workers
@@ -250,8 +255,9 @@ ManageSimulator.Region <- function(region,
       }
     }
 
+    parallel_stats <- NULL
     if (parallel_replicates) {
-      run_parallel_replicates(
+      parallel_stats <- run_parallel_replicates(
         sim_env = sim_env,
         n_workers = n_workers,
         cluster_type = cluster_type,
@@ -259,7 +265,8 @@ ManageSimulator.Region <- function(region,
         per_replicate_seed = per_replicate_seed,
         worker_init = worker_init,
         psock_exports = psock_exports,
-        psock_export_envir = psock_export_envir
+        psock_export_envir = psock_export_envir,
+        parallel_merge_callback = parallel_merge_callback
       )
     } else {
       # Replicates
@@ -273,6 +280,10 @@ ManageSimulator.Region <- function(region,
 
     # Finalize results
     sim_env$results$finalize()
+
+    if (!is.null(parallel_stats)) {
+      attr(sim_env$results, "parallel_stats") <- parallel_stats
+    }
 
     # Return results
     return(sim_env$results)

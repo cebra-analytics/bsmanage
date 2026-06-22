@@ -76,3 +76,52 @@ test_that("replicate_workers defaults to min(parallel_cores, replicates)", {
   ))
   expect_is(res, "ManageResults")
 })
+
+test_that("timestep_callback fires once per time step in serial runs", {
+  simulator <- make_spread_simulator(replicates = 1L)
+  calls <- 0L
+  timestep_cb <- function(tm, r, t0, t1, t2, t3, t4, t5,
+                          n, gc_time_prev, collations = NULL) {
+    calls <<- calls + 1L
+    gc_time_prev
+  }
+  suppressMessages(simulator$run(
+    timestep_callback = timestep_cb
+  ))
+  expect_equal(calls, 3L)
+})
+
+test_that("parallel_merge_callback fires for each merged replicate", {
+  skip_if_not(.Platform$OS.type == "unix", "FORK cluster requires Unix")
+  simulator <- make_spread_simulator(replicates = 3L)
+  phases <- character()
+  merge_cb <- function(phase, sim_env, reps_merged, reps_total,
+                       rep_outputs = NULL, out = NULL) {
+    phases <<- c(phases, phase)
+    invisible(NULL)
+  }
+  suppressMessages(simulator$run(
+    parallel_replicates = TRUE,
+    replicate_workers = 2L,
+    cluster_type = "FORK",
+    parallel_merge_callback = merge_cb
+  ))
+  expect_true("before_pool" %in% phases)
+  expect_true("after_merge" %in% phases)
+  expect_equal(sum(grepl("^received r=", phases)), 3L)
+  expect_equal(sum(grepl("^merged r=", phases)), 3L)
+})
+
+test_that("parallel runs attach parallel_stats to results", {
+  skip_if_not(.Platform$OS.type == "unix", "FORK cluster requires Unix")
+  simulator <- make_spread_simulator(replicates = 2L)
+  res <- suppressMessages(simulator$run(
+    parallel_replicates = TRUE,
+    replicate_workers = 2L,
+    cluster_type = "FORK"
+  ))
+  stats <- attr(res, "parallel_stats", exact = TRUE)
+  expect_is(stats, "list")
+  expect_equal(stats$reps, 2L)
+  expect_true(is.numeric(stats$wall_s))
+})

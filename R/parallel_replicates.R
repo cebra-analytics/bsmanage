@@ -45,11 +45,36 @@ parallel_persistent_backend_label <- function(cluster_type) {
 #' Merge deferred replicate collations into parent results
 #'
 #' @noRd
-merge_replicate_collations <- function(out, sim_env) {
+merge_replicate_collations <- function(out,
+                                       sim_env,
+                                       parallel_merge_callback = NULL,
+                                       reps_merged = 0L,
+                                       reps_total = NA_integer_) {
+  if (is.function(parallel_merge_callback)) {
+    parallel_merge_callback(
+      phase = sprintf("received r=%d", out$r),
+      sim_env = sim_env,
+      reps_merged = reps_merged,
+      reps_total = reps_total,
+      rep_outputs = list(out),
+      out = out
+    )
+  }
   for (col in out$collations) {
     sim_env$results$collate(col$r, col$tm, col$n, col$calc_impacts)
   }
-  invisible(NULL)
+  reps_merged <- reps_merged + 1L
+  if (is.function(parallel_merge_callback)) {
+    parallel_merge_callback(
+      phase = sprintf("merged r=%d", out$r),
+      sim_env = sim_env,
+      reps_merged = reps_merged,
+      reps_total = reps_total,
+      rep_outputs = NULL,
+      out = out
+    )
+  }
+  reps_merged
 }
 
 #' Worker entry point for parallel replicate execution
@@ -124,7 +149,8 @@ run_parallel_replicates <- function(sim_env,
                                     per_replicate_seed = TRUE,
                                     worker_init = NULL,
                                     psock_exports = NULL,
-                                    psock_export_envir = .GlobalEnv) {
+                                    psock_export_envir = .GlobalEnv,
+                                    parallel_merge_callback = NULL) {
   cluster_type <- parallel_resolve_cluster_type(cluster_type)
   n_workers <- min(as.integer(n_workers), sim_env$replicates)
   replicate_seq <- seq_len(sim_env$replicates)
@@ -140,6 +166,17 @@ run_parallel_replicates <- function(sim_env,
   }
 
   force_serial_inner_parallel(sim_env)
+
+  if (is.function(parallel_merge_callback)) {
+    parallel_merge_callback(
+      phase = "before_pool",
+      sim_env = sim_env,
+      reps_merged = 0L,
+      reps_total = reps_total,
+      rep_outputs = NULL,
+      out = NULL
+    )
+  }
 
   manage_parallel_worker_state$sim_env <- sim_env
   manage_parallel_worker_state$random_seed <- random_seed
@@ -161,6 +198,7 @@ run_parallel_replicates <- function(sim_env,
 
   pending_reps <- as.list(replicate_seq)
   active_rep <- rep(NA_integer_, length(cl))
+  reps_merged <- 0L
 
   for (i in seq_along(cl)) {
     if (!length(pending_reps)) {
@@ -184,7 +222,13 @@ run_parallel_replicates <- function(sim_env,
         as.character(res$value)
       ), call. = FALSE)
     }
-    merge_replicate_collations(res$value, sim_env)
+    reps_merged <- merge_replicate_collations(
+      res$value,
+      sim_env,
+      parallel_merge_callback = parallel_merge_callback,
+      reps_merged = reps_merged,
+      reps_total = reps_total
+    )
     active_rep[worker_i] <- NA_integer_
 
     if (length(pending_reps)) {
@@ -193,6 +237,17 @@ run_parallel_replicates <- function(sim_env,
       active_rep[worker_i] <- r
       parallel:::sendCall(cl[[worker_i]], manage_parallel_worker, list(r = r))
     }
+  }
+
+  if (is.function(parallel_merge_callback)) {
+    parallel_merge_callback(
+      phase = "after_merge",
+      sim_env = sim_env,
+      reps_merged = reps_total,
+      reps_total = reps_total,
+      rep_outputs = NULL,
+      out = NULL
+    )
   }
 
   list(

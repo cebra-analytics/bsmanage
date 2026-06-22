@@ -30,6 +30,8 @@ manage_sim_env <- function(region,
   sim_env$user_function <- user_function
   sim_env$continued_incursions <- NULL
   sim_env$results <- NULL
+  sim_env$timestep_callback <- NULL
+  sim_env$dispersal_callback <- NULL
   sim_env
 }
 
@@ -61,6 +63,9 @@ manage_setup_results <- function(sim_env) {
 #' When \code{defer_collate = TRUE}, collation steps are returned as
 #' \code{list(r = r, collations = ...)} for parallel worker merge on the parent.
 #'
+#' Optional \code{sim_env$timestep_callback} and \code{sim_env$dispersal_callback}
+#' support per-timestep observability (e.g. platform benchmark logging).
+#'
 #' @noRd
 run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
   region <- sim_env$region
@@ -73,8 +78,15 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
   user_function <- sim_env$user_function
   continued_incursions <- sim_env$continued_incursions
   results <- sim_env$results
+  timestep_callback <- sim_env$timestep_callback
+  dispersal_callback <- sim_env$dispersal_callback
   collations <- if (defer_collate) {
     list()
+  } else {
+    NULL
+  }
+  gc_time_prev <- if (is.function(timestep_callback)) {
+    sum(gc.time())
   } else {
     NULL
   }
@@ -153,8 +165,16 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
   # Time steps
   for (tm in seq_len(time_steps)) {
 
+    if (is.function(timestep_callback)) {
+      t0 <- Sys.time()
+    }
+
     # Population growth
     n <- population_model$grow(n, tm)
+
+    if (is.function(timestep_callback)) {
+      t1 <- Sys.time()
+    }
 
     # Dispersal for each spread vector
     if (length(dispersal_models)) {
@@ -164,11 +184,27 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
 
       # Perform dispersal for each spread vector
       for (i in seq_along(dispersal_models)) {
+        if (is.function(dispersal_callback) || is.function(timestep_callback)) {
+          t_dm <- Sys.time()
+        }
         n <- dispersal_models[[i]]$disperse(n, tm)
+        if (is.function(dispersal_callback)) {
+          aggr_n <- attr(n, "dispersal_aggr_n")
+          dispersal_callback(
+            i,
+            as.numeric(Sys.time() - t_dm, units = "secs"),
+            r = if (defer_collate) r else NA_integer_,
+            aggr_n = aggr_n
+          )
+        }
       }
 
       # Unpack population array from separated list
       n <- dispersal_models[[1]]$unpack(n)
+    }
+
+    if (is.function(timestep_callback)) {
+      t2 <- Sys.time()
     }
 
     # Calculate impacts
@@ -184,6 +220,10 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
 
     }
 
+    if (is.function(timestep_callback)) {
+      t3 <- Sys.time()
+    }
+
     # Apply actions
     if (length(actions)) {
 
@@ -196,6 +236,10 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
       for (i in seq_along(actions)) {
         n <- actions[[i]]$apply(n, tm)
       }
+    }
+
+    if (is.function(timestep_callback)) {
+      t4 <- Sys.time()
     }
 
     # User-defined function
@@ -221,6 +265,23 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
     # Continued incursions
     if (is.function(continued_incursions)) {
       n <- continued_incursions(tm, n)
+    }
+
+    if (is.function(timestep_callback)) {
+      t5 <- Sys.time()
+      gc_time_prev <- timestep_callback(
+        tm = tm,
+        r = r,
+        t0 = t0,
+        t1 = t1,
+        t2 = t2,
+        t3 = t3,
+        t4 = t4,
+        t5 = t5,
+        n = n,
+        gc_time_prev = gc_time_prev,
+        collations = if (defer_collate) collations else NULL
+      )
     }
 
   } # time steps
