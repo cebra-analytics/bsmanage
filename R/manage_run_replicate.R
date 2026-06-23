@@ -80,6 +80,15 @@ manage_setup_results <- function(sim_env) {
 #'
 #' @noRd
 run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
+  parallel_debug <- identical(Sys.getenv("PARALLEL_DEBUG"), "1") ||
+    (exists(".parallel_debug", inherits = TRUE) &&
+       isTRUE(get(".parallel_debug", inherits = TRUE)))
+  dbg <- function(...) {
+    if (parallel_debug) {
+      message(sprintf("[PARALLEL_DEBUG r=%s pid=%d] %s", r, Sys.getpid(), sprintf(...)))
+    }
+  }
+
   region <- sim_env$region
   time_steps <- sim_env$time_steps
   initializer <- sim_env$initializer
@@ -96,8 +105,11 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
   }
   timestep_callback <- sim_env$timestep_callback
   dispersal_callback <- sim_env$dispersal_callback
-  collations <- if (defer_collate) {
-    list()
+  collation_buf <- if (defer_collate) {
+    # Mutable buffer avoids <<- (unsafe when PSOCK exports pollute .GlobalEnv).
+    buf <- new.env(parent = emptyenv())
+    buf$collations <- list()
+    buf
   } else {
     NULL
   }
@@ -109,8 +121,8 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
 
   result_collate <- function(tm, n, calc_impacts) {
     if (defer_collate) {
-      i <- length(collations) + 1L
-      collations[[i]] <<- list(
+      i <- length(collation_buf$collations) + 1L
+      collation_buf$collations[[i]] <- list(
         r = r,
         tm = tm,
         n = n,
@@ -122,7 +134,21 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
   }
 
   # Initialize population array
+  dbg("initializer$initialize")
+  if (!is.function(initializer$initialize)) {
+    stop(sprintf(
+      "initializer$initialize is not a function (class: %s)",
+      paste(class(initializer$initialize), collapse = ", ")
+    ), call. = FALSE)
+  }
+  if (!is.function(population_model$make)) {
+    stop(sprintf(
+      "population_model$make is not a function (class: %s); check PSOCK .GlobalEnv pollution",
+      paste(class(population_model$make), collapse = ", ")
+    ), call. = FALSE)
+  }
   n <- initializer$initialize()
+  dbg("initializer done")
 
   # Set diffusion attributes when spatially implicit (single patch)
   if (region$spatially_implicit()) {
@@ -155,10 +181,12 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
 
   # Calculate impacts
   if (length(impacts)) {
-    calc_impacts <- lapply(impacts, function(impacts_i) {
-      n <<- impacts_i$calculate(n, 0)
-      attr(n, "impacts")
-    })
+    dbg("impacts tm=0")
+    calc_impacts <- vector("list", length(impacts))
+    for (i in seq_along(impacts)) {
+      n <- impacts[[i]]$calculate(n, 0)
+      calc_impacts[[i]] <- attr(n, "impacts")
+    }
     attr(n, "impacts") <- NULL
 
     # Apply any dynamically linked impacts to capacity
@@ -170,22 +198,26 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
 
   # Apply actions
   if (length(actions)) {
+    dbg("actions tm=0")
     for (i in seq_along(actions)) {
       n <- actions[[i]]$apply(n, 0)
     }
   }
 
   # Initial results (t = 0)
+  dbg("collate tm=0")
   result_collate(0L, n, calc_impacts)
 
   # Time steps
   for (tm in seq_len(time_steps)) {
+    dbg("tm=%d start", tm)
 
     if (is.function(timestep_callback)) {
       t0 <- Sys.time()
     }
 
     # Population growth
+    dbg("grow tm=%d", tm)
     n <- population_model$grow(n, tm)
 
     if (is.function(timestep_callback)) {
@@ -194,6 +226,7 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
 
     # Dispersal for each spread vector
     if (length(dispersal_models)) {
+      dbg("pack tm=%d", tm)
 
       # Pack into list of original, remaining and relocated populations
       n <- dispersal_models[[1]]$pack(n)
@@ -203,6 +236,7 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
         if (is.function(dispersal_callback) || is.function(timestep_callback)) {
           t_dm <- Sys.time()
         }
+        dbg("disperse model %d tm=%d", i, tm)
         n <- dispersal_models[[i]]$disperse(n, tm)
         if (is.function(dispersal_callback)) {
           aggr_n <- attr(n, "dispersal_aggr_n")
@@ -225,10 +259,11 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
 
     # Calculate impacts
     if (length(impacts)) {
-      calc_impacts <- lapply(impacts, function(impacts_i) {
-        n <<- impacts_i$calculate(n, tm)
-        attr(n, "impacts")
-      })
+      calc_impacts <- vector("list", length(impacts))
+      for (i in seq_along(impacts)) {
+        n <- impacts[[i]]$calculate(n, tm)
+        calc_impacts[[i]] <- attr(n, "impacts")
+      }
       attr(n, "impacts") <- NULL
 
       # Apply any dynamically linked impacts to capacity
@@ -260,6 +295,7 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
 
     # User-defined function
     if (is.function(user_function)) {
+      dbg("user_function tm=%d", tm)
       n_attr <- attributes(n) # get attributes
       if (length(formals(user_function)) == 3) {
         n <- user_function(n, r, tm)
@@ -296,14 +332,14 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
         t5 = t5,
         n = n,
         gc_time_prev = gc_time_prev,
-        collations = if (defer_collate) collations else NULL
+        collations = if (defer_collate) collation_buf$collations else NULL
       )
     }
 
   } # time steps
 
   if (defer_collate) {
-    return(list(r = r, collations = collations))
+    return(list(r = r, collations = collation_buf$collations))
   }
   invisible(NULL)
 }

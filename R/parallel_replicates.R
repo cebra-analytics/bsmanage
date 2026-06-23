@@ -7,28 +7,84 @@
 #' @noRd
 manage_parallel_worker_state <- new.env(parent = emptyenv())
 
-#' Prepare sim_env for FORK workers (lean shared-memory fork)
+#' Active worker state (PSOCK: .GlobalEnv export; FORK: package namespace)
 #'
-#' Callbacks and other non-terra closures are stored on worker_state so forked
-#' workers do not inherit them on sim_env (reduces copy-on-write). ManageResults
-#' must be created only after \code{makeCluster(FORK)} on the parent.
+#' clusterExport copies \code{manage_parallel_worker_state} into worker
+#' .GlobalEnv; clusterEvalQ mutates that copy. Worker entry points must read
+#' the global copy on PSOCK, not the stale package-namespace binding.
 #'
 #' @noRd
-parallel_fork_prepare_worker_state <- function(sim_env) {
+parallel_worker_state <- function() {
+  if (exists("manage_parallel_worker_state", envir = .GlobalEnv, inherits = FALSE)) {
+    get("manage_parallel_worker_state", envir = .GlobalEnv)
+  } else {
+    manage_parallel_worker_state
+  }
+}
+
+#' Scalar-only sim_env for PSOCK export (terra objects cannot be serialised)
+#'
+#' @noRd
+parallel_lean_sim_env <- function(sim_env) {
+  lean <- new.env(parent = emptyenv())
+  for (name in c(
+    "time_steps", "step_duration", "step_units", "collation_steps",
+    "replicates", "result_stages"
+  )) {
+    lean[[name]] <- sim_env[[name]]
+  }
+  lean
+}
+
+#' Prepare worker_state before cluster creation
+#'
+#' FORK: strip callbacks from sim_env (inherit terra via shared memory).
+#' PSOCK: store scalar-only sim_env; terra is rebuilt via worker_init.
+#'
+#' @noRd
+parallel_prepare_worker_state <- function(sim_env, cluster_type) {
   manage_parallel_worker_state$timestep_callback <- sim_env$timestep_callback
   manage_parallel_worker_state$dispersal_callback <- sim_env$dispersal_callback
-  sim_env$timestep_callback <- NULL
-  sim_env$dispersal_callback <- NULL
-  manage_parallel_worker_state$sim_env <- sim_env
+  if (cluster_type == "FORK") {
+    sim_env$timestep_callback <- NULL
+    sim_env$dispersal_callback <- NULL
+    manage_parallel_worker_state$sim_env <- sim_env
+  } else {
+    lean <- parallel_lean_sim_env(sim_env)
+    # PSOCK: seed fields ride on lean sim_env (worker_state env export can drop them).
+    lean$random_seed <- manage_parallel_worker_state$random_seed
+    lean$per_replicate_seed <- manage_parallel_worker_state$per_replicate_seed
+    manage_parallel_worker_state$sim_env <- lean
+  }
   invisible(NULL)
 }
 
-#' Restore callbacks on worker sim_env after FORK
+#' Restore callbacks on worker sim_env (when set on worker_state)
+#'
+#' Rebuild logging helpers on the worker; never attach serialised parent
+#' callbacks (nested closures break after PSOCK export).
 #'
 #' @noRd
-parallel_fork_attach_worker_callbacks <- function(sim_env) {
-  sim_env$timestep_callback <- manage_parallel_worker_state$timestep_callback
-  sim_env$dispersal_callback <- manage_parallel_worker_state$dispersal_callback
+parallel_attach_worker_callbacks <- function(sim_env) {
+  worker_state <- parallel_worker_state()
+  wants_timestep <- !is.null(worker_state$timestep_callback)
+  wants_dispersal <- !is.null(worker_state$dispersal_callback)
+  if (wants_timestep || wants_dispersal) {
+    if (exists("parallel_psock_worker_ensure_timestep_logging",
+               mode = "function", inherits = TRUE)) {
+      parallel_psock_worker_ensure_timestep_logging()
+    }
+  }
+  sim_env$timestep_callback <- NULL
+  sim_env$dispersal_callback <- NULL
+  if (wants_timestep &&
+      exists("log_timestep", mode = "function", inherits = TRUE)) {
+    sim_env$timestep_callback <- get("log_timestep", inherits = TRUE)
+  }
+  if (wants_dispersal &&
+      exists("log_dispersal_model", mode = "function", inherits = TRUE)) {
+    sim_env$dispersal_callback <- get("log_dispersal_model", inherits = TRUE)
+  }
   invisible(sim_env)
 }
 
@@ -36,10 +92,14 @@ parallel_fork_attach_worker_callbacks <- function(sim_env) {
 #'
 #' @noRd
 force_serial_inner_parallel <- function(sim_env) {
-  sim_env$region$set_cores(1)
+  if (is.function(sim_env$region$set_cores)) {
+    sim_env$region$set_cores(1)
+  }
   if (length(sim_env$dispersal_models)) {
     for (i in seq_along(sim_env$dispersal_models)) {
-      sim_env$dispersal_models[[i]]$set_cores(1)
+      if (is.function(sim_env$dispersal_models[[i]]$set_cores)) {
+        sim_env$dispersal_models[[i]]$set_cores(1)
+      }
     }
   }
   invisible(NULL)
@@ -105,6 +165,24 @@ merge_replicate_collations <- function(out,
   reps_merged
 }
 
+#' Format a remote worker error for the parent process
+#'
+#' @noRd
+parallel_worker_error_message <- function(x) {
+  if (!inherits(x, "try-error")) {
+    return(as.character(x))
+  }
+  cond <- attr(x, "condition", exact = TRUE)
+  if (!is.null(cond) && inherits(cond, "condition")) {
+    return(conditionMessage(cond))
+  }
+  ch <- as.character(x)
+  if (length(ch) && nzchar(ch[[1L]])) {
+    return(paste(ch, collapse = "\n"))
+  }
+  "unknown worker error (empty try-error)"
+}
+
 #' Worker entry point for parallel replicate execution
 #'
 #' Reads simulation state from \code{manage_parallel_worker_state} so only
@@ -112,11 +190,24 @@ merge_replicate_collations <- function(out,
 #'
 #' @noRd
 manage_parallel_worker <- function(r) {
-  sim_env <- manage_parallel_worker_state$sim_env
-  parallel_fork_attach_worker_callbacks(sim_env)
-  random_seed <- manage_parallel_worker_state$random_seed
-  per_replicate_seed <- manage_parallel_worker_state$per_replicate_seed
-  if (per_replicate_seed && !is.null(random_seed)) {
+  worker_state <- parallel_worker_state()
+  sim_env <- worker_state$sim_env
+  parallel_attach_worker_callbacks(sim_env)
+  random_seed <- worker_state$random_seed
+  if (is.null(random_seed) && !is.null(sim_env$random_seed)) {
+    random_seed <- sim_env$random_seed
+  }
+  if (is.null(random_seed) && exists(".parallel_random_seed", inherits = TRUE)) {
+    random_seed <- get(".parallel_random_seed", inherits = TRUE)
+  }
+  per_replicate_seed <- worker_state$per_replicate_seed
+  if (is.null(per_replicate_seed) && !is.null(sim_env$per_replicate_seed)) {
+    per_replicate_seed <- sim_env$per_replicate_seed
+  }
+  if (is.null(per_replicate_seed) && exists(".parallel_per_replicate_seed", inherits = TRUE)) {
+    per_replicate_seed <- get(".parallel_per_replicate_seed", inherits = TRUE)
+  }
+  if (isTRUE(per_replicate_seed) && !is.null(random_seed)) {
     rep_seed <- random_seed + as.integer(r) - 1L
     set.seed(rep_seed)
     message(sprintf(
@@ -130,7 +221,17 @@ manage_parallel_worker <- function(r) {
     ))
   }
   force_serial_inner_parallel(sim_env)
-  run_one_replicate(r, sim_env, defer_collate = TRUE)
+  tryCatch(
+    run_one_replicate(r, sim_env, defer_collate = TRUE),
+    error = function(e) {
+      calls <- utils::capture.output(sys.calls())
+      stop(paste(c(
+        sprintf("replicate %d on pid %d:", r, Sys.getpid()),
+        conditionMessage(e),
+        calls
+      ), collapse = "\n"), call. = FALSE)
+    }
+  )
 }
 
 #' Initialise a persistent parallel cluster for replicate execution
@@ -144,17 +245,8 @@ parallel_init_cluster <- function(n_workers,
   cl <- parallel::makeCluster(n_workers, type = cluster_type, outfile = "")
 
   if (cluster_type == "PSOCK") {
-    export_vars <- c(
-      "manage_parallel_worker_state",
-      "manage_parallel_worker",
-      "run_one_replicate",
-      "force_serial_inner_parallel",
-      "parallel_fork_attach_worker_callbacks"
-    )
-    parallel::clusterExport(cl, export_vars, envir = environment())
-
     if (!is.function(worker_init)) {
-      parallel::stopCluster(cl)
+      parallel_stop_cluster(cl)
       stop(
         paste(
           "PSOCK parallel replicates require worker_init(sim_env);",
@@ -163,18 +255,81 @@ parallel_init_cluster <- function(n_workers,
         call. = FALSE
       )
     }
-    psock_vars <- unique(c("worker_init", psock_exports))
-    parallel::clusterExport(cl, psock_vars, envir = psock_export_envir)
+    assign(".parallel_worker_init", worker_init, envir = psock_export_envir)
+    on.exit(
+      rm(list = ".parallel_worker_init", envir = psock_export_envir),
+      add = TRUE
+    )
+    export_vars <- c(
+      "manage_parallel_worker_state",
+      "parallel_worker_state",
+      "manage_parallel_worker",
+      "run_one_replicate",
+      "force_serial_inner_parallel",
+      "parallel_attach_worker_callbacks"
+    )
+    parallel::clusterExport(cl, export_vars, envir = environment())
+    parallel::clusterExport(cl, ".parallel_worker_init", envir = psock_export_envir)
+
+    psock_vars <- unique(psock_exports)
+    if (length(psock_vars)) {
+      parallel::clusterExport(cl, psock_vars, envir = psock_export_envir)
+    }
+    seed_vars <- intersect(
+      c(".parallel_random_seed", ".parallel_per_replicate_seed", ".parallel_debug"),
+      ls(envir = psock_export_envir, all.names = TRUE)
+    )
+    if (length(seed_vars)) {
+      parallel::clusterExport(cl, seed_vars, envir = psock_export_envir)
+    }
     parallel::clusterEvalQ(cl, {
-      worker_init(manage_parallel_worker_state$sim_env)
-      force_serial_inner_parallel(manage_parallel_worker_state$sim_env)
+      worker_state <- parallel_worker_state()
+      if (exists("parallel_psock_sanitize_globals", mode = "function",
+                 inherits = TRUE)) {
+        parallel_psock_sanitize_globals()
+      }
+      .parallel_worker_init(worker_state$sim_env)
+      parallel_attach_worker_callbacks(worker_state$sim_env)
+      force_serial_inner_parallel(worker_state$sim_env)
     })
   }
   # FORK workers inherit the parent address space; clusterExport / clusterEvalQ
   # here would assign into worker globals and trigger copy-on-write on sim_env.
 
   attr(cl, "cluster_type") <- cluster_type
+  pids <- tryCatch(
+    parallel::clusterCall(cl, function() Sys.getpid()),
+    error = function(e) integer()
+  )
+  if (length(pids)) {
+    attr(cl, "worker_pids") <- as.integer(unlist(pids))
+  }
   cl
+}
+
+#' Stop a parallel cluster; force-kill PSOCK workers when needed
+#'
+#' PSOCK workers with \code{outfile=""} can keep writing to the terminal after
+#' the parent is interrupted unless their processes are terminated explicitly.
+#'
+#' @noRd
+parallel_stop_cluster <- function(cl, force = FALSE) {
+  if (is.null(cl)) {
+    return(invisible(NULL))
+  }
+  pids <- attr(cl, "worker_pids", exact = TRUE)
+  tryCatch(parallel::stopCluster(cl), error = function(e) NULL)
+  psock <- identical(attr(cl, "cluster_type", exact = TRUE), "PSOCK")
+  if ((isTRUE(force) || psock) &&
+      length(pids) &&
+      .Platform$OS.type == "unix") {
+    pids <- unique(as.integer(pids))
+    pids <- pids[is.finite(pids) & pids > 1L]
+    if (length(pids)) {
+      tryCatch(tools::pskill(pids), error = function(e) NULL)
+    }
+  }
+  invisible(NULL)
 }
 
 #' Run replicates on a persistent worker pool
@@ -221,12 +376,26 @@ run_parallel_replicates <- function(sim_env,
 
   manage_parallel_worker_state$random_seed <- random_seed
   manage_parallel_worker_state$per_replicate_seed <- per_replicate_seed
-  if (cluster_type == "FORK") {
-    parallel_fork_prepare_worker_state(sim_env)
-  } else {
-    manage_parallel_worker_state$timestep_callback <- NULL
-    manage_parallel_worker_state$dispersal_callback <- NULL
-    manage_parallel_worker_state$sim_env <- sim_env
+  parallel_prepare_worker_state(sim_env, cluster_type)
+
+  if (cluster_type == "PSOCK") {
+    assign(".parallel_random_seed", random_seed, envir = psock_export_envir)
+    assign(".parallel_per_replicate_seed", per_replicate_seed, envir = psock_export_envir)
+    assign(
+      ".parallel_debug",
+      identical(Sys.getenv("PARALLEL_DEBUG"), "1"),
+      envir = psock_export_envir
+    )
+    on.exit({
+      rm(
+        list = c(
+          ".parallel_random_seed",
+          ".parallel_per_replicate_seed",
+          ".parallel_debug"
+        ),
+        envir = psock_export_envir
+      )
+    }, add = TRUE)
   }
 
   cl <- parallel_init_cluster(
@@ -239,7 +408,7 @@ run_parallel_replicates <- function(sim_env,
 
   if (is.null(results)) {
     if (!is.function(results_factory)) {
-      parallel::stopCluster(cl)
+      parallel_stop_cluster(cl)
       stop(
         "Parallel replicates require results or results_factory.",
         call. = FALSE
@@ -248,14 +417,17 @@ run_parallel_replicates <- function(sim_env,
     results <- results_factory()
   }
 
-  on.exit({
-    parallel::stopCluster(cl)
+  cleanup_cluster_pool <- function(force = FALSE) {
+    parallel_stop_cluster(cl, force = force)
     manage_parallel_worker_state$sim_env <- NULL
     manage_parallel_worker_state$random_seed <- NULL
     manage_parallel_worker_state$per_replicate_seed <- NULL
     manage_parallel_worker_state$timestep_callback <- NULL
     manage_parallel_worker_state$dispersal_callback <- NULL
-  }, add = TRUE)
+    invisible(NULL)
+  }
+
+  on.exit(cleanup_cluster_pool(force = FALSE), add = TRUE)
 
   pending_reps <- as.list(replicate_seq)
   active_rep <- rep(NA_integer_, length(cl))
@@ -272,51 +444,61 @@ run_parallel_replicates <- function(sim_env,
   }
 
   rep_wall_start <- Sys.time()
-  while (any(!is.na(active_rep))) {
-    res <- parallel:::recvOneResult(cl)
-    worker_i <- res$node
-    if (inherits(res$value, "try-error")) {
-      stop(sprintf(
-        "Parallel replicates: replicate %d FAILED on worker %d:\n%s",
-        active_rep[worker_i],
-        worker_i,
-        as.character(res$value)
-      ), call. = FALSE)
+  tryCatch({
+    while (any(!is.na(active_rep))) {
+      res <- parallel:::recvOneResult(cl)
+      worker_i <- res$node
+      if (inherits(res$value, "try-error")) {
+        worker_err <- parallel_worker_error_message(res$value)
+        stop(sprintf(
+          "Parallel replicates: replicate %d FAILED on worker %d:\n%s",
+          active_rep[worker_i],
+          worker_i,
+          worker_err
+        ), call. = FALSE)
+      }
+      reps_merged <- merge_replicate_collations(
+        res$value,
+        results,
+        sim_env,
+        parallel_merge_callback = parallel_merge_callback,
+        reps_merged = reps_merged,
+        reps_total = reps_total
+      )
+      active_rep[worker_i] <- NA_integer_
+
+      if (length(pending_reps)) {
+        r <- pending_reps[[1L]]
+        pending_reps <- pending_reps[-1L]
+        active_rep[worker_i] <- r
+        parallel:::sendCall(cl[[worker_i]], manage_parallel_worker, list(r = r))
+      }
     }
-    reps_merged <- merge_replicate_collations(
-      res$value,
-      results,
-      sim_env,
-      parallel_merge_callback = parallel_merge_callback,
-      reps_merged = reps_merged,
-      reps_total = reps_total
-    )
-    active_rep[worker_i] <- NA_integer_
 
-    if (length(pending_reps)) {
-      r <- pending_reps[[1L]]
-      pending_reps <- pending_reps[-1L]
-      active_rep[worker_i] <- r
-      parallel:::sendCall(cl[[worker_i]], manage_parallel_worker, list(r = r))
+    if (is.function(parallel_merge_callback)) {
+      parallel_merge_callback(
+        phase = "after_merge",
+        sim_env = sim_env,
+        results = results,
+        reps_merged = reps_total,
+        reps_total = reps_total,
+        rep_outputs = NULL,
+        out = NULL
+      )
     }
-  }
 
-  if (is.function(parallel_merge_callback)) {
-    parallel_merge_callback(
-      phase = "after_merge",
-      sim_env = sim_env,
-      results = results,
-      reps_merged = reps_total,
-      reps_total = reps_total,
-      rep_outputs = NULL,
-      out = NULL
+    list(
+      wall_s = as.numeric(Sys.time() - rep_wall_start, units = "secs"),
+      reps = reps_total,
+      cores = n_workers,
+      backend = parallel_persistent_backend_label(cluster_type)
     )
-  }
-
-  list(
-    wall_s = as.numeric(Sys.time() - rep_wall_start, units = "secs"),
-    reps = reps_total,
-    cores = n_workers,
-    backend = parallel_persistent_backend_label(cluster_type)
-  )
+  }, interrupt = function(cond) {
+    cleanup_cluster_pool(force = TRUE)
+    message("Parallel replicates interrupted; workers stopped.", call. = FALSE)
+    if (!interactive()) {
+      quit(save = "no", status = 130, runLast = FALSE)
+    }
+    invokeRestart("abort")
+  })
 }

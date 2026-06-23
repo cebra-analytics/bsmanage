@@ -65,6 +65,58 @@ test_that("PSOCK parallel replicates require worker_init", {
   )
 })
 
+test_that("PSOCK parallel replicates match serial with worker_init", {
+  skip_if_not(.Platform$OS.type == "unix", "PSOCK test requires Unix cluster")
+  psock_worker_init <- function(sim_env) {
+    TEST_DIRECTORY <- test_path("test_inputs")
+    template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
+    region <- bsspread::Region(template)
+    initial_n <- rep(0, region$get_locations())
+    initial_n[5922] <- 10
+    population_model <- bsspread::UnstructPopulation(region, growth = 1.5)
+    initializer <- bsspread::Initializer(
+      initial_n,
+      region = region,
+      population_model = population_model
+    )
+    dispersal <- bsspread::Dispersal(
+      region,
+      population_model,
+      proportion = 1,
+      max_distance = 1000
+    )
+    sim_env$region <- region
+    sim_env$population_model <- population_model
+    sim_env$initializer <- initializer
+    sim_env$dispersal_models <- list(dispersal)
+    sim_env$impacts <- list()
+    sim_env$actions <- list()
+    sim_env$user_function <- NULL
+    sim_env$continued_incursions <- initializer$continued_incursions()
+    invisible(NULL)
+  }
+  simulator <- make_spread_simulator(replicates = 4L)
+  expect_silent(
+    res_serial <- simulator$run(
+      random_seed = 100L,
+      per_replicate_seed = TRUE
+    )
+  )
+  simulator <- make_spread_simulator(replicates = 4L)
+  res_parallel <- suppressMessages(simulator$run(
+    parallel_replicates = TRUE,
+    replicate_workers = 2L,
+    cluster_type = "PSOCK",
+    random_seed = 100L,
+    per_replicate_seed = TRUE,
+    worker_init = psock_worker_init
+  ))
+  expect_equal(
+    res_serial$get_list(),
+    res_parallel$get_list()
+  )
+})
+
 test_that("replicate_workers defaults to min(parallel_cores, replicates)", {
   skip_if_not(.Platform$OS.type == "unix", "FORK cluster requires Unix")
   simulator <- make_spread_simulator(replicates = 6L, parallel_cores = 4L)
