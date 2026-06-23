@@ -1,17 +1,12 @@
 #' Shared worker state for parallel replicate execution
 #'
-#' Populated on the parent before \code{makeCluster(FORK)} so forked workers
-#' inherit valid terra external pointers. Socket workers repopulate via
-#' \code{worker_init}.
+#' Populated on the parent before \code{makeCluster(PSOCK)}. Socket workers
+#' repopulate terra-backed state via \code{worker_init}.
 #'
 #' @noRd
 manage_parallel_worker_state <- new.env(parent = emptyenv())
 
-#' Active worker state (PSOCK: .GlobalEnv export; FORK: package namespace)
-#'
-#' clusterExport copies \code{manage_parallel_worker_state} into worker
-#' .GlobalEnv; clusterEvalQ mutates that copy. Worker entry points must read
-#' the global copy on PSOCK, not the stale package-namespace binding.
+#' Active worker state (reads \code{.GlobalEnv} copy after clusterExport)
 #'
 #' @noRd
 parallel_worker_state <- function() {
@@ -38,24 +33,11 @@ parallel_lean_sim_env <- function(sim_env) {
 
 #' Prepare worker_state before cluster creation
 #'
-#' FORK: strip callbacks from sim_env (inherit terra via shared memory).
-#' PSOCK: store scalar-only sim_env; terra is rebuilt via worker_init.
-#'
 #' @noRd
-parallel_prepare_worker_state <- function(sim_env, cluster_type) {
+parallel_prepare_worker_state <- function(sim_env) {
   manage_parallel_worker_state$timestep_callback <- sim_env$timestep_callback
   manage_parallel_worker_state$dispersal_callback <- sim_env$dispersal_callback
-  if (cluster_type == "FORK") {
-    sim_env$timestep_callback <- NULL
-    sim_env$dispersal_callback <- NULL
-    manage_parallel_worker_state$sim_env <- sim_env
-  } else {
-    lean <- parallel_lean_sim_env(sim_env)
-    # PSOCK: seed fields ride on lean sim_env (worker_state env export can drop them).
-    lean$random_seed <- manage_parallel_worker_state$random_seed
-    lean$per_replicate_seed <- manage_parallel_worker_state$per_replicate_seed
-    manage_parallel_worker_state$sim_env <- lean
-  }
+  manage_parallel_worker_state$sim_env <- parallel_lean_sim_env(sim_env)
   invisible(NULL)
 }
 
@@ -103,28 +85,6 @@ force_serial_inner_parallel <- function(sim_env) {
     }
   }
   invisible(NULL)
-}
-
-#' Resolve persistent cluster type from auto/FORK/PSOCK
-#'
-#' @noRd
-parallel_resolve_cluster_type <- function(cluster_type = c("auto", "FORK", "PSOCK")) {
-  cluster_type <- match.arg(cluster_type)
-  if (cluster_type != "auto") {
-    return(cluster_type)
-  }
-  if (.Platform$OS.type == "unix") {
-    "FORK"
-  } else {
-    "PSOCK"
-  }
-}
-
-#' Label for persistent parallel backend
-#'
-#' @noRd
-parallel_persistent_backend_label <- function(cluster_type) {
-  paste0(cluster_type, " persistent")
 }
 
 #' Merge deferred replicate collations into parent results
@@ -185,28 +145,13 @@ parallel_worker_error_message <- function(x) {
 
 #' Worker entry point for parallel replicate execution
 #'
-#' Reads simulation state from \code{manage_parallel_worker_state} so only
-#' \code{r} is passed through \code{sendCall} (terra-safe on FORK workers).
-#'
 #' @noRd
 manage_parallel_worker <- function(r) {
   worker_state <- parallel_worker_state()
   sim_env <- worker_state$sim_env
   parallel_attach_worker_callbacks(sim_env)
   random_seed <- worker_state$random_seed
-  if (is.null(random_seed) && !is.null(sim_env$random_seed)) {
-    random_seed <- sim_env$random_seed
-  }
-  if (is.null(random_seed) && exists(".parallel_random_seed", inherits = TRUE)) {
-    random_seed <- get(".parallel_random_seed", inherits = TRUE)
-  }
   per_replicate_seed <- worker_state$per_replicate_seed
-  if (is.null(per_replicate_seed) && !is.null(sim_env$per_replicate_seed)) {
-    per_replicate_seed <- sim_env$per_replicate_seed
-  }
-  if (is.null(per_replicate_seed) && exists(".parallel_per_replicate_seed", inherits = TRUE)) {
-    per_replicate_seed <- get(".parallel_per_replicate_seed", inherits = TRUE)
-  }
   if (isTRUE(per_replicate_seed) && !is.null(random_seed)) {
     rep_seed <- random_seed + as.integer(r) - 1L
     set.seed(rep_seed)
@@ -224,79 +169,65 @@ manage_parallel_worker <- function(r) {
   tryCatch(
     run_one_replicate(r, sim_env, defer_collate = TRUE),
     error = function(e) {
-      calls <- utils::capture.output(sys.calls())
-      stop(paste(c(
-        sprintf("replicate %d on pid %d:", r, Sys.getpid()),
-        conditionMessage(e),
-        calls
-      ), collapse = "\n"), call. = FALSE)
+      stop(sprintf(
+        "replicate %d on pid %d: %s",
+        r, Sys.getpid(), conditionMessage(e)
+      ), call. = FALSE)
     }
   )
 }
 
-#' Initialise a persistent parallel cluster for replicate execution
+#' Initialise a persistent PSOCK cluster for replicate execution
 #'
 #' @noRd
 parallel_init_cluster <- function(n_workers,
-                                  cluster_type,
                                   worker_init = NULL,
                                   psock_exports = NULL,
                                   psock_export_envir = .GlobalEnv) {
-  cl <- parallel::makeCluster(n_workers, type = cluster_type, outfile = "")
-
-  if (cluster_type == "PSOCK") {
-    if (!is.function(worker_init)) {
-      parallel_stop_cluster(cl)
-      stop(
-        paste(
-          "PSOCK parallel replicates require worker_init(sim_env);",
-          "terra-backed objects cannot be serialised to socket workers."
-        ),
-        call. = FALSE
-      )
-    }
-    assign(".parallel_worker_init", worker_init, envir = psock_export_envir)
-    on.exit(
-      rm(list = ".parallel_worker_init", envir = psock_export_envir),
-      add = TRUE
+  if (!is.function(worker_init)) {
+    stop(
+      paste(
+        "PSOCK parallel replicates require worker_init(sim_env);",
+        "terra-backed objects cannot be serialised to socket workers."
+      ),
+      call. = FALSE
     )
-    export_vars <- c(
-      "manage_parallel_worker_state",
-      "parallel_worker_state",
-      "manage_parallel_worker",
-      "run_one_replicate",
-      "force_serial_inner_parallel",
-      "parallel_attach_worker_callbacks"
-    )
-    parallel::clusterExport(cl, export_vars, envir = environment())
-    parallel::clusterExport(cl, ".parallel_worker_init", envir = psock_export_envir)
-
-    psock_vars <- unique(psock_exports)
-    if (length(psock_vars)) {
-      parallel::clusterExport(cl, psock_vars, envir = psock_export_envir)
-    }
-    seed_vars <- intersect(
-      c(".parallel_random_seed", ".parallel_per_replicate_seed", ".parallel_debug"),
-      ls(envir = psock_export_envir, all.names = TRUE)
-    )
-    if (length(seed_vars)) {
-      parallel::clusterExport(cl, seed_vars, envir = psock_export_envir)
-    }
-    parallel::clusterEvalQ(cl, {
-      worker_state <- parallel_worker_state()
-      if (exists("parallel_psock_sanitize_globals", mode = "function",
-                 inherits = TRUE)) {
-        parallel_psock_sanitize_globals()
-      }
-      .parallel_worker_init(worker_state$sim_env)
-      parallel_attach_worker_callbacks(worker_state$sim_env)
-      force_serial_inner_parallel(worker_state$sim_env)
-    })
   }
-  # FORK workers inherit the parent address space; clusterExport / clusterEvalQ
-  # here would assign into worker globals and trigger copy-on-write on sim_env.
 
-  attr(cl, "cluster_type") <- cluster_type
+  cl <- parallel::makeCluster(n_workers, type = "PSOCK", outfile = "")
+
+  assign(".parallel_worker_init", worker_init, envir = psock_export_envir)
+  on.exit(
+    rm(list = ".parallel_worker_init", envir = psock_export_envir),
+    add = TRUE
+  )
+  export_vars <- c(
+    "manage_parallel_worker_state",
+    "parallel_worker_state",
+    "manage_parallel_worker",
+    "run_one_replicate",
+    "force_serial_inner_parallel",
+    "parallel_attach_worker_callbacks"
+  )
+  parallel::clusterExport(cl, export_vars, envir = environment())
+  parallel::clusterExport(cl, ".parallel_worker_init", envir = psock_export_envir)
+
+  psock_vars <- unique(psock_exports)
+  if (length(psock_vars)) {
+    parallel::clusterExport(cl, psock_vars, envir = psock_export_envir)
+  }
+
+  parallel::clusterEvalQ(cl, {
+    worker_state <- parallel_worker_state()
+    if (exists("parallel_psock_sanitize_globals", mode = "function",
+               inherits = TRUE)) {
+      parallel_psock_sanitize_globals()
+    }
+    .parallel_worker_init(worker_state$sim_env)
+    parallel_attach_worker_callbacks(worker_state$sim_env)
+    force_serial_inner_parallel(worker_state$sim_env)
+  })
+
   pids <- tryCatch(
     parallel::clusterCall(cl, function() Sys.getpid()),
     error = function(e) integer()
@@ -307,10 +238,7 @@ parallel_init_cluster <- function(n_workers,
   cl
 }
 
-#' Stop a parallel cluster; force-kill PSOCK workers when needed
-#'
-#' PSOCK workers with \code{outfile=""} can keep writing to the terminal after
-#' the parent is interrupted unless their processes are terminated explicitly.
+#' Stop a parallel cluster; force-kill workers when needed
 #'
 #' @noRd
 parallel_stop_cluster <- function(cl, force = FALSE) {
@@ -319,10 +247,7 @@ parallel_stop_cluster <- function(cl, force = FALSE) {
   }
   pids <- attr(cl, "worker_pids", exact = TRUE)
   tryCatch(parallel::stopCluster(cl), error = function(e) NULL)
-  psock <- identical(attr(cl, "cluster_type", exact = TRUE), "PSOCK")
-  if ((isTRUE(force) || psock) &&
-      length(pids) &&
-      .Platform$OS.type == "unix") {
+  if (length(pids) && .Platform$OS.type == "unix") {
     pids <- unique(as.integer(pids))
     pids <- pids[is.finite(pids) & pids > 1L]
     if (length(pids)) {
@@ -332,21 +257,19 @@ parallel_stop_cluster <- function(cl, force = FALSE) {
   invisible(NULL)
 }
 
-#' Run replicates on a persistent worker pool
+#' Run replicates on a persistent PSOCK worker pool
 #'
 #' @noRd
 run_parallel_replicates <- function(sim_env,
                                     results = NULL,
                                     results_factory = NULL,
                                     n_workers,
-                                    cluster_type = c("auto", "FORK", "PSOCK"),
                                     random_seed = NULL,
                                     per_replicate_seed = TRUE,
                                     worker_init = NULL,
                                     psock_exports = NULL,
                                     psock_export_envir = .GlobalEnv,
                                     parallel_merge_callback = NULL) {
-  cluster_type <- parallel_resolve_cluster_type(cluster_type)
   n_workers <- min(as.integer(n_workers), sim_env$replicates)
   replicate_seq <- seq_len(sim_env$replicates)
   reps_total <- length(replicate_seq)
@@ -356,7 +279,7 @@ run_parallel_replicates <- function(sim_env,
       wall_s = 0,
       reps = 0L,
       cores = n_workers,
-      backend = parallel_persistent_backend_label(cluster_type)
+      backend = "PSOCK persistent"
     ))
   }
 
@@ -376,31 +299,10 @@ run_parallel_replicates <- function(sim_env,
 
   manage_parallel_worker_state$random_seed <- random_seed
   manage_parallel_worker_state$per_replicate_seed <- per_replicate_seed
-  parallel_prepare_worker_state(sim_env, cluster_type)
-
-  if (cluster_type == "PSOCK") {
-    assign(".parallel_random_seed", random_seed, envir = psock_export_envir)
-    assign(".parallel_per_replicate_seed", per_replicate_seed, envir = psock_export_envir)
-    assign(
-      ".parallel_debug",
-      identical(Sys.getenv("PARALLEL_DEBUG"), "1"),
-      envir = psock_export_envir
-    )
-    on.exit({
-      rm(
-        list = c(
-          ".parallel_random_seed",
-          ".parallel_per_replicate_seed",
-          ".parallel_debug"
-        ),
-        envir = psock_export_envir
-      )
-    }, add = TRUE)
-  }
+  parallel_prepare_worker_state(sim_env)
 
   cl <- parallel_init_cluster(
     n_workers,
-    cluster_type = cluster_type,
     worker_init = worker_init,
     psock_exports = psock_exports,
     psock_export_envir = psock_export_envir
@@ -491,7 +393,7 @@ run_parallel_replicates <- function(sim_env,
       wall_s = as.numeric(Sys.time() - rep_wall_start, units = "secs"),
       reps = reps_total,
       cores = n_workers,
-      backend = parallel_persistent_backend_label(cluster_type)
+      backend = "PSOCK persistent"
     )
   }, interrupt = function(cond) {
     cleanup_cluster_pool(force = TRUE)
