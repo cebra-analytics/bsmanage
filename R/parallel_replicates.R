@@ -107,8 +107,11 @@ merge_replicate_collations <- function(out,
       out = out
     )
   }
+  # collate()'s first argument is the number of replicates merged so far
+  # (Welford count), not the replicate index. Completion order varies in parallel.
+  merge_count <- reps_merged + 1L
   for (col in out$collations) {
-    results$collate(col$r, col$tm, col$n, col$calc_impacts)
+    results$collate(merge_count, col$tm, col$n, col$calc_impacts)
   }
   reps_merged <- reps_merged + 1L
   if (is.function(parallel_merge_callback)) {
