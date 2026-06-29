@@ -1,9 +1,9 @@
 Package: bsmanage
 Title: Biosecurity Management Resource Allocation and Scenario Analysis
-Version: 0.3.2
-Authors@R: c(person("Sean", "Haythorne", 
-                    email = "sean.haythorne@unimelb.edu.au", 
-                    role = c("aut", "cre")))
+Version: 0.3.2.9000
+Authors@R: c(
+    person("Sean", "Haythorne", email = "sean.haythorne@unimelb.edu.au", role = c("aut", "cre")),
+    person("John", "Baumgartner", email = "john.baumgartner@unimelb.edu.au", role = c("aut")))
 Description: Biosecurity Management Resource Allocation and Scenario Analysis 
     ...
 Depends: R (>= 4.0)
