@@ -87,6 +87,53 @@ force_serial_inner_parallel <- function(sim_env) {
   invisible(NULL)
 }
 
+#' Elapsed pool wall time and average seconds per merged replicate
+#'
+#' \code{rep_wall_start} is set after cluster init and first-batch dispatch,
+#' immediately before the parent blocks on \code{recvOneResult}.
+#'
+#' @noRd
+parallel_replicate_timing <- function(rep_wall_start, reps_merged) {
+  if (is.null(rep_wall_start) || is.na(reps_merged) || reps_merged <= 0L) {
+    return(list(wall_s = NA_real_, avg_s_per_rep = NA_real_))
+  }
+  wall_s <- as.numeric(difftime(Sys.time(), rep_wall_start, units = "secs"))
+  list(
+    wall_s = wall_s,
+    avg_s_per_rep = wall_s / reps_merged
+  )
+}
+
+#' Invoke \code{parallel_merge_callback} with optional pool timing
+#'
+#' @noRd
+parallel_invoke_merge_callback <- function(parallel_merge_callback,
+                                           phase,
+                                           sim_env,
+                                           results,
+                                           reps_merged,
+                                           reps_total,
+                                           rep_wall_start = NULL,
+                                           rep_outputs = NULL,
+                                           out = NULL) {
+  if (!is.function(parallel_merge_callback)) {
+    return(invisible(NULL))
+  }
+  timing <- parallel_replicate_timing(rep_wall_start, reps_merged)
+  parallel_merge_callback(
+    phase = phase,
+    sim_env = sim_env,
+    results = results,
+    reps_merged = reps_merged,
+    reps_total = reps_total,
+    wall_s = timing$wall_s,
+    avg_s_per_rep = timing$avg_s_per_rep,
+    rep_outputs = rep_outputs,
+    out = out
+  )
+  invisible(NULL)
+}
+
 #' Merge deferred replicate collations into parent results
 #'
 #' @noRd
@@ -95,18 +142,19 @@ merge_replicate_collations <- function(out,
                                        sim_env,
                                        parallel_merge_callback = NULL,
                                        reps_merged = 0L,
-                                       reps_total = NA_integer_) {
-  if (is.function(parallel_merge_callback)) {
-    parallel_merge_callback(
-      phase = sprintf("received r=%d", out$r),
-      sim_env = sim_env,
-      results = results,
-      reps_merged = reps_merged,
-      reps_total = reps_total,
-      rep_outputs = list(out),
-      out = out
-    )
-  }
+                                       reps_total = NA_integer_,
+                                       rep_wall_start = NULL) {
+  parallel_invoke_merge_callback(
+    parallel_merge_callback = parallel_merge_callback,
+    phase = sprintf("received r=%d", out$r),
+    sim_env = sim_env,
+    results = results,
+    reps_merged = reps_merged,
+    reps_total = reps_total,
+    rep_wall_start = rep_wall_start,
+    rep_outputs = list(out),
+    out = out
+  )
   # collate()'s first argument is the number of replicates merged so far
   # (Welford count), not the replicate index. Completion order varies in parallel.
   merge_count <- reps_merged + 1L
@@ -114,17 +162,17 @@ merge_replicate_collations <- function(out,
     results$collate(merge_count, col$tm, col$n, col$calc_impacts)
   }
   reps_merged <- reps_merged + 1L
-  if (is.function(parallel_merge_callback)) {
-    parallel_merge_callback(
-      phase = sprintf("merged r=%d", out$r),
-      sim_env = sim_env,
-      results = results,
-      reps_merged = reps_merged,
-      reps_total = reps_total,
-      rep_outputs = NULL,
-      out = out
-    )
-  }
+  parallel_invoke_merge_callback(
+    parallel_merge_callback = parallel_merge_callback,
+    phase = sprintf("merged r=%d", out$r),
+    sim_env = sim_env,
+    results = results,
+    reps_merged = reps_merged,
+    reps_total = reps_total,
+    rep_wall_start = rep_wall_start,
+    rep_outputs = NULL,
+    out = out
+  )
   reps_merged
 }
 
@@ -288,17 +336,17 @@ run_parallel_replicates <- function(sim_env,
 
   force_serial_inner_parallel(sim_env)
 
-  if (is.function(parallel_merge_callback)) {
-    parallel_merge_callback(
-      phase = "before_pool",
-      sim_env = sim_env,
-      results = results,
-      reps_merged = 0L,
-      reps_total = reps_total,
-      rep_outputs = NULL,
-      out = NULL
-    )
-  }
+  parallel_invoke_merge_callback(
+    parallel_merge_callback = parallel_merge_callback,
+    phase = "before_pool",
+    sim_env = sim_env,
+    results = results,
+    reps_merged = 0L,
+    reps_total = reps_total,
+    rep_wall_start = NULL,
+    rep_outputs = NULL,
+    out = NULL
+  )
 
   manage_parallel_worker_state$random_seed <- random_seed
   manage_parallel_worker_state$per_replicate_seed <- per_replicate_seed
@@ -368,7 +416,8 @@ run_parallel_replicates <- function(sim_env,
         sim_env,
         parallel_merge_callback = parallel_merge_callback,
         reps_merged = reps_merged,
-        reps_total = reps_total
+        reps_total = reps_total,
+        rep_wall_start = rep_wall_start
       )
       active_rep[worker_i] <- NA_integer_
 
@@ -380,17 +429,17 @@ run_parallel_replicates <- function(sim_env,
       }
     }
 
-    if (is.function(parallel_merge_callback)) {
-      parallel_merge_callback(
-        phase = "after_merge",
-        sim_env = sim_env,
-        results = results,
-        reps_merged = reps_total,
-        reps_total = reps_total,
-        rep_outputs = NULL,
-        out = NULL
-      )
-    }
+    parallel_invoke_merge_callback(
+      parallel_merge_callback = parallel_merge_callback,
+      phase = "after_merge",
+      sim_env = sim_env,
+      results = results,
+      reps_merged = reps_total,
+      reps_total = reps_total,
+      rep_wall_start = rep_wall_start,
+      rep_outputs = NULL,
+      out = NULL
+    )
 
     list(
       wall_s = as.numeric(Sys.time() - rep_wall_start, units = "secs"),

@@ -1,7 +1,9 @@
 context("ManageSimulator parallel replicates")
 
+TEST_INPUTS_DIR <- test_path("test_inputs")
+
 make_spread_simulator <- function(replicates = 4L, parallel_cores = NULL) {
-  TEST_DIRECTORY <- test_path("test_inputs")
+  TEST_DIRECTORY <- TEST_INPUTS_DIR
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
   region <- bsspread::Region(template)
   initial_n <- rep(0, region$get_locations())
@@ -29,34 +31,36 @@ make_spread_simulator <- function(replicates = 4L, parallel_cores = NULL) {
   )
 }
 
-psock_worker_init <- function(sim_env) {
-  TEST_DIRECTORY <- test_path("test_inputs")
-  template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
-  region <- bsspread::Region(template)
-  initial_n <- rep(0, region$get_locations())
-  initial_n[5922] <- 10
-  population_model <- bsspread::UnstructPopulation(region, growth = 1.5)
-  initializer <- bsspread::Initializer(
-    initial_n,
-    region = region,
-    population_model = population_model
-  )
-  dispersal <- bsspread::Dispersal(
-    region,
-    population_model,
-    proportion = 1,
-    max_distance = 1000
-  )
-  sim_env$region <- region
-  sim_env$population_model <- population_model
-  sim_env$initializer <- initializer
-  sim_env$dispersal_models <- list(dispersal)
-  sim_env$impacts <- list()
-  sim_env$actions <- list()
-  sim_env$user_function <- NULL
-  sim_env$continued_incursions <- initializer$continued_incursions()
-  invisible(NULL)
-}
+psock_worker_init <- local({
+  test_inputs_dir <- TEST_INPUTS_DIR
+  function(sim_env) {
+    template <- terra::rast(file.path(test_inputs_dir, "greater_melb.tif"))
+    region <- bsspread::Region(template)
+    initial_n <- rep(0, region$get_locations())
+    initial_n[5922] <- 10
+    population_model <- bsspread::UnstructPopulation(region, growth = 1.5)
+    initializer <- bsspread::Initializer(
+      initial_n,
+      region = region,
+      population_model = population_model
+    )
+    dispersal <- bsspread::Dispersal(
+      region,
+      population_model,
+      proportion = 1,
+      max_distance = 1000
+    )
+    sim_env$region <- region
+    sim_env$population_model <- population_model
+    sim_env$initializer <- initializer
+    sim_env$dispersal_models <- list(dispersal)
+    sim_env$impacts <- list()
+    sim_env$actions <- list()
+    sim_env$user_function <- NULL
+    sim_env$continued_incursions <- initializer$continued_incursions()
+    invisible(NULL)
+  }
+})
 
 test_that("parallel PSOCK replicates match serial with per-replicate seeding", {
   skip_if_not(.Platform$OS.type == "unix", "PSOCK cluster requires Unix")
@@ -155,6 +159,38 @@ test_that("parallel_merge_callback fires for each merged replicate", {
   expect_true("after_merge" %in% phases)
   expect_equal(sum(grepl("^received r=", phases)), 3L)
   expect_equal(sum(grepl("^merged r=", phases)), 3L)
+})
+
+test_that("parallel_merge_callback receives pool wall timing on merge", {
+  skip_if_not(.Platform$OS.type == "unix", "PSOCK cluster requires Unix")
+  simulator <- make_spread_simulator(replicates = 3L)
+  merged_timing <- list()
+  merge_cb <- function(phase, sim_env, reps_merged, reps_total,
+                       wall_s = NA_real_, avg_s_per_rep = NA_real_,
+                       rep_outputs = NULL, out = NULL, ...) {
+    if (grepl("^merged r=", phase)) {
+      merged_timing[[length(merged_timing) + 1L]] <<- list(
+        reps_merged = reps_merged,
+        wall_s = wall_s,
+        avg_s_per_rep = avg_s_per_rep
+      )
+    }
+    invisible(NULL)
+  }
+  suppressMessages(simulator$run(
+    parallel_replicates = TRUE,
+    replicate_workers = 2L,
+    worker_init = psock_worker_init,
+    parallel_merge_callback = merge_cb
+  ))
+  expect_length(merged_timing, 3L)
+  expect_true(all(vapply(merged_timing, function(x) {
+    is.finite(x$wall_s) && x$wall_s >= 0
+  }, logical(1L))))
+  expect_true(all(vapply(merged_timing, function(x) {
+    is.finite(x$avg_s_per_rep) && x$avg_s_per_rep > 0
+  }, logical(1L))))
+  expect_equal(vapply(merged_timing, `[[`, integer(1L), "reps_merged"), 1:3)
 })
 
 test_that("parallel runs attach parallel_stats to results", {
