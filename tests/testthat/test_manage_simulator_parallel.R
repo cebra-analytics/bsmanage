@@ -127,7 +127,7 @@ test_that("parallel sim_env has no results before workers start", {
   skip_if_not(.Platform$OS.type == "unix", "PSOCK cluster requires Unix")
   simulator <- make_spread_simulator(replicates = 2L)
   merge_cb <- function(phase, sim_env, ...) {
-    if (identical(phase, "before_pool")) {
+    if (identical(phase, "before_pool") || identical(phase, "pool_ready")) {
       expect_null(sim_env$results)
     }
     invisible(NULL)
@@ -156,7 +156,10 @@ test_that("parallel_merge_callback fires for each merged replicate", {
     parallel_merge_callback = merge_cb
   ))
   expect_true("before_pool" %in% phases)
+  expect_true("pool_ready" %in% phases)
   expect_true("after_merge" %in% phases)
+  expect_lt(match("before_pool", phases), match("pool_ready", phases))
+  expect_lt(match("pool_ready", phases), match(phases[grepl("^received r=", phases)][1L], phases))
   expect_equal(sum(grepl("^received r=", phases)), 3L)
   expect_equal(sum(grepl("^merged r=", phases)), 3L)
 })

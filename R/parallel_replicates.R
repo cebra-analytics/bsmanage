@@ -106,6 +106,9 @@ parallel_replicate_timing <- function(rep_wall_start, reps_merged) {
 
 #' Invoke \code{parallel_merge_callback} with optional pool timing
 #'
+#' \code{phase} is one of \code{before_pool}, \code{pool_ready},
+#' \code{received r=N}, \code{merged r=N}, or \code{after_merge}.
+#'
 #' @noRd
 parallel_invoke_merge_callback <- function(parallel_merge_callback,
                                            phase,
@@ -357,6 +360,18 @@ run_parallel_replicates <- function(sim_env,
     worker_init = worker_init,
     psock_exports = psock_exports,
     psock_export_envir = psock_export_envir
+  )
+
+  parallel_invoke_merge_callback(
+    parallel_merge_callback = parallel_merge_callback,
+    phase = "pool_ready",
+    sim_env = sim_env,
+    results = results,
+    reps_merged = 0L,
+    reps_total = reps_total,
+    rep_wall_start = NULL,
+    rep_outputs = NULL,
+    out = NULL
   )
 
   if (is.null(results)) {
