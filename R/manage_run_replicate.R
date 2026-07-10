@@ -209,12 +209,10 @@ run_one_replicate <- function(r, sim_env, defer_collate = FALSE) {
         }
         n <- dispersal_models[[i]]$disperse(n, tm)
         if (is.function(dispersal_callback)) {
-          aggr_n <- attr(n, "dispersal_aggr_n")
           dispersal_callback(
             i,
             as.numeric(Sys.time() - t_dm, units = "secs"),
-            r = if (defer_collate) r else NA_integer_,
-            aggr_n = aggr_n
+            r = if (defer_collate) r else NA_integer_
           )
         }
       }
