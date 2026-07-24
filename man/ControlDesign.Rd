@@ -22,6 +22,7 @@ ControlDesign(
   average_pr = NULL,
   overall_pr = NULL,
   min_alloc = NULL,
+  max_alloc = NULL,
   discrete_alloc = FALSE,
   exist_alloc = NULL,
   exist_manage_pr = NULL,
@@ -47,6 +48,7 @@ ControlDesign(
   average_pr = NULL,
   overall_pr = NULL,
   min_alloc = NULL,
+  max_alloc = NULL,
   discrete_alloc = FALSE,
   exist_alloc = NULL,
   exist_manage_pr = NULL,
@@ -59,7 +61,7 @@ ControlDesign(
 \item{context}{A \code{ManageContext} or inherited class object representing
 the context of a biosecurity management resource allocation design.}
 
-\item{divisions}{A \code{bsdesign::Divisions} or inherited class object
+\item{divisions}{A \code{ManageDivisions} or inherited class object
 representing one or more divisions (invasion pathways, invasive species,
 spatial locations, etc.) for the management design.}
 
@@ -139,6 +141,16 @@ weighted average is calculated using (relative) establishment probability
 success (or effectiveness) of the management design (e.g. 0.95). Can only
 be used when actual (not relative) establishment probability
 (\code{establish_pr}) values are provided. Default is \code{NULL}.}
+
+\item{min_alloc}{A vector of minimum permissible allocated management
+resource quantities at each division part specified by \code{divisions}.
+Used to avoid impractically low allocation quantities. Default is
+\code{NULL}.}
+
+\item{max_alloc}{A vector of maximum permissible allocated management
+resource quantities at each division part specified by \code{divisions}.
+Used to avoid impractically high allocation quantities. Default is
+\code{NULL}.}
 
 \item{discrete_alloc}{A logical to indicate that the allocated management
 resource quantities at each division part specified by \code{divisions}

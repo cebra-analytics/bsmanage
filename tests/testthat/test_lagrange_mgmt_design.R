@@ -13,11 +13,11 @@ test_that("initializes with context, divisions, and valid parameters", {
     alpha_min = NULL,
     f_unit_eff = NULL,
     f_inv_unit_eff = NULL),
-    paste("Divisions parameter must be a 'bsdesign::Divisions' or inherited",
+    paste("Divisions parameter must be a 'ManageDivisions' or inherited",
           "class object."))
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:5,
     f_obj = NULL,
     f_deriv = NULL,
@@ -30,7 +30,7 @@ test_that("initializes with context, divisions, and valid parameters", {
           "the number of division parts."))
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = NULL,
     f_deriv = NULL,
@@ -42,7 +42,7 @@ test_that("initializes with context, divisions, and valid parameters", {
     "The unconstrained marginal benefit alpha value must be numeric.")
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = NULL,
     f_deriv = NULL,
@@ -54,7 +54,7 @@ test_that("initializes with context, divisions, and valid parameters", {
     "The minimum marginal benefit alpha value must be numeric.")
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = NULL,
     f_deriv = NULL,
@@ -67,7 +67,7 @@ test_that("initializes with context, divisions, and valid parameters", {
     fixed = TRUE)
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = function(x) 0,
     f_deriv = function() 0,
@@ -80,7 +80,7 @@ test_that("initializes with context, divisions, and valid parameters", {
     fixed = TRUE)
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = function(x) 0,
     f_deriv = function(x) 0,
@@ -93,7 +93,7 @@ test_that("initializes with context, divisions, and valid parameters", {
           "function(alpha)."), fixed = TRUE)
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = function(x) 0,
     f_deriv = function(x) 0,
@@ -106,7 +106,7 @@ test_that("initializes with context, divisions, and valid parameters", {
     fixed = TRUE)
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = function(x) 0,
     f_deriv = function(x) 0,
@@ -119,7 +119,7 @@ test_that("initializes with context, divisions, and valid parameters", {
           "function(unit_effectiveness)."), fixed = TRUE)
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = function(x) 0,
     f_deriv = function(x) 0,
@@ -132,7 +132,7 @@ test_that("initializes with context, divisions, and valid parameters", {
     "The budget parameter must be numeric and > 0.")
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = function(x) 0,
     f_deriv = function(x) 0,
@@ -146,7 +146,7 @@ test_that("initializes with context, divisions, and valid parameters", {
           "numeric, >= 0 and <= 1."), fixed = TRUE)
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = function(x) 0,
     f_deriv = function(x) 0,
@@ -162,7 +162,7 @@ test_that("initializes with context, divisions, and valid parameters", {
     fixed = TRUE)
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = (1:10)/10,
     f_obj = function(x) 0,
     f_deriv = function(x) 0,
@@ -176,7 +176,7 @@ test_that("initializes with context, divisions, and valid parameters", {
           ">= 0 and <= 1."))
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = function(x) 0,
     f_deriv = function(x) 0,
@@ -190,7 +190,7 @@ test_that("initializes with context, divisions, and valid parameters", {
           "values for each division part."))
   expect_error(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = function(x) 0,
     f_deriv = function(x) 0,
@@ -203,7 +203,7 @@ test_that("initializes with context, divisions, and valid parameters", {
     "The search alpha indicator parameter must be logical.")
   expect_silent(mgmt_design <- LagrangeMgmtDesign(
     context = ManageContext("test"),
-    divisions = bsdesign::Divisions(matrix(1:10)),
+    divisions = ManageDivisions(matrix(1:10)),
     establish_pr = 1:10,
     f_obj = function(x) 0,
     f_deriv = function(x) 0,

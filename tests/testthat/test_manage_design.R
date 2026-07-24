@@ -3,10 +3,10 @@ context("ManageDesign")
 test_that("initializes with context, divisions, and valid parameters", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
-  divisions <- bsdesign::Divisions(template)
+  divisions <- ManageDivisions(template)
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = "invalid"),
-               paste("Divisions parameter must be a 'bsdesign::Divisions' or",
+               paste("Divisions parameter must be a 'ManageDivisions' or",
                      "inherited class object."))
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
@@ -147,7 +147,7 @@ test_that("initializes with context, divisions, and valid parameters", {
                                 "get_manage_pr", "get_average_pr",
                                 "get_overall_pr", "save_design"))
   expect_is(manage_design$get_context(), "ManageContext")
-  expect_is(manage_design$get_divisions(), "Divisions")
+  expect_is(manage_design$get_divisions(), "ManageDivisions")
   expect_equal(manage_design$get_dim_type(), "spatial")
   expect_null(manage_design$get_allocation())
   expect_null(manage_design$get_manage_pr())
@@ -172,7 +172,7 @@ test_that("initializes with context, divisions, and valid parameters", {
 test_that("combines existing management probability/effectiveness via union", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "greater_melb.tif"))
-  divisions <- bsdesign::Divisions(template)
+  divisions <- ManageDivisions(template)
   set.seed(1234)
   exist_manage_pr <- lapply(1:3, function(i) runif(divisions$get_parts(), 0, 1))
   expect_silent(manage_design <- ManageDesign(

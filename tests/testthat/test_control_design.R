@@ -3,12 +3,12 @@ context("ControlDesign")
 test_that("initializes with context, divisions, and valid parameters", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
-  divisions <- bsdesign::Divisions(template)
+  divisions <- ManageDivisions(template)
   test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
   establish_pr <- test_ref$establish_pr
   expect_error(control_design <- ControlDesign(context = ManageContext("test"),
                                                divisions = "invalid"),
-               paste("Divisions parameter must be a 'bsdesign::Divisions' or",
+               paste("Divisions parameter must be a 'ManageDivisions' or",
                      "inherited class object."))
   expect_error(control_design <- ControlDesign(context = ManageContext("test"),
                                                divisions = divisions,
@@ -55,7 +55,7 @@ test_that("initializes with context, divisions, and valid parameters", {
                  "get_cost_unit", "get_allocation", "get_manage_pr",
                  "get_average_pr", "get_overall_pr", "save_design"))
   expect_is(control_design$get_context(), "ManageContext")
-  expect_is(control_design$get_divisions(), "Divisions")
+  expect_is(control_design$get_divisions(), "ManageDivisions")
   expect_equal(control_design$get_dim_type(), "spatial")
   expect_null(control_design$get_allocation())
   expect_null(control_design$get_manage_pr())
@@ -66,7 +66,7 @@ test_that("initializes with context, divisions, and valid parameters", {
 test_that("allocates resources consistently with reference method", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
-  divisions <- bsdesign::Divisions(template)
+  divisions <- ManageDivisions(template)
   test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
   expect_silent(control_design <- ControlDesign(
     context = ManageContext("test"),
@@ -104,7 +104,7 @@ test_that("allocates resources consistently with reference method", {
 test_that("facilitates existing allocations and management probabilities", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
-  divisions <- bsdesign::Divisions(template)
+  divisions <- ManageDivisions(template)
   test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
   expected_manage_pr <- 1 - exp(-1*test_ref$lambda*
                                   test_ref$surv_effort$no_budget)
@@ -149,7 +149,7 @@ test_that("facilitates existing allocations and management probabilities", {
 test_that("allocates for optimal number of successes via constraints", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
-  divisions <- bsdesign::Divisions(template)
+  divisions <- ManageDivisions(template)
   test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
   expect_silent(control_design <- ControlDesign(
     context = ManageContext("test"),
@@ -225,7 +225,7 @@ test_that("allocates for optimal number of successes via constraints", {
 test_that("allocates for optimal effectiveness via constraints", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
-  divisions <- bsdesign::Divisions(template)
+  divisions <- ManageDivisions(template)
   test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
   benefit <- test_ref$cost_undetected - test_ref$cost_detected
   expect_silent(control_design <- ControlDesign(
@@ -286,7 +286,7 @@ test_that("allocates for optimal effectiveness via constraints", {
 test_that("handles establishment probabilities of one", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
-  divisions <- bsdesign::Divisions(template)
+  divisions <- ManageDivisions(template)
   test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
   establish_pr <- test_ref$establish_pr/max(test_ref$establish_pr)
   expect_silent(control_design <- ControlDesign(
@@ -330,7 +330,7 @@ test_that("handles establishment probabilities of one", {
 test_that("resource allocation utilises previous control efforts", {
   TEST_DIRECTORY <- test_path("test_inputs")
   template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
-  divisions <- bsdesign::Divisions(template)
+  divisions <- ManageDivisions(template)
   test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
   previous_control <- +(test_ref$surv_effort$no_budget > 0.1)
   repeats <- +previous_control + (test_ref$surv_effort$no_budget > 0.15)

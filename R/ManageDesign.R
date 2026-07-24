@@ -9,7 +9,7 @@
 #'
 #' @param context A \code{ManageContext} or inherited class object representing
 #'   the context of a biosecurity management resource allocation design.
-#' @param divisions A \code{bsdesign::Divisions} or inherited class object
+#' @param divisions A \code{ManageDivisions} or inherited class object
 #'   representing one or more divisions (management responses, strategies,
 #'   invasion pathways, invasive species, spatial locations, time, etc.) for
 #'   the management design.
@@ -229,8 +229,8 @@ ManageDesign.ManageContext <- function(context,
                                        class = character(), ...) {
 
   # Check divisions
-  if (!inherits(divisions, "Divisions")) {
-    stop(paste("Divisions parameter must be a 'bsdesign::Divisions' or",
+  if (!inherits(divisions, "ManageDivisions")) {
+    stop(paste("Divisions parameter must be a 'ManageDivisions' or",
                "inherited class object."), call. = FALSE)
   }
 

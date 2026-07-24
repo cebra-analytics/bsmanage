@@ -49,7 +49,7 @@ ManageDesign(
 \item{context}{A \code{ManageContext} or inherited class object representing
 the context of a biosecurity management resource allocation design.}
 
-\item{divisions}{A \code{bsdesign::Divisions} or inherited class object
+\item{divisions}{A \code{ManageDivisions} or inherited class object
 representing one or more divisions (management responses, strategies,
 invasion pathways, invasive species, spatial locations, time, etc.) for
 the management design.}

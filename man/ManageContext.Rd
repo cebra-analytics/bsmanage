@@ -8,18 +8,18 @@
 ManageContext(
   species_names,
   species_types = c("pest", "weed", "disease"),
-  impact_types = c("none", "ecological", "social", "economic"),
-  action_types = c("none", "surveillance", "control", "removal"),
-  manage_scope = c("optimal", "scenarios"),
+  resource_type = c("survey", "traps", "treatment", "removal", "mixed", "other"),
+  management_purpose = c("delimitation", "containment", "eradication", "other"),
+  threat_status = c("detected", "delimited", "contained", "eradicated", "other"),
   ...
 )
 
 \method{ManageContext}{default}(
   species_names,
   species_types = c("pest", "weed", "disease"),
-  impact_types = c("none", "ecological", "social", "economic"),
-  action_types = c("none", "surveillance", "control", "removal"),
-  manage_scope = c("optimal", "scenarios"),
+  resource_type = c("survey", "traps", "treatment", "removal", "mixed", "other"),
+  management_purpose = c("delimitation", "containment", "eradication", "other"),
+  threat_status = c("detected", "delimited", "contained", "eradicated", "other"),
   ...
 )
 }
@@ -30,17 +30,17 @@ names.}
 \item{species_types}{Vector of types of invasive species. One or more of
 \code{"pest"}, \code{"weed"}, or \code{"disease"}.}
 
-\item{impact_types}{Vector of the types of impacts involved. Either
-\code{"none"} when impacts are not considered, or one or more of
-\code{"ecological"}, \code{"social"}, and/or \code{"economic"}.}
+\item{resource_type}{The type of management resource being allocated. One of
+\code{"survey"}, \code{"traps"}, \code{"treatment"}, \code{"removal"},
+\code{"mixed"}, or \code{"other"}.}
 
-\item{action_types}{Vector of the types of management actions involved.
-Either \code{"none"} when actions are not considered, or one or more of
-\code{"surveillance"}, \code{"control"}, and/or \code{"removal"}.}
+\item{management_purpose}{The purpose of the management. One of
+\code{"delimitation"}, \code{"containment"}, \code{"eradication"}, or
+\code{"other"}.}
 
-\item{manage_scope}{The scope of the resource management. One of
-\code{"optimal"} resource allocation or management simulation
-\code{"scenarios"}.}
+\item{threat_status}{The status of the invasive species threat. One of
+\code{"detected"}, \code{"delimited"}, \code{"contained"},
+\code{"eradicated"}, or \code{"other"}.}
 
 \item{...}{Additional parameters.}
 }
@@ -51,18 +51,14 @@ accessing attributes:
 \item{\code{get_species_names()}}{Get the invasive species names.}
 \item{\code{get_species_types()}}{Get the types of invasive species:
 "pest", "weed", or "disease".}
-\item{\code{get_impact_types()}}{Get the impact types.}
-\item{\code{get_action_types()}}{Get the management action types.}
-\item{\code{get_manage_scope()}}{Get the management scope.}
+\item{\code{get_resource_type()}}{Get the resource type.}
+\item{\code{get_management_purpose()}}{Get the management purpose.}
+\item{\code{get_threat_status()}}{Get the threat status.}
 }
 }
 \description{
 Builds a class to represent the context of a biosecurity management resource
-allocation or scenario analysis, including information about the invasive
-species being managed, the of impacts considered, and the management
-resources being utilised, plus the scope of the management specifying
-whether to find optimal resource allocations across management responses,
-invasive species, time, and/or space, or alternatively to analyse
-simulations of management scenarios with different responses, or with and
-without resources.
+allocation, including information about the invasive pest, weed or disease
+species or genus being monitored, the type of management resources
+allocated, the purpose of the management, and the status of the threat.
 }
