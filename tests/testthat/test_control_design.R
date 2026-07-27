@@ -41,6 +41,15 @@ test_that("initializes with context, divisions, and valid parameters", {
                                                lambda = 1,
                                                optimal = "effectiveness",
                                                budget = 1,
+                                               max_alloc = 1:5),
+               paste("The maximum allocation parameter must be a numeric",
+                     "vector with values for each division part."))
+  expect_error(control_design <- ControlDesign(context = ManageContext("test"),
+                                               divisions = divisions,
+                                               establish_pr = establish_pr,
+                                               lambda = 1,
+                                               optimal = "effectiveness",
+                                               budget = 1,
                                                discrete_alloc = NULL),
                "The discrete allocation indicator parameter must be logical.")
   expect_silent(control_design <- ControlDesign(context = ManageContext("test"),
@@ -144,6 +153,112 @@ test_that("facilitates existing allocations and management probabilities", {
                      8))
   expect_silent(manage_pr <- control_design$get_manage_pr())
   expect_equal(manage_pr, expected_manage_pr)
+})
+
+test_that("allocates with minimum or maximum allocation", {
+  TEST_DIRECTORY <- test_path("test_inputs")
+  template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
+  divisions <- ManageDivisions(template)
+  test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "saving",
+    benefit = test_ref$cost_undetected - test_ref$cost_detected,
+    budget = NULL,
+    min_alloc = 0.06,
+    max_alloc = 0.10))
+  expect_silent(alloc_no_budget <- control_design$get_allocation())
+  idx <- which(test_ref$surv_effort$no_budget > 0.06 &
+                 test_ref$surv_effort$no_budget < 0.10)
+  expect_equal(round(alloc_no_budget[idx], 6),
+               round(test_ref$surv_effort$no_budget[idx], 6))
+  expect_true(all(alloc_no_budget[-idx] %in% c(0, 0.06, 0.10)))
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "saving",
+    benefit = test_ref$cost_undetected - test_ref$cost_detected,
+    budget = test_ref$budget,
+    min_alloc = 0.04))
+  expect_silent(min_alloc_with_budget <- control_design$get_allocation())
+  expect_equal(sum(min_alloc_with_budget), test_ref$budget)
+  expect_equal(min(min_alloc_with_budget[which(min_alloc_with_budget > 0)]),
+               0.04)
+  below_idx <- which(test_ref$surv_effort$with_budget <= 0.04)
+  expect_true(all(min_alloc_with_budget[below_idx] %in% c(0, 0.04)))
+  above_idx <- which(test_ref$surv_effort$with_budget > 0.04)
+  expect_true(all(min_alloc_with_budget[above_idx] >= 0.04))
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda,
+    optimal = "saving",
+    benefit = test_ref$cost_undetected - test_ref$cost_detected,
+    budget = test_ref$budget,
+    max_alloc = 0.06))
+  expect_silent(max_alloc_with_budget <- control_design$get_allocation())
+  expect_equal(sum(max_alloc_with_budget), test_ref$budget)
+  expect_equal(max(max_alloc_with_budget[which(max_alloc_with_budget > 0)]),
+               0.06)
+  below_idx <- which(test_ref$surv_effort$with_budget < 0.06)
+  expect_true(all(max_alloc_with_budget[below_idx] <= 0.06))
+  above_idx <- which(test_ref$surv_effort$with_budget > 0.06)
+  expect_true(all(max_alloc_with_budget[above_idx] == 0.06))
+})
+
+test_that("allocates discrete integer allocations", {
+  TEST_DIRECTORY <- test_path("test_inputs")
+  template <- terra::rast(file.path(TEST_DIRECTORY, "template.tif"))
+  divisions <- ManageDivisions(template)
+  test_ref <- readRDS(file.path(TEST_DIRECTORY, "Hauser2009_test.rds"))
+  continuous_alloc <- test_ref$surv_effort$no_budget*100
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda/100,
+    optimal = "saving",
+    benefit = (test_ref$cost_undetected - test_ref$cost_detected)*100,
+    discrete_alloc = TRUE))
+  expect_silent(discrete_alloc <- control_design$get_allocation())
+  expect_true(all(discrete_alloc %in% 0:ceiling(max(continuous_alloc))))
+  expect_true(all(discrete_alloc >= floor(continuous_alloc)))
+  expect_true(all(discrete_alloc <= ceiling(continuous_alloc)))
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda/100,
+    optimal = "saving",
+    benefit = (test_ref$cost_undetected - test_ref$cost_detected)*100,
+    min_alloc = 6,
+    max_alloc = 10,
+    discrete_alloc = TRUE))
+  expect_silent(discrete_alloc3 <- control_design$get_allocation())
+  idx <- which(discrete_alloc < 6 | discrete_alloc > 10)
+  expect_true(all(discrete_alloc3[idx] %in% c(0, 6, 10)))
+  expect_true(all(abs(discrete_alloc3[-idx] - discrete_alloc[-idx]) <= 1))
+  continuous_alloc <- test_ref$surv_effort$with_budget*100
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda/100,
+    optimal = "saving",
+    benefit = (test_ref$cost_undetected - test_ref$cost_detected)*100,
+    budget = test_ref$budget*100,
+    discrete_alloc = TRUE))
+  expect_silent(discrete_alloc <- control_design$get_allocation())
+  expect_true(all(discrete_alloc %in% 0:ceiling(max(continuous_alloc))))
+  expect_true(all(discrete_alloc >= floor(continuous_alloc)))
+  expect_true(all(discrete_alloc <= ceiling(continuous_alloc)))
+  expect_equal(sum(discrete_alloc), test_ref$budget*100)
 })
 
 test_that("allocates for optimal number of successes via constraints", {

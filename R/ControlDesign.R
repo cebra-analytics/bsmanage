@@ -323,7 +323,7 @@ ControlDesign.ManageContext <- function(context,
     lambda <- rep(lambda, parts)
   }
 
-  # Check fixed_cost, min_alloc, & discrete_alloc
+  # Check fixed_cost, min/max_alloc, & discrete_alloc
   if (!is.null(fixed_cost) &&
       (!is.numeric(fixed_cost) || !length(fixed_cost) %in% c(1, parts))) {
     stop(paste("The fixed cost parameter must be a numeric vector with values",
@@ -332,6 +332,11 @@ ControlDesign.ManageContext <- function(context,
   if (!is.null(min_alloc) &&
       (!is.numeric(min_alloc) || !length(min_alloc) %in% c(1, parts))) {
     stop(paste("The minimum allocation parameter must be a numeric vector",
+               "with values for each division part."), call. = FALSE)
+  }
+  if (!is.null(max_alloc) &&
+      (!is.numeric(max_alloc) || !length(max_alloc) %in% c(1, parts))) {
+    stop(paste("The maximum allocation parameter must be a numeric vector",
                "with values for each division part."), call. = FALSE)
   }
   if (!is.logical(discrete_alloc)) {
@@ -364,7 +369,7 @@ ControlDesign.ManageContext <- function(context,
   output_cost <- list(alloc_cost = is.numeric(alloc_cost),
                       fixed_cost = is.numeric(fixed_cost))
 
-  # Resolve alloc_cost, fixed_cost, min_alloc, and exist_manage_pr
+  # Resolve alloc_cost, fixed_cost, min/max_alloc, and exist_manage_pr
   if (length(alloc_cost) == 1) {
     alloc_cost <- rep(alloc_cost, parts)
   } else if (is.null(alloc_cost)) {
@@ -376,11 +381,25 @@ ControlDesign.ManageContext <- function(context,
     fixed_cost <- rep(0, parts)
   }
   if (!is.null(min_alloc)) {
+    if (discrete_alloc) {
+      min_alloc <- ceiling(min_alloc)
+      if (all(min_alloc %in% c(0, 1))) {
+        min_alloc <- 0 # allow discrete to handle
+      }
+    }
     if (length(min_alloc) == 1) {
       min_alloc <- rep(min_alloc, parts)
     }
   } else {
     min_alloc <- rep(0, parts)
+  }
+  if (!is.null(max_alloc)) {
+    if (discrete_alloc) {
+      max_alloc <- floor(max_alloc)
+    }
+    if (length(max_alloc) == 1) {
+      max_alloc <- rep(max_alloc, parts)
+    }
   }
   if (is.null(exist_manage_pr)) {
     exist_manage_pr <- rep(0, parts)
@@ -457,6 +476,9 @@ ControlDesign.ManageContext <- function(context,
     # Pseudo-inverse of derivative given marginal benefit alpha
     f_pos <<- function(alpha) {
       values <- lambda/alloc_cost*benefit*establish_pr*(1 - exist_manage_pr)
+      if (!is.null(max_alloc)) {
+        values <- values*(max_alloc > 0)
+      }
       idx <- which(values > 0)
       if (length(idx) && optimal == "effectiveness" &&
           !relative_establish_pr) {
@@ -558,12 +580,13 @@ ControlDesign.ManageContext <- function(context,
   self$get_allocation <- function() {
     if (optimal != "none" && is.null(qty_alloc)) {
 
-      if (discrete_alloc) {
+      if (discrete_alloc || !is.null(max_alloc)) {
 
         # Make a copy of altered parameters
         fixed_cost_orig <- fixed_cost
         budget_orig <- budget
         min_alloc_orig <- min_alloc
+        max_alloc_orig <- max_alloc
         exist_manage_pr_orig <- exist_manage_pr
 
         # Initial allocation
@@ -582,35 +605,51 @@ ControlDesign.ManageContext <- function(context,
         }
 
         # Get cost allocation x_alloc via Lagrange management design
-        lagrangeMgmtDesign <- LagrangeMgmtDesign(context,
-                                                 divisions,
-                                                 establish_pr,
-                                                 f_obj,
-                                                 f_deriv,
-                                                 f_pos,
-                                                 alpha_unconstr,
-                                                 alpha_min,
-                                                 f_unit_eff,
-                                                 f_inv_unit_eff,
-                                                 budget = budget,
-                                                 average_pr = average_pr,
-                                                 overall_pr = overall_pr,
-                                                 min_alloc = min_x_alloc,
-                                                 search_alpha = search_alpha)
+        lagrangeMgmtDesign <-
+          LagrangeMgmtDesign(context,
+                             divisions,
+                             establish_pr,
+                             f_obj,
+                             f_deriv,
+                             f_pos,
+                             alpha_unconstr,
+                             alpha_min,
+                             f_unit_eff,
+                             f_inv_unit_eff,
+                             budget = budget,
+                             average_pr = average_pr,
+                             overall_pr = overall_pr,
+                             min_alloc = min_x_alloc,
+                             search_alpha = search_alpha)
         x_alloc <- lagrangeMgmtDesign$get_cost_allocation()
 
         # Optimal resource allocation
-        if (discrete_alloc) {
+        if (discrete_alloc || !is.null(max_alloc)) {
 
-          # Add discrete allocation
-          n_alloc <- floor((x_alloc >= fixed_cost)*
-                             (x_alloc - fixed_cost)/alloc_cost)
+          # Allocation quantity
+          n_alloc <- (x_alloc >= fixed_cost)*(x_alloc - fixed_cost)/alloc_cost
+
+          # Further allocation required
+          add_allocation <- (sum(n_alloc) > 0)
+
+          # Discrete allocation
+          if (discrete_alloc) {
+            n_alloc <- floor(n_alloc)
+          }
+
+          # Limit to maximum allocation and reduce maximum
+          if (!is.null(max_alloc)) {
+            n_alloc <- pmin(n_alloc, max_alloc)
+            max_alloc <<- max_alloc - n_alloc
+          }
+
+          # Add allocation
           qty_alloc <<- qty_alloc + n_alloc
+
 
           # Alter parameters and indicate further allocation required
           fixed_cost[which(qty_alloc > 0)] <<- 0
           exist_manage_pr <<- calculate_manage_pr(n_alloc)
-          add_allocation <- (sum(n_alloc) > 0 || all(min_alloc < 1))
           if (is.numeric(budget)) {
             total_x_alloc <- sum(qty_alloc*alloc_cost +
                                    (qty_alloc > 0)*fixed_cost_orig)
@@ -627,8 +666,15 @@ ControlDesign.ManageContext <- function(context,
               (calculate_overall_pr(exist_manage_pr) < overall_pr &&
                  add_allocation)
           }
-          min_alloc <<- pmax(ceiling(min_alloc), 1)
-          min_alloc[which(qty_alloc > 0)] <<- 1
+          if (!is.null(max_alloc)) {
+            add_allocation <- (add_allocation && sum(max_alloc) > 0)
+          }
+
+          # Set minimum discrete allocation to 1
+          if (discrete_alloc) {
+            min_alloc <<- pmax(min_alloc, 1)
+            min_alloc[which(qty_alloc > 0)] <<- 1
+          }
 
           # Reset Lagrange parameters
           set_lagrange_params()
@@ -643,10 +689,11 @@ ControlDesign.ManageContext <- function(context,
       }
 
       # Return altered parameters to their original values
-      if (discrete_alloc) {
+      if (discrete_alloc || !is.null(max_alloc)) {
         fixed_cost <<- fixed_cost_orig
         budget <<- budget_orig
         min_alloc <<- min_alloc_orig
+        max_alloc <<- max_alloc_orig
         exist_manage_pr <<- exist_manage_pr_orig
       }
     }
