@@ -259,6 +259,19 @@ test_that("allocates discrete integer allocations", {
   expect_true(all(discrete_alloc >= floor(continuous_alloc)))
   expect_true(all(discrete_alloc <= ceiling(continuous_alloc)))
   expect_equal(sum(discrete_alloc), test_ref$budget*100)
+  # Budget not a multiple of allocation cost
+  expect_silent(control_design <- ControlDesign(
+    context = ManageContext("test"),
+    divisions = divisions,
+    establish_pr = test_ref$establish_pr,
+    lambda = test_ref$lambda/100,
+    optimal = "saving",
+    benefit = (test_ref$cost_undetected - test_ref$cost_detected)*100,
+    alloc_cost = 3,
+    budget = test_ref$budget*300 + 2,
+    discrete_alloc = TRUE))
+  expect_silent(discrete_alloc <- control_design$get_allocation())
+  expect_equal(sum(discrete_alloc)*3, test_ref$budget*300)
 })
 
 test_that("allocates for optimal number of successes via constraints", {
