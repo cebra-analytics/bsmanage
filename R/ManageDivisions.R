@@ -41,9 +41,10 @@
 #'       inclusion of each index.}
 #'     \item{\code{get_data()}}{Get the data frame specifying the division when
 #'       \code{type} is "patch" or "other".}
-#'     \item{\code{get_coords(extra_cols = FALSE)}}{Get a data frame of patch
-#'       location coordinates when \code{type} is "patch", as well as optional
-#'       extra named columns from the original location data.}
+#'     \item{\code{get_coords(extra_cols = FALSE)}}{Get a data frame of
+#'       location coordinates when \code{type} is "patch" or "grid", as well as
+#'       optional extra named columns from the original patch-based location
+#'       data.}
 #'     \item{\code{get_feat()}}{Get spatial \code{terra::SpatVector} features
 #'       or points when \code{type} is "grid" or "patch".}
 #'   }
@@ -144,6 +145,14 @@ ManageDivisions.SpatRaster <- function(x, ...) {
     } else {
       return(mean(terra::res(x)[1]))
     }
+  }
+
+  # Get location coordinates (unused extra named columns for grid)
+  self$get_coords <- function(extra_cols = FALSE) {
+    coords <- terra::as.data.frame(terra::project(grid_pts, "EPSG:4326"),
+                                   geom = "XY")
+    colnames(coords) <- c("lon", "lat")
+    return(coords)
   }
 
   # Check if cell indices are included (non-NA cells) in the design

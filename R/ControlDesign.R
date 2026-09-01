@@ -761,25 +761,33 @@ ControlDesign.ManageContext <- function(context,
       }
     }
     if (divisions$get_type() == "grid") {
+      idx <- which(self$get_manage_pr() > 0)
+      design_df <- divisions$get_coords()[idx,]
       if (optimal != "none") {
         terra::writeRaster(divisions$get_rast(self$get_allocation()),
                            "allocation.tif", ...)
+        design_df$allocation <- self$get_allocation()[idx]
         if (exist_manage_pr_present) {
           terra::writeRaster(
             divisions$get_rast(calculate_manage_pr(self$get_allocation(),
                                                    incl_exist = FALSE)),
             "alloc_manage_pr.tif", ...)
+          design_df$alloc_manage_pr <-
+            calculate_manage_pr(self$get_allocation(), incl_exist = FALSE)[idx]
         }
       }
       terra::writeRaster(divisions$get_rast(self$get_manage_pr()),
                          "manage_pr.tif", ...)
+      design_df$manage_pr <- self$get_manage_pr()[idx]
       if (!is.null(previous_control)) {
         terra::writeRaster(divisions$get_rast(self$get_mod_establish_pr()),
                            "mod_establish_pr.tif", ...)
       }
       if (any(unlist(output_cost))) {
         terra::writeRaster(divisions$get_rast(cost), "control_cost.tif", ...)
+        design_df$control_cost <- cost[idx]
       }
+      write.csv(design_df, file = "design.csv", row.names = FALSE)
     } else if (divisions$get_type() == "patch") {
       design_df <- divisions$get_coords(extra_cols = TRUE)
       if (!is.null(previous_control)) {

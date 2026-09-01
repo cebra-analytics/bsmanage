@@ -57,9 +57,10 @@ locations are included (non-NA cells) in the design when the
 inclusion of each index.}
 \item{\code{get_data()}}{Get the data frame specifying the division when
 \code{type} is "patch" or "other".}
-\item{\code{get_coords(extra_cols = FALSE)}}{Get a data frame of patch
-location coordinates when \code{type} is "patch", as well as optional
-extra named columns from the original location data.}
+\item{\code{get_coords(extra_cols = FALSE)}}{Get a data frame of
+location coordinates when \code{type} is "patch" or "grid", as well as
+optional extra named columns from the original patch-based location
+data.}
 \item{\code{get_feat()}}{Get spatial \code{terra::SpatVector} features
 or points when \code{type} is "grid" or "patch".}
 }

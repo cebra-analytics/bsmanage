@@ -14,6 +14,8 @@ test_that("initializes with planar CRS raster", {
   expect_silent(features <- parts$get_feat())
   expect_is(features, "SpatVector")
   expect_length(features, parts$get_parts())
+  expect_equal(dim(parts$get_coords()), c(parts$get_parts(), 2))
+  expect_equal(colnames(parts$get_coords()), c("lon", "lat"))
 })
 
 test_that("initializes with lonlat raster", {
