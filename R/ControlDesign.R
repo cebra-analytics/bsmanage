@@ -785,7 +785,7 @@ ControlDesign.ManageContext <- function(context,
       }
       if (any(unlist(output_cost))) {
         terra::writeRaster(divisions$get_rast(cost), "control_cost.tif", ...)
-        design_df$control_cost <- cost[idx]
+        design_df$control_cost <- round(cost[idx], 2)
       }
       write.csv(design_df, file = "design.csv", row.names = FALSE)
     } else if (divisions$get_type() == "patch") {
