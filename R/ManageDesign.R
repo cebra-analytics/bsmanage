@@ -61,10 +61,11 @@
 #'   success (or effectiveness) of the management design (e.g. 0.95). Can only
 #'   be used when actual (not relative) establishment probability
 #'   (\code{establish_pr}) values are provided. Default is \code{NULL}.
-#' @param exist_alloc A vector of existing management resource quantities at
-#'   each division part specified by \code{divisions}. Should only be used to
-#'   represent existing management resource allocation designs when
-#'   \code{optimal = "none"}. Default is \code{NULL}.
+#' @param exist_alloc A vector or matrix (containing temporal columns) of
+#'   existing management resource quantities at each division part (row)
+#'   specified by \code{divisions}. Should only be used to represent existing
+#'   management resource allocation designs when \code{optimal = "none"}.
+#'   Default is \code{NULL}.
 #' @param exist_manage_pr A vector, or list of vectors, of probability of
 #'   success (or effectiveness) values for existing management resources at
 #'   each division part specified by \code{divisions}. Multiple existing
@@ -337,9 +338,10 @@ ManageDesign.ManageContext <- function(context,
                "when the optimal parameter is 'none'."), call. = FALSE)
   }
   if (!is.null(exist_alloc) &&
-      (!is.numeric(exist_alloc) || !length(exist_alloc) == parts)) {
-    stop(paste("The existing allocation parameter must be a numeric vector",
-               "with values for each division part."), call. = FALSE)
+      (!is.numeric(exist_alloc) || nrow(as.matrix(exist_alloc)) != parts)) {
+    stop(paste("The existing allocation parameter should be a vector or",
+               "matrix with a value or row for each division part."),
+         call. = FALSE)
   }
   if (!is.null(exist_manage_pr) &&
       (!(is.numeric(exist_manage_pr) || is.list(exist_manage_pr)) ||

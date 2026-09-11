@@ -89,10 +89,11 @@
 #'   should be discrete integers. Used to allocate discrete management resource
 #'   units, such as traps or removals. Default is \code{FALSE} for continuous
 #'   resources quantities, such as control hours.
-#' @param exist_alloc A vector of existing management resource quantities at
-#'   each division part specified by \code{divisions}. Should only be used to
-#'   represent existing management resource allocation designs when
-#'   \code{optimal = "none"}. Default is \code{NULL}.
+#' @param exist_alloc A vector or matrix (containing temporal columns) of
+#'   existing management resource quantities at each division part (row)
+#'   specified by \code{divisions}. Should only be used to represent existing
+#'   management resource allocation designs when \code{optimal = "none"}.
+#'   Default is \code{NULL}.
 #' @param exist_manage_pr A vector, or list of vectors, of probability of
 #'   success (or effectiveness) values for existing management resources at
 #'   each division part specified by \code{divisions}. Multiple existing
@@ -134,7 +135,7 @@
 #'       appropriate for the \code{divisions} type, including the management
 #'       resource \code{allocation}, the corresponding probability of
 #'       management success (or effectiveness) values (\code{alloc_manage_pr})
-#'       when existing sensitivity is included, the overall probability of
+#'       when existing effectiveness is included, the overall probability of
 #'       management success values (\code{manage_pr}), \code{manage_cost}
 #'       (combined allocation and fixed costs), and a \code{summary} (CSV) of
 #'       the total allocation, costs (when applicable), the weighted average
@@ -143,7 +144,7 @@
 #'       management design (\code{overall_pr}), as well as the component of
 #'       each (\code{alloc_average_pr} and \code{alloc_overall_pr}
 #'       respectively) corresponding to the allocation when existing
-#'       sensitivity is included. \code{Terra} raster write options may be
+#'       effectiveness is included. \code{Terra} raster write options may be
 #'       passed to the function for saving grid-based designs.}
 #'   }
 #' @references
@@ -400,6 +401,9 @@ ControlDesign.ManageContext <- function(context,
     if (length(max_alloc) == 1) {
       max_alloc <- rep(max_alloc, parts)
     }
+  }
+  if (is.numeric(exist_alloc)) {
+    exist_alloc <- as.matrix(exist_alloc)
   }
   if (is.null(exist_manage_pr)) {
     exist_manage_pr <- rep(0, parts)
@@ -712,7 +716,13 @@ ControlDesign.ManageContext <- function(context,
       if (optimal != "none" && !is.null(qty_alloc)) {
         manage_pr <<- calculate_manage_pr(qty_alloc)
       } else if (optimal == "none" && !is.null(exist_alloc)) {
-        manage_pr <<- calculate_manage_pr(exist_alloc)
+        if (ncol(exist_alloc) > 1) {
+          manage_pr <<- matrix(apply(exist_alloc, 2,
+                                     function(a) calculate_manage_pr(a)),
+                               ncol = ncol(exist_alloc))
+        } else {
+          manage_pr <<- as.numeric(calculate_manage_pr(exist_alloc))
+        }
       } else if (optimal == "none") {
         manage_pr <<- super$get_manage_pr()
       }
@@ -726,9 +736,14 @@ ControlDesign.ManageContext <- function(context,
     manage_pr <- self$get_manage_pr()
     if (!is.null(manage_pr)) {
       if (parts == 1) {
-        average_eff <- manage_pr
+        average_eff <- as.numeric(manage_pr)
       } else if (!is.null(establish_pr)) {
-        average_eff <- calculate_average_pr(manage_pr)
+        if (is.matrix(manage_pr) && ncol(manage_pr) > 1) {
+          average_eff <- apply(manage_pr, 2,
+                               function(s) calculate_average_pr(s))
+        } else {
+          average_eff <- calculate_average_pr(manage_pr)
+        }
       }
     }
     return(average_eff)
@@ -741,9 +756,14 @@ ControlDesign.ManageContext <- function(context,
       manage_pr <- self$get_manage_pr()
       if (!is.null(manage_pr)) {
         if (parts == 1) {
-          system_eff <- manage_pr
+          system_eff <- as.numeric(manage_pr)
         } else if (!is.null(establish_pr)) {
-          system_eff <- calculate_overall_pr(manage_pr)
+          if (is.matrix(manage_pr) && ncol(manage_pr) > 1) {
+            system_eff <- apply(manage_pr, 2,
+                                function(s) calculate_overall_pr(s))
+          } else {
+            system_eff <- calculate_overall_pr(manage_pr)
+          }
         }
       }
       return(system_eff)
@@ -753,116 +773,196 @@ ControlDesign.ManageContext <- function(context,
   # Save the management design as a collection of appropriate files
   self$save_design <- function(...) {
 
-    # Save allocation and management probability/effectiveness
-    if (any(unlist(output_cost))) {
-      cost <- (self$get_allocation() > 0)*fixed_cost
-      if (output_cost$alloc_cost) {
-        cost <- cost + self$get_allocation()*alloc_cost
-      }
-    }
+    # Save allocation, management effectiveness, and cost (when applicable)
     if (divisions$get_type() == "grid") {
-      idx <- which(self$get_manage_pr() > 0)
-      design_df <- divisions$get_coords()[idx,]
-      if (optimal == "none") {
-        if (!is.null(exist_alloc)) {
-          design_df$exist_alloc <- exist_alloc[idx]
-        }
+      if (!is.null(exist_alloc)) {
+        idx <- which(rowSums(as.matrix(self$get_manage_pr())) > 0 |
+                       rowSums(exist_alloc) > 0)
       } else {
+        idx <- which(rowSums(as.matrix(self$get_manage_pr())) > 0)
+      }
+      design_df <- divisions$get_coords()[idx,]
+    } else if (divisions$get_type() == "patch") {
+      idx <- 1:parts
+      design_df <- divisions$get_coords(extra_cols = TRUE)
+    } else if (divisions$get_type() == "other") {
+      idx <- 1:parts
+      design_df <- divisions$get_data()
+    }
+    if (!is.null(previous_control)) {
+      terra::writeRaster(divisions$get_rast(self$get_mod_establish_pr()),
+                         "mod_establish_pr.tif", ...)
+      design_df$mod_establish_pr <- self$get_mod_establish_pr()
+    }
+    if (optimal == "none") {
+      if (!is.null(exist_alloc)) {
+        if (ncol(exist_alloc) > 1) {
+          for (i in 1:ncol(exist_alloc)) {
+            if (divisions$get_type() == "grid") {
+              terra::writeRaster(divisions$get_rast(exist_alloc[,i]),
+                                 sprintf("exist_alloc_%s.tif", i), ...)
+            }
+            design_df[[sprintf("exist_alloc_%s", i)]] <- exist_alloc[idx, i]
+            if (exist_manage_pr_present) {
+              if (divisions$get_type() == "grid") {
+                terra::writeRaster(divisions$get_rast(
+                  calculate_manage_pr(exist_alloc[,i], incl_exist = FALSE)),
+                  sprintf("alloc_manage_pr_%s.tif", i), ...)
+              }
+              design_df[[sprintf("alloc_manage_pr_%s", i)]] <-
+                calculate_manage_pr(exist_alloc[,i], incl_exist = FALSE)[idx]
+            }
+          }
+        } else {
+          if (divisions$get_type() == "grid") {
+            terra::writeRaster(divisions$get_rast(exist_alloc),
+                               "exist_alloc.tif", ...)
+          }
+          design_df$exist_alloc <- exist_alloc[idx,]
+          if (exist_manage_pr_present) {
+            if (divisions$get_type() == "grid") {
+              terra::writeRaster(divisions$get_rast(
+                calculate_manage_pr(exist_alloc, incl_exist = FALSE)),
+                "alloc_manage_pr.tif", ...)
+            }
+            design_df$alloc_manage_pr <-
+              calculate_manage_pr(exist_alloc, incl_exist = FALSE)[idx]
+          }
+        }
+      }
+    } else {
+      if (divisions$get_type() == "grid") {
         terra::writeRaster(divisions$get_rast(self$get_allocation()),
                            "allocation.tif", ...)
-        design_df$allocation <- self$get_allocation()[idx]
-        if (exist_manage_pr_present) {
-          terra::writeRaster(
-            divisions$get_rast(calculate_manage_pr(self$get_allocation(),
-                                                   incl_exist = FALSE)),
+      }
+      design_df$allocation <- self$get_allocation()[idx]
+      if (exist_manage_pr_present) {
+        if (divisions$get_type() == "grid") {
+          terra::writeRaster(divisions$get_rast(
+            calculate_manage_pr(self$get_allocation(), incl_exist = FALSE)),
             "alloc_manage_pr.tif", ...)
-          design_df$alloc_manage_pr <-
-            calculate_manage_pr(self$get_allocation(), incl_exist = FALSE)[idx]
         }
+        design_df$alloc_manage_pr <-
+          calculate_manage_pr(self$get_allocation(), incl_exist = FALSE)[idx]
       }
-      terra::writeRaster(divisions$get_rast(self$get_manage_pr()),
-                         "manage_pr.tif", ...)
+    }
+    if (is.matrix(self$get_manage_pr()) && ncol(self$get_manage_pr()) > 1) {
+      for (i in 1:ncol(self$get_manage_pr())) {
+        if (divisions$get_type() == "grid") {
+          terra::writeRaster(divisions$get_rast(self$get_manage_pr()[,i]),
+                             sprintf("manage_pr_%s.tif", i), ...)
+        }
+        design_df[[sprintf("manage_pr_%s", i)]] <- self$get_manage_pr()[idx, i]
+      }
+    } else {
+      if (divisions$get_type() == "grid") {
+        terra::writeRaster(divisions$get_rast(self$get_manage_pr()),
+                           "manage_pr.tif", ...)
+      }
       design_df$manage_pr <- self$get_manage_pr()[idx]
-      if (!is.null(previous_control)) {
-        terra::writeRaster(divisions$get_rast(self$get_mod_establish_pr()),
-                           "mod_establish_pr.tif", ...)
-      }
-      if (any(unlist(output_cost))) {
-        terra::writeRaster(divisions$get_rast(cost), "control_cost.tif", ...)
+    }
+    if (any(unlist(output_cost))) {
+      if (optimal == "none") {
+        if (!is.null(exist_alloc)) {
+          if (ncol(exist_alloc) > 1) {
+            for (i in 1:ncol(exist_alloc)) {
+              cost <- (exist_alloc[,i] > 0)*fixed_cost
+              if (output_cost$alloc_cost) {
+                cost <- cost + exist_alloc[,i]*alloc_cost
+              }
+              if (divisions$get_type() == "grid") {
+                terra::writeRaster(divisions$get_rast(cost),
+                                   sprintf("control_cost_%s.tif", i), ...)
+              }
+              design_df[[sprintf("control_cost_%s", i)]] <- round(cost[idx], 2)
+            }
+          } else {
+            cost <- (exist_alloc[,1] > 0)*fixed_cost
+            if (output_cost$alloc_cost) {
+              cost <- cost + exist_alloc[,1]*alloc_cost
+            }
+            if (divisions$get_type() == "grid") {
+              terra::writeRaster(divisions$get_rast(cost),
+                                 "control_cost.tif", ...)
+            }
+            design_df$control_cost <- round(cost[idx], 2)
+          }
+        }
+      } else {
+        cost <- (self$get_allocation() > 0)*fixed_cost
+        if (output_cost$alloc_cost) {
+          cost <- cost + self$get_allocation()*alloc_cost
+        }
+        if (divisions$get_type() == "grid") {
+          terra::writeRaster(divisions$get_rast(cost), "control_cost.tif", ...)
+        }
         design_df$control_cost <- round(cost[idx], 2)
       }
-      write.csv(design_df, file = "design.csv", row.names = FALSE)
-    } else if (divisions$get_type() == "patch") {
-      design_df <- divisions$get_coords(extra_cols = TRUE)
-      if (!is.null(previous_control)) {
-        design_df$mod_establish_pr <- self$get_mod_establish_pr()
-      }
-      if (optimal == "none") {
-        if (!is.null(exist_alloc)) {
-          design_df$exist_alloc <- exist_alloc
-        }
-      } else {
-        design_df$allocation <- self$get_allocation()
-        if (exist_manage_pr_present) {
-          design_df$alloc_manage_pr <-
-            calculate_manage_pr(self$get_allocation(), incl_exist = FALSE)
-        }
-      }
-      design_df$manage_pr <- self$get_manage_pr()
-      if (any(unlist(output_cost))) {
-        design_df$control_cost <- round(cost, 2)
-      }
-      write.csv(design_df, file = "design.csv", row.names = FALSE)
-    } else if (divisions$get_type() == "other") {
-      design_df <- divisions$get_data()
-      if (!is.null(previous_control)) {
-        design_df$mod_establish_pr <- self$get_mod_establish_pr()
-      }
-      if (optimal == "none") {
-        if (!is.null(exist_alloc)) {
-          design_df$exist_alloc <- exist_alloc
-        }
-      } else {
-        design_df$allocation <- self$get_allocation()
-        if (exist_manage_pr_present) {
-          design_df$alloc_manage_pr <-
-            calculate_manage_pr(self$get_allocation(), incl_exist = FALSE)
-        }
-      }
-      design_df$manage_pr <- self$get_manage_pr()
-      if (any(unlist(output_cost))) {
-        design_df$control_cost <- round(cost, 2)
-      }
-      write.csv(design_df, file = "design.csv", row.names = FALSE)
     }
+    write.csv(design_df, file = "design.csv", row.names = FALSE)
 
     # Save summary
     if (optimal == "none") {
       if (!is.null(exist_alloc)) {
-        total_allocation <- sum(exist_alloc)
+        if (ncol(exist_alloc) > 1) {
+          summary_data <- data.frame(interval = 1:ncol(exist_alloc),
+                                     total_allocation = colSums(exist_alloc))
+
+        } else {
+          summary_data <- data.frame(total_allocation = sum(exist_alloc))
+        }
       } else {
-        total_allocation <- 0
+        summary_data <- data.frame(total_allocation = 0)
       }
     } else {
-      total_allocation <- sum(self$get_allocation())
+      summary_data <- data.frame(total_allocation = sum(self$get_allocation()))
     }
-    summary_data <- data.frame(total_allocation = total_allocation)
-    if (!all(alloc_cost == 1)) {
-      summary_data$allocation_cost <- sum(self$get_allocation()*alloc_cost)
-    }
-    if (!all(fixed_cost == 0)) {
-      summary_data$fixed_cost <- sum((self$get_allocation() > 0)*fixed_cost)
+    if (any(unlist(output_cost))) {
+      if (optimal == "none") {
+        if (!is.null(exist_alloc)) {
+          summary_data$allocation_cost <-
+            round(colSums(exist_alloc*alloc_cost), 2)
+          if (!all(fixed_cost == 0)) {
+            summary_data$fixed_cost <-
+              round(colSums((exist_alloc > 0)*fixed_cost), 2)
+          }
+        }
+      } else {
+        summary_data$allocation_cost <-
+          round(sum(self$get_allocation()*alloc_cost), 2)
+        if (!all(fixed_cost == 0)) {
+          summary_data$fixed_cost <-
+            round(sum((self$get_allocation() > 0)*fixed_cost), 2)
+        }
+      }
     }
     if (optimal == "saving") {
-      summary_data$total_saving <- sum(establish_pr*benefit*
-                                         self$get_manage_pr())
+      summary_data$total_saving <- round(sum(establish_pr*benefit*
+                                               self$get_manage_pr()), 2)
     }
-    if (optimal != "none" && exist_manage_pr_present) {
-      alloc_manage_pr <- calculate_manage_pr(self$get_allocation(),
-                                             incl_exist = FALSE)
-      summary_data$alloc_average_pr <- calculate_average_pr(alloc_manage_pr)
-      if (!relative_establish_pr) {
-        summary_data$alloc_overall_pr <- calculate_overall_pr(alloc_manage_pr)
+    if (exist_manage_pr_present) {
+      if (optimal == "none") {
+        if (!is.null(exist_alloc)) {
+          summary_data$alloc_average_pr <-
+            sapply(1:ncol(exist_alloc),
+                   function (i) calculate_average_pr(
+                     calculate_manage_pr(exist_alloc[,i],
+                                         incl_exist = FALSE)))
+          if (!relative_establish_pr) {
+            summary_data$alloc_overall_pr <-
+              sapply(1:ncol(exist_alloc),
+                     function (i) calculate_overall_pr(
+                       calculate_manage_pr(exist_alloc[,i],
+                                           incl_exist = FALSE)))
+          }
+        }
+      } else {
+        summary_data$alloc_average_pr <- calculate_average_pr(
+          calculate_manage_pr(self$get_allocation(), incl_exist = FALSE))
+        if (!relative_establish_pr) {
+          summary_data$alloc_overall_pr <- calculate_overall_pr(
+            calculate_manage_pr(self$get_allocation(), incl_exist = FALSE))
+        }
       }
     }
     summary_data$average_pr <- self$get_average_pr()

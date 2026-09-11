@@ -120,8 +120,8 @@ test_that("initializes with context, divisions, and valid parameters", {
                                              divisions = divisions,
                                              optimal = "none",
                                              exist_alloc = 1),
-               paste("The existing allocation parameter must be a numeric",
-                     "vector with values for each division part."))
+               paste("The existing allocation parameter should be a vector or",
+                     "matrix with a value or row for each division part."))
   expect_error(manage_design <- ManageDesign(context = ManageContext("test"),
                                              divisions = divisions,
                                              optimal = "none",

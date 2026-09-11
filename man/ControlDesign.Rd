@@ -158,10 +158,11 @@ should be discrete integers. Used to allocate discrete management resource
 units, such as traps or removals. Default is \code{FALSE} for continuous
 resources quantities, such as control hours.}
 
-\item{exist_alloc}{A vector of existing management resource quantities at
-each division part specified by \code{divisions}. Should only be used to
-represent existing management resource allocation designs when
-\code{optimal = "none"}. Default is \code{NULL}.}
+\item{exist_alloc}{A vector or matrix (containing temporal columns) of
+existing management resource quantities at each division part (row)
+specified by \code{divisions}. Should only be used to represent existing
+management resource allocation designs when \code{optimal = "none"}.
+Default is \code{NULL}.}
 
 \item{exist_manage_pr}{A vector, or list of vectors, of probability of
 success (or effectiveness) values for existing management resources at
@@ -208,7 +209,7 @@ collection of raster TIF and/or comma-separated value (CSV) files,
 appropriate for the \code{divisions} type, including the management
 resource \code{allocation}, the corresponding probability of
 management success (or effectiveness) values (\code{alloc_manage_pr})
-when existing sensitivity is included, the overall probability of
+when existing effectiveness is included, the overall probability of
 management success values (\code{manage_pr}), \code{manage_cost}
 (combined allocation and fixed costs), and a \code{summary} (CSV) of
 the total allocation, costs (when applicable), the weighted average
@@ -217,7 +218,7 @@ overall system-wide probability of success (or effectiveness) of the
 management design (\code{overall_pr}), as well as the component of
 each (\code{alloc_average_pr} and \code{alloc_overall_pr}
 respectively) corresponding to the allocation when existing
-sensitivity is included. \code{Terra} raster write options may be
+effectiveness is included. \code{Terra} raster write options may be
 passed to the function for saving grid-based designs.}
 }
 }

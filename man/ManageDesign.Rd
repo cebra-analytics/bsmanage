@@ -112,10 +112,11 @@ success (or effectiveness) of the management design (e.g. 0.95). Can only
 be used when actual (not relative) establishment probability
 (\code{establish_pr}) values are provided. Default is \code{NULL}.}
 
-\item{exist_alloc}{A vector of existing management resource quantities at
-each division part specified by \code{divisions}. Should only be used to
-represent existing management resource allocation designs when
-\code{optimal = "none"}. Default is \code{NULL}.}
+\item{exist_alloc}{A vector or matrix (containing temporal columns) of
+existing management resource quantities at each division part (row)
+specified by \code{divisions}. Should only be used to represent existing
+management resource allocation designs when \code{optimal = "none"}.
+Default is \code{NULL}.}
 
 \item{exist_manage_pr}{A vector, or list of vectors, of probability of
 success (or effectiveness) values for existing management resources at
