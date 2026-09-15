@@ -792,7 +792,7 @@ ControlDesign.ManageContext <- function(context,
     if (!is.null(previous_control)) {
       terra::writeRaster(divisions$get_rast(self$get_mod_establish_pr()),
                          "mod_establish_pr.tif", ...)
-      design_df$mod_establish_pr <- self$get_mod_establish_pr()
+      design_df$mod_establish_pr <- self$get_mod_establish_pr()[idx]
     }
     if (optimal == "none") {
       if (!is.null(exist_alloc)) {
@@ -803,7 +803,9 @@ ControlDesign.ManageContext <- function(context,
                                  sprintf("exist_alloc_%s.tif", i), ...)
             }
             design_df[[sprintf("exist_alloc_%s", i)]] <- exist_alloc[idx, i]
-            if (exist_manage_pr_present) {
+          }
+          if (exist_manage_pr_present) {
+            for (i in 1:ncol(exist_alloc)) {
               if (divisions$get_type() == "grid") {
                 terra::writeRaster(divisions$get_rast(
                   calculate_manage_pr(exist_alloc[,i], incl_exist = FALSE)),
