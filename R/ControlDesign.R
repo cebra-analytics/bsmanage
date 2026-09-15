@@ -789,11 +789,6 @@ ControlDesign.ManageContext <- function(context,
       idx <- 1:parts
       design_df <- divisions$get_data()
     }
-    if (!is.null(previous_control)) {
-      terra::writeRaster(divisions$get_rast(self$get_mod_establish_pr()),
-                         "mod_establish_pr.tif", ...)
-      design_df$mod_establish_pr <- self$get_mod_establish_pr()[idx]
-    }
     if (optimal == "none") {
       if (!is.null(exist_alloc)) {
         if (ncol(exist_alloc) > 1) {
@@ -900,6 +895,11 @@ ControlDesign.ManageContext <- function(context,
         }
         design_df$control_cost <- round(cost[idx], 2)
       }
+    }
+    if (!is.null(previous_control)) {
+      terra::writeRaster(divisions$get_rast(self$get_mod_establish_pr()),
+                         "mod_establish_pr.tif", ...)
+      design_df$mod_establish_pr <- self$get_mod_establish_pr()[idx]
     }
     write.csv(design_df, file = "design.csv", row.names = FALSE)
 
