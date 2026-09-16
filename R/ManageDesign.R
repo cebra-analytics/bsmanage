@@ -111,6 +111,12 @@
 #'       passed to the function for saving grid-based designs.}
 #'   }
 #' @references
+#'   Anderson, D. P., Gormley, A. M., Ramsey, D. S. L., Nugent, G., Martin,
+#'   P. A. J., Bosson, M., Livingstone, P., & Byrom, A. E. (2017).
+#'   Bio-economic optimisation of surveillance to confirm broadscale
+#'   eradications of invasive pests and diseases. \emph{Biological Invasions},
+#'   19(10), 2869–2884. \doi{10.1007/s10530-017-1490-5}
+#'
 #'   Cannon, R. M. (2009). Inspecting and monitoring on a restricted budget -
 #'   where best to look? \emph{Preventive Veterinary Medicine}, 92(1–2),
 #'   163-174. \doi{10.1016/j.prevetmed.2009.06.009}
